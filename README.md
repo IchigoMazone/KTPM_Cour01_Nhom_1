@@ -1,4 +1,4 @@
-<h2 align="center" style="font-size: 20px;">Bài Toán Tóm Tắt Tập Ảnh CIFAR-10</h1>
+<h2 align="center" style="font-size: 20px;">Bài Toán Tóm Tắt Tập Ảnh CIFAR-10.</h1>
 
 <p>
 Bài toán <b>Dataset Summarization (Coreset Selection)</b> nhằm chọn ra một tập con dữ liệu nhỏ nhưng vẫn giữ được hiệu quả huấn luyện gần tương đương với toàn bộ tập dữ liệu ban đầu.
