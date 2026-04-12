@@ -1,10 +1,8 @@
-"use client"
+"use client";
 import React from "react";
 import { GradientText } from "../components/ui/gradient-text";
 import { motion } from "framer-motion";
 import CountUp from "react-countup"; // npm install react-countup
-
-/* ─────────────────────────── DATA ─────────────────────────── */
 
 const stats = [
   { value: 2500, suffix: "+", label: "Khách hàng tin tưởng" },
@@ -16,7 +14,13 @@ const stats = [
 const values = [
   {
     icon: (
-      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <svg
+        className="w-6 h-6"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+      >
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       </svg>
     ),
@@ -25,7 +29,13 @@ const values = [
   },
   {
     icon: (
-      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <svg
+        className="w-6 h-6"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+      >
         <circle cx="12" cy="12" r="10" />
         <polyline points="12 6 12 12 16 14" />
       </svg>
@@ -35,7 +45,13 @@ const values = [
   },
   {
     icon: (
-      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <svg
+        className="w-6 h-6"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+      >
         <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
       </svg>
     ),
@@ -44,7 +60,13 @@ const values = [
   },
   {
     icon: (
-      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <svg
+        className="w-6 h-6"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+      >
         <path d="M12 2L2 7l10 5 10-5-10-5z" />
         <path d="M2 17l10 5 10-5" />
         <path d="M2 12l10 5 10-5" />
@@ -56,25 +78,45 @@ const values = [
 ];
 
 const team = [
-  { name: "Chị Lan Anh", role: "Sáng lập & Quản lý", initials: "LA", color: "bg-blue-100 text-blue-700" },
-  { name: "Anh Minh Tuấn", role: "Kỹ thuật viên trưởng", initials: "MT", color: "bg-cyan-100 text-cyan-700" },
-  { name: "Chị Thu Hà", role: "Chăm sóc khách hàng", initials: "TH", color: "bg-sky-100 text-sky-700" },
-  { name: "Anh Quốc Bảo", role: "Giao nhận & vận hành", initials: "QB", color: "bg-indigo-100 text-indigo-700" },
+  {
+    name: "Chị Lan Anh",
+    role: "Sáng lập & Quản lý",
+    initials: "LA",
+    color: "bg-blue-100 text-blue-700",
+  },
+  {
+    name: "Anh Minh Tuấn",
+    role: "Kỹ thuật viên trưởng",
+    initials: "MT",
+    color: "bg-cyan-100 text-cyan-700",
+  },
+  {
+    name: "Chị Thu Hà",
+    role: "Chăm sóc khách hàng",
+    initials: "TH",
+    color: "bg-sky-100 text-sky-700",
+  },
+  {
+    name: "Anh Quốc Bảo",
+    role: "Giao nhận & vận hành",
+    initials: "QB",
+    color: "bg-indigo-100 text-indigo-700",
+  },
 ];
 
 /* ───────────────────────── ANIMATION VARIANTS ───────────────────────── */
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 60 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
 };
 
 const staggerContainer = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1, delayChildren: 0.2 }
-  }
+    transition: { staggerChildren: 0.1, delayChildren: 0.2 },
+  },
 };
 
 export default function GioiThieuPage() {
@@ -88,17 +130,23 @@ export default function GioiThieuPage() {
           transition={{ duration: 0.8 }}
         >
           <div className="inline-flex items-center gap-2 mb-4">
-            <span className="text-[11px] font-medium tracking-[2px] uppercase text-blue-600">Câu chuyện của chúng tôi</span>
+            <span className="text-[11px] font-medium tracking-[2px] uppercase text-blue-600">
+              Câu chuyện của chúng tôi
+            </span>
           </div>
-          
+
           <GradientText className="font-serif text-5xl md:text-6xl leading-[1.1] text-stone-900">
-            Từ một tiệm nhỏ<br />
-            đến niềm tin<br />
+            Từ một tiệm nhỏ
+            <br />
+            đến niềm tin
+            <br />
             của hàng nghìn gia đình
           </GradientText>
 
           <p className="mt-6 text-lg text-stone-600 max-w-lg">
-            Bé Gấu được thành lập năm 2019 với mong muốn mang lại sự tiện nghi và an tâm tuyệt đối cho khách hàng qua dịch vụ giặt là chuyên nghiệp.
+            Bé Gấu được thành lập năm 2019 với mong muốn mang lại sự tiện nghi
+            và an tâm tuyệt đối cho khách hàng qua dịch vụ giặt là chuyên
+            nghiệp.
           </p>
 
           <div className="mt-10 flex gap-4">
@@ -127,23 +175,43 @@ export default function GioiThieuPage() {
           transition={{ delay: 0.3 }}
           className="grid grid-cols-2 gap-4 h-[520px] relative"
         >
-          <motion.div 
+          <motion.div
             className="bg-blue-100 rounded-3xl overflow-hidden relative row-span-2 shadow-xl"
             whileHover={{ scale: 1.02 }}
             transition={{ duration: 0.4 }}
           >
-            <img src="https://media-cdn-v2.laodong.vn/storage/newsportal/2023/4/15/1180274/IMG_20230415_161015.jpg" alt="Cơ sở Bé Gấu" className="w-full h-full object-cover" />
+            <img
+              src="https://media-cdn-v2.laodong.vn/storage/newsportal/2023/4/15/1180274/IMG_20230415_161015.jpg"
+              alt="Cơ sở Bé Gấu"
+              className="w-full h-full object-cover"
+            />
             <div className="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-md rounded-2xl p-5">
-              <p className="text-blue-600 text-xs tracking-widest uppercase font-medium">Cơ sở chính</p>
+              <p className="text-blue-600 text-xs tracking-widest uppercase font-medium">
+                Cơ sở chính
+              </p>
               <p className="text-stone-800 font-semibold">Hoàn Kiếm • Hà Nội</p>
             </div>
           </motion.div>
 
-          <motion.div className="rounded-3xl overflow-hidden shadow-xl" whileHover={{ scale: 1.02 }}>
-            <img src="https://media-cdn-v2.laodong.vn/storage/newsportal/2023/4/15/1180274/IMG_20230415_161015.jpg" alt="" className="w-full h-full object-cover" />
+          <motion.div
+            className="rounded-3xl overflow-hidden shadow-xl"
+            whileHover={{ scale: 1.02 }}
+          >
+            <img
+              src="https://media-cdn-v2.laodong.vn/storage/newsportal/2023/4/15/1180274/IMG_20230415_161015.jpg"
+              alt=""
+              className="w-full h-full object-cover"
+            />
           </motion.div>
-          <motion.div className="rounded-3xl overflow-hidden shadow-xl" whileHover={{ scale: 1.02 }}>
-            <img src="https://media-cdn-v2.laodong.vn/storage/newsportal/2023/4/15/1180274/IMG_20230415_161015.jpg" alt="" className="w-full h-full object-cover" />
+          <motion.div
+            className="rounded-3xl overflow-hidden shadow-xl"
+            whileHover={{ scale: 1.02 }}
+          >
+            <img
+              src="https://media-cdn-v2.laodong.vn/storage/newsportal/2023/4/15/1180274/IMG_20230415_161015.jpg"
+              alt=""
+              className="w-full h-full object-cover"
+            />
           </motion.div>
         </motion.div>
       </section>
@@ -162,7 +230,9 @@ export default function GioiThieuPage() {
               <p className="font-serif text-5xl md:text-6xl text-white font-light">
                 <CountUp end={stat.value} duration={2.5} suffix={stat.suffix} />
               </p>
-              <p className="text-blue-100 mt-2 text-sm tracking-wide">{stat.label}</p>
+              <p className="text-blue-100 mt-2 text-sm tracking-wide">
+                {stat.label}
+              </p>
             </motion.div>
           ))}
         </div>
@@ -178,7 +248,9 @@ export default function GioiThieuPage() {
           className="grid lg:grid-cols-[1fr_2fr] gap-16"
         >
           <div>
-            <div className="text-blue-600 text-sm tracking-[2px] uppercase mb-3">Sứ mệnh & Giá trị</div>
+            <div className="text-blue-600 text-sm tracking-[2px] uppercase mb-3">
+              Sứ mệnh & Giá trị
+            </div>
             <h2 className="font-serif text-4xl md:text-5xl leading-tight text-stone-900">
               Không chỉ sạch —<br />
               <span className="italic text-stone-400">mà còn an tâm</span>
@@ -196,8 +268,12 @@ export default function GioiThieuPage() {
                 <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 group-hover:bg-blue-100 transition-colors">
                   {item.icon}
                 </div>
-                <h3 className="mt-6 font-semibold text-xl text-stone-900">{item.title}</h3>
-                <p className="mt-3 text-stone-600 leading-relaxed">{item.desc}</p>
+                <h3 className="mt-6 font-semibold text-xl text-stone-900">
+                  {item.title}
+                </h3>
+                <p className="mt-3 text-stone-600 leading-relaxed">
+                  {item.desc}
+                </p>
               </motion.div>
             ))}
           </div>
@@ -205,19 +281,42 @@ export default function GioiThieuPage() {
       </section>
 
       {/* HÀNH TRÌNH */}
-      <section id="hanh-trinh" className="bg-gradient-to-br from-blue-50 to-cyan-50 py-24 border-y">
+      <section
+        id="hanh-trinh"
+        className="bg-gradient-to-br from-blue-50 to-cyan-50 py-24 border-y"
+      >
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <div className="text-center mb-16">
-            <div className="text-blue-600 text-sm tracking-[2px] uppercase mb-3">Hành trình phát triển</div>
-            <h2 className="font-serif text-4xl text-stone-900">5 năm — từng bước vững chắc</h2>
+            <div className="text-blue-600 text-sm tracking-[2px] uppercase mb-3">
+              Hành trình phát triển
+            </div>
+            <h2 className="font-serif text-4xl text-stone-900">
+              5 năm — từng bước vững chắc
+            </h2>
           </div>
 
           <div className="grid md:grid-cols-4 gap-8 relative">
             {[
-              { year: "2019", title: "Ra mắt tiệm", desc: "Khai trương với 1 máy giặt và 2 nhân viên tại Hoàn Kiếm." },
-              { year: "2020", title: "Dịch vụ tại nhà", desc: "Triển khai giao nhận tận nơi miễn phí trong bán kính 3km." },
-              { year: "2022", title: "Mở rộng công nghệ", desc: "Nâng cấp máy giặt châu Âu, xử lý đồ da & hàng cao cấp." },
-              { year: "2024", title: "2.500+ khách hàng", desc: "Đạt mốc 2.500 khách hàng thân thiết." },
+              {
+                year: "2019",
+                title: "Ra mắt tiệm",
+                desc: "Khai trương với 1 máy giặt và 2 nhân viên tại Hoàn Kiếm.",
+              },
+              {
+                year: "2020",
+                title: "Dịch vụ tại nhà",
+                desc: "Triển khai giao nhận tận nơi miễn phí trong bán kính 3km.",
+              },
+              {
+                year: "2022",
+                title: "Mở rộng công nghệ",
+                desc: "Nâng cấp máy giặt châu Âu, xử lý đồ da & hàng cao cấp.",
+              },
+              {
+                year: "2024",
+                title: "2.500+ khách hàng",
+                desc: "Đạt mốc 2.500 khách hàng thân thiết.",
+              },
             ].map((item, i) => (
               <motion.div
                 key={i}
@@ -227,7 +326,9 @@ export default function GioiThieuPage() {
                 viewport={{ once: true }}
                 className="relative bg-white rounded-3xl p-8 shadow-sm"
               >
-                <div className="text-4xl font-serif text-blue-600 mb-4">{item.year}</div>
+                <div className="text-4xl font-serif text-blue-600 mb-4">
+                  {item.year}
+                </div>
                 <h3 className="font-semibold text-xl mb-2">{item.title}</h3>
                 <p className="text-stone-600">{item.desc}</p>
               </motion.div>
@@ -239,8 +340,12 @@ export default function GioiThieuPage() {
       {/* ĐỘI NGŨ */}
       <section className="max-w-7xl mx-auto px-6 md:px-12 py-24">
         <div className="text-center mb-16">
-          <div className="text-blue-600 text-sm tracking-[2px] uppercase">Con người</div>
-          <h2 className="font-serif text-4xl text-stone-900 mt-3">Đội ngũ Bé Gấu</h2>
+          <div className="text-blue-600 text-sm tracking-[2px] uppercase">
+            Con người
+          </div>
+          <h2 className="font-serif text-4xl text-stone-900 mt-3">
+            Đội ngũ Bé Gấu
+          </h2>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -253,7 +358,9 @@ export default function GioiThieuPage() {
               whileHover={{ y: -10 }}
               className="bg-white rounded-3xl p-8 text-center border border-stone-100 hover:border-blue-200 hover:shadow-xl transition-all"
             >
-              <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center text-2xl font-bold ${member.color}`}>
+              <div
+                className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center text-2xl font-bold ${member.color}`}
+              >
                 {member.initials}
               </div>
               <p className="mt-6 font-semibold">{member.name}</p>
@@ -266,15 +373,29 @@ export default function GioiThieuPage() {
       {/* REVIEWS */}
       <section className="max-w-7xl mx-auto px-6 md:px-12 pb-32">
         <div className="text-center mb-12">
-          <p className="uppercase tracking-[2px] text-blue-600 text-sm">Khách hàng nói gì?</p>
+          <p className="uppercase tracking-[2px] text-blue-600 text-sm">
+            Khách hàng nói gì?
+          </p>
           <h2 className="font-serif text-4xl mt-3">Trải nghiệm thực tế</h2>
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">
           {[
-            { name: "Minh Anh", content: "Dịch vụ rất nhanh và tiện lợi, quần áo sạch sẽ, thơm lâu. Mình không còn phải lo giặt giũ mỗi tuần nữa." },
-            { name: "Hải Nam", content: "Nhân viên nhiệt tình, giao nhận đúng giờ. Rất hài lòng với chất lượng dịch vụ." },
-            { name: "Lan Phương", content: "Giặt đồ rất cẩn thận, đặc biệt là đồ trắng và đồ dễ hỏng. Sẽ tiếp tục ủng hộ lâu dài." },
+            {
+              name: "Minh Anh",
+              content:
+                "Dịch vụ rất nhanh và tiện lợi, quần áo sạch sẽ, thơm lâu. Mình không còn phải lo giặt giũ mỗi tuần nữa.",
+            },
+            {
+              name: "Hải Nam",
+              content:
+                "Nhân viên nhiệt tình, giao nhận đúng giờ. Rất hài lòng với chất lượng dịch vụ.",
+            },
+            {
+              name: "Lan Phương",
+              content:
+                "Giặt đồ rất cẩn thận, đặc biệt là đồ trắng và đồ dễ hỏng. Sẽ tiếp tục ủng hộ lâu dài.",
+            },
           ].map((review, i) => (
             <motion.div
               key={i}
@@ -286,10 +407,14 @@ export default function GioiThieuPage() {
             >
               <div className="flex gap-1 mb-6">
                 {[...Array(5)].map((_, i) => (
-                  <span key={i} className="text-yellow-400">★</span>
+                  <span key={i} className="text-yellow-400">
+                    ★
+                  </span>
                 ))}
               </div>
-              <p className="text-stone-600 italic leading-relaxed">"{review.content}"</p>
+              <p className="text-stone-600 italic leading-relaxed">
+                "{review.content}"
+              </p>
               <p className="mt-8 font-medium">— {review.name}</p>
             </motion.div>
           ))}
