@@ -7,9 +7,14 @@ export default function SidebarMobile({ onClick }: { onClick: () => void }) {
   const icon = useRef<IconType>({ x: 32, y: 1.6 });
 
   useEffect(() => {
-    document.body.style.overflow = "hidden";
+    const lock = (e: WheelEvent | TouchEvent) => e.preventDefault();
+
+    document.addEventListener("wheel", lock, { passive: false });
+    document.addEventListener("touchmove", lock, { passive: false });
+
     return () => {
-      document.body.style.overflow = "auto";
+      document.removeEventListener("wheel", lock);
+      document.removeEventListener("touchmove", lock);
     };
   }, []);
 
@@ -35,7 +40,7 @@ export default function SidebarMobile({ onClick }: { onClick: () => void }) {
           </div>
           <div className="flex justify-center items-center">
             <PanelLeft
-              className="xl:hidden"
+              className="xl:hidden cursor-pointer"
               size={icon.current.x - 5}
               strokeWidth={icon.current.y}
               onClick={onClick}

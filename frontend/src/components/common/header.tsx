@@ -23,7 +23,7 @@ export default function Header() {
             strokeWidth={icon.current.y}
           />
           <Menu
-            className="xl:hidden"
+            className="xl:hidden cursor-pointer"
             size={icon.current.x - 5}
             strokeWidth={icon.current.y}
             onClick={() => setOpenNav(true)}
@@ -34,7 +34,7 @@ export default function Header() {
         </div>
         <div className="hidden xl:flex flex-6">
           <nav className="w-full h-full">
-            <ul className="h-full flex items-center justify-evenly text-[16px] font-semibold">
+            <ul className="h-full flex items-center justify-evenly text-[16px] font-medium">
               <li className="h-full flex items-center">
                 <Link
                   href="/"
@@ -79,8 +79,18 @@ export default function Header() {
           </nav>
         </div>
         <div className="flex-2 flex items-center justify-end gap-2">
-          <Button onClick={() => router.push("/login")}>Đăng nhập</Button>
-          <Button onClick={() => router.push("/register")}>Đăng kí</Button>
+          <Button
+            className="cursor-pointer"
+            onClick={() => router.push("/login")}
+          >
+            Đăng nhập
+          </Button>
+          <Button
+            className="cursor-pointer"
+            onClick={() => router.push("/register")}
+          >
+            Đăng kí
+          </Button>
         </div>
       </header>
       {openNav && <SidebarMobile onClick={() => setOpenNav(false)} />}
