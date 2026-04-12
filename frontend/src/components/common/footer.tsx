@@ -56,7 +56,7 @@ const navLinks = [
 export default function Footer() {
   return (
     <footer className="bg-white border-t border-[var(--color-divider)] text-stone-700">
-      <div className="max-w-7xl mx-auto px-6 md:px-12 pt-14 pb-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1.4fr] gap-10 lg:gap-12">
+      <div className="max-w-7xl mx-auto px-6 md:px-12 pt-6 pb-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1.4fr] gap-10 lg:gap-12">
         <div className="flex flex-col gap-5">
           <div className="flex items-center gap-1">
             <div className="w-9 h-9 flex items-center justify-center shrink-0">
@@ -114,7 +114,7 @@ export default function Footer() {
           </div>
         </div>
       </div>
-      <div className="border-t border-stone-200 max-w-7xl mx-auto px-6 md:px-12 py-4 flex flex-col md:flex-row items-center justify-between gap-3">
+      <div className="border-t border-[var(--color-divider)] max-w-7xl mx-auto px-6 md:px-12 py-4 flex flex-col md:flex-row items-center justify-between gap-3">
         <span className="text-xs text-stone-400">
           © 2026 Tiệm giặt Bé Gấu. All rights reserved.
         </span>
