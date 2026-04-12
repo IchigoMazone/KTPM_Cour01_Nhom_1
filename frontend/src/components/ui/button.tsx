@@ -16,7 +16,7 @@ export function Button({
     <button
       onClick={onClick}
       style={{ backgroundColor: background }}
-      className={`px-2 py-[7px] rounded-[10px] text-[14px] font-semibold hover:outline hover:outline-gray-400 outline outline-gray-200 outline-offset-2 whitespace-nowrap ${className ?? ""}`}
+      className={`px-2 py-[7px] rounded-[10px] text-[14px] font-medium hover:outline hover:outline-gray-400 outline outline-gray-200 outline-offset-2 whitespace-nowrap ${className ?? ""}`}
     >
       {children}
     </button>
