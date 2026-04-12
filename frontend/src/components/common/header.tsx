@@ -23,7 +23,7 @@ export default function Header() {
             strokeWidth={icon.current.y}
           />
           <Menu
-            className="xl:hidden"
+            className="xl:hidden cursor-pointer"
             size={icon.current.x - 5}
             strokeWidth={icon.current.y}
             onClick={() => setOpenNav(true)}

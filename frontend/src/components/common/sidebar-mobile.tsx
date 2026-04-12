@@ -40,7 +40,7 @@ export default function SidebarMobile({ onClick }: { onClick: () => void }) {
           </div>
           <div className="flex justify-center items-center">
             <PanelLeft
-              className="xl:hidden"
+              className="xl:hidden cursor-pointer"
               size={icon.current.x - 5}
               strokeWidth={icon.current.y}
               onClick={onClick}
