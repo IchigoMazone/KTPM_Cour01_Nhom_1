@@ -53,7 +53,7 @@ const navLinks = [
   { id: 5, category: "Liên hệ", href: "/contact" },
 ];
 
-const socials = [];
+const socials: any[] = [];
 
 export default function Footer() {
   return (
