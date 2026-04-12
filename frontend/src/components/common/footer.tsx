@@ -53,11 +53,9 @@ const navLinks = [
   { id: 5, category: "Liên hệ", href: "/contact" },
 ];
 
-const socials = [];
-
 export default function Footer() {
   return (
-    <footer className="bg-[#faf9f7] border-t border-[var(--color-divider)] text-stone-700">
+    <footer className="bg-white border-t border-[var(--color-divider)] text-stone-700">
       <div className="max-w-7xl mx-auto px-6 md:px-12 pt-14 pb-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1.4fr] gap-10 lg:gap-12">
         <div className="flex flex-col gap-5">
           <div className="flex items-center gap-1">
@@ -76,18 +74,7 @@ export default function Footer() {
               Mở cửa hằng ngày · 7:00 – 22:00
             </span>
           </div>
-          <div className="flex gap-2">
-            {socials.length > 0 &&
-              socials.map(({ title, icon }) => (
-                <Link
-                  key={title}
-                  title={title}
-                  className="w-8 h-8 rounded-lg border border-stone-200 bg-white flex items-center justify-center text-stone-400 hover:text-stone-800 hover:border-stone-300 hover:bg-stone-50 transition-all"
-                >
-                  {icon}
-                </Link>
-              ))}
-          </div>
+          {/* Insert icon */}
         </div>
         <div>
           <h3 className="text-[13px] font-medium tracking-[1.4px] uppercase mb-4">
@@ -127,8 +114,6 @@ export default function Footer() {
           </div>
         </div>
       </div>
-
-      {/* ── BOTTOM BAR ── */}
       <div className="border-t border-stone-200 max-w-7xl mx-auto px-6 md:px-12 py-4 flex flex-col md:flex-row items-center justify-between gap-3">
         <span className="text-xs text-stone-400">
           © 2026 Tiệm giặt Bé Gấu. All rights reserved.
