@@ -63,7 +63,7 @@ export default function Footer() {
               <Panda />
             </div>
             <span className="text-lg font-semibold ">
-              <GradientText>BegauShop</GradientText>
+              <GradientText className="select-none">BegauShop</GradientText>
             </span>
           </div>
           <p className="text-sm text-stone-500 leading-relaxed max-w-[240px]">
