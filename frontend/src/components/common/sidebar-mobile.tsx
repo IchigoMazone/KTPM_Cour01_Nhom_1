@@ -16,18 +16,35 @@ import { ProcessMenu } from "./process-menu";
 
 export default function SidebarMobile({ onClick }: { onClick: () => void }) {
   const icon = useRef<IconType>({ x: 32, y: 1.6 });
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const lock = (e: WheelEvent | TouchEvent) => e.preventDefault();
-
-    document.addEventListener("wheel", lock, { passive: false });
-    document.addEventListener("touchmove", lock, { passive: false });
+    // Chặn cuộn ở body (background)
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
     return () => {
-      document.removeEventListener("wheel", lock);
-      document.removeEventListener("touchmove", lock);
+      // Khôi phục khi đóng sidebar
+      document.body.style.overflow = originalOverflow;
     };
   }, []);
+
+  // Xử lý để chỉ cuộn được trong sidebar
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const container = sidebarRef.current;
+    if (!container) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const isAtTop = scrollTop === 0 && e.deltaY < 0;
+    const isAtBottom =
+      scrollHeight - scrollTop === clientHeight && e.deltaY > 0;
+
+    // Nếu ở đầu hoặc cuối thì chặn không cho cuộn nữa
+    if (isAtTop || isAtBottom) {
+      e.preventDefault();
+    }
+    // Cho phép cuộn bình thường trong sidebar
+  };
 
   return (
     <div

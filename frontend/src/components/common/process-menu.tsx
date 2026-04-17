@@ -6,7 +6,17 @@ import {
   ListChecks,
   MonitorCloud,
   PiggyBank,
+  LucideIcon,
 } from "lucide-react";
+
+interface ProcessMenuProps {
+  icon?: LucideIcon;
+  iconSize?: { x: number; y: number };
+  title?: string;
+  items?: string[];
+  onItemClick?: (item: string, index: number) => void;
+  defaultOpen?: boolean;
+}
 
 export const ProcessMenu = ({
   icon: CustomIcon = ListChecks,
@@ -15,7 +25,7 @@ export const ProcessMenu = ({
   items = ["Quy trình", "Các bước", "Giao nhận", "Theo dõi"],
   onItemClick,
   defaultOpen = false,
-}) => {
+}: ProcessMenuProps) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   const toggleMenu = () => {
