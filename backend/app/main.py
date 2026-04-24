@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from app.core.exceptions import validation_exception_handler
 from app.api.router import api_router
 
 app = FastAPI(
@@ -22,6 +24,11 @@ def root():
         "message": "Server đang chạy.",
         "version": "1.0.0"
     }
+
+app.add_exception_handler(
+    RequestValidationError,
+    validation_exception_handler
+)
 
 app.include_router(
     api_router,
