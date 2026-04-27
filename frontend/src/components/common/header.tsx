@@ -40,44 +40,52 @@ export default function Header() {
   const [openNav, setOpenNav] = React.useState(false);
   const icon = React.useRef<IconType>({ x: 32, y: 1.6 });
 
-  useEffect(() => {
-    // Kiểm tra nếu có hash trong URL khi chuyển trang xong
-    if (window.location.hash) {
-      const hash = window.location.hash.substring(1); // bỏ dấu #
-      const el = document.getElementById(hash);
-      if (el) {
-        // Delay nhỏ để đảm bảo layout đã ổn định
-        setTimeout(() => {
-          el.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 100);
-      }
-    }
-  }, [pathname]); // Ch
-
-  const handleHashNav = (close: () => void, href: string) => {
-    close();
-
-    const [path, hash] = href.split("#");
-
-    const scrollToHash = () => {
-      const el = document.getElementById(hash);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth" });
-        window.history.replaceState(
-          null,
-          "",
-          `${path === pathname ? "" : path}#${hash}`,
-        );
-      }
+  const scrollToHash = (hash: string, updateHistory?: string) => {
+    const execute = (el: HTMLElement) => {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (updateHistory) window.history.replaceState(null, "", updateHistory);
     };
 
-    if (pathname === path || (path === "" && pathname === "/")) {
-      scrollToHash();
+    const el = document.getElementById(hash);
+    if (el) {
+      execute(el);
       return;
     }
 
-    router.push(href);
-    setTimeout(scrollToHash, 300);
+    const observer = new MutationObserver((_, obs) => {
+      const el = document.getElementById(hash);
+      if (el) {
+        obs.disconnect();
+        execute(el);
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+  };
+
+  useEffect(() => {
+    if (!window.location.hash) return;
+    scrollToHash(window.location.hash.slice(1));
+  }, [pathname]);
+
+  const handleHashNav = (close: () => void, href: string) => {
+    close();
+    const [path = "/", hash] = href.split("#");
+
+    if (!hash) {
+      router.push(path);
+      return;
+    }
+
+    const historyUrl = `${pathname === path ? "" : path}#${hash}`;
+
+    if (pathname === path || (path === "" && pathname === "/")) {
+      scrollToHash(hash, historyUrl);
+      return;
+    }
+
+    router.push(`${path}#${hash}`);
+    scrollToHash(hash, historyUrl);
   };
 
   return (
