@@ -98,7 +98,7 @@ export default function Sidebar() {
                 />
               </button>
             }
-            position="top-right"
+            position="top-end"
           >
             {({ close }) => (
               <>
