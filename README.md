@@ -67,7 +67,7 @@
     <td>Lưu trữ và quản lý dữ liệu hệ thống.<br>Đảm bảo toàn vẹn và bảo mật dữ liệu.</td>
 </tr>
 <tr>
-    <td>NestJS</td>
+    <td>FastAPI</td>
     <td>10.x</td>
     <td><a href="https://docs.nestjs.com/" target="_blank">Tải tại đây</a></td>
     <td>Xây dựng backend và cung cấp API.<br>Xử lý logic nghiệp vụ hệ thống.</td>
