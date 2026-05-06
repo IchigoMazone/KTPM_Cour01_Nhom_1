@@ -1,6 +1,6 @@
 "use client";
 
-import { GradientText } from "../components/ui/gradient-text";
+import { GradientText } from "../../components/ui/gradient-text";
 
 const NAV_HEIGHT = 80;
 

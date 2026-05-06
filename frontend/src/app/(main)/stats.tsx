@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Users, Calendar, Smile, Building2, TrendingUp, Package, UserCheck, Phone, Star } from "lucide-react";
-import { GradientText } from "../components/ui/gradient-text";
+import { GradientText } from "../../components/ui/gradient-text";
 
 export default function Stats() {
   const mainStats = [
