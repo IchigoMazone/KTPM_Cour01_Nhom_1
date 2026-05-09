@@ -47,6 +47,15 @@
 
 ---
 
+## 5. Liên hệ
+
+- Số điện thoại, Zalo
+- Địa chỉ + bản đồ nhúng
+- Giờ hoạt động
+- Form liên hệ nhanh hoặc chat Zalo trực tiếp
+
+---
+
 ## Nút CTA — Đặt lịch
 
 - Đặt ở góc phải nav, nổi bật hơn các mục còn lại

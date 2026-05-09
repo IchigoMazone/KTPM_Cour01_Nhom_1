@@ -349,7 +349,7 @@ export default function Header() {
                       <button
                         className="w-full px-3 py-2 text-sm hover:bg-gray-100 rounded-lg flex items-center gap-2 cursor-pointer select-none"
                         onClick={() => {
-                          handleHashNav(close, "/promotions#referral");
+                          handleHashNav(close, "/promotions#referrals");
                         }}
                       >
                         <HeartHandshake
