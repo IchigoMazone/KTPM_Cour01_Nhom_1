@@ -4,12 +4,9 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { GradientText } from "@/src/components/ui/gradient-text";
+import { validateEmail, validatePassword } from "@/src/lib/validators/auth";
 
-const images = [
-  "/tải xuống (5).jfif",
-  "/tải xuống (9).jfif",
-  "/tải xuống (11).jfif",
-];
+const images = ["/summer (1).jfif", "/summer (2).jfif", "/summer (3).jfif"];
 
 export default function Page() {
   const [showPassword, setShowPassword] = useState(false);
@@ -18,6 +15,20 @@ export default function Page() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [errors, setErrors] = useState({
+    email: "",
+    password: "",
+  });
+
+  const isFormValid = email && password && !errors.email && !errors.password;
+
+  /*
+    Call API Login tai day
+  */
+
+  const handleLogin = () => {
+    console.log("Call API LOGIN");
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -30,7 +41,7 @@ export default function Page() {
   return (
     <div
       className="min-h-screen flex items-center justify-center bg-cover bg-center p-4"
-      style={{ backgroundImage: "url('/tải xuống (8).jfif')" }}
+      style={{ backgroundImage: "url('/summer (4).jfif')" }}
     >
       <div className="w-full min-w-[330px] h-[540px] sm:w-[480px] sm:h-[620px] lg:w-[1000px] lg:h-[640px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
         {/* ── TRÁI: Slider ── */}
@@ -113,15 +124,27 @@ export default function Page() {
             {/* Email */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-700 tracking-wide">
-                Tài khoản
+                Email
               </label>
               <input
                 type="email"
-                placeholder="ichigomazone"
+                placeholder="example@gmail.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEmail(value);
+
+                  setErrors((prev) => ({
+                    ...prev,
+                    email: validateEmail(value),
+                    password: "",
+                  }));
+                }}
                 className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 transition-all"
               />
+              {errors.email && (
+                <p className="text-xs text-[#f59e0b]">{errors.email}</p>
+              )}
             </div>
 
             {/* Mật khẩu */}
@@ -134,13 +157,21 @@ export default function Page() {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setPassword(value);
+
+                    setErrors((prev) => ({
+                      email: "",
+                      password: validatePassword(value),
+                    }));
+                  }}
                   className="w-full h-10 px-3 pr-10 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
                 >
                   {showPassword ? (
                     <EyeOff size={16} strokeWidth={1.8} />
@@ -149,6 +180,9 @@ export default function Page() {
                   )}
                 </button>
               </div>
+              {errors.password && (
+                <p className="text-xs text-[#f59e0b]">{errors.password}</p>
+              )}
             </div>
           </div>
 
@@ -179,7 +213,7 @@ export default function Page() {
             </label>
 
             <Link
-              href="/quen-mat-khau"
+              href="/forgot-password"
               className="text-xs text-amber-600 hover:text-amber-700 transition-colors"
             >
               Quên mật khẩu?
@@ -187,7 +221,11 @@ export default function Page() {
           </div>
 
           {/* Nút đăng nhập */}
-          <button className="w-full h-10 rounded-md bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white text-sm font-semibold tracking-wide transition-all mb-4">
+          <button
+            disabled={!isFormValid}
+            className={`w-full h-10 rounded-md bg-amber-500 hover:bg-amber-600 ${isFormValid ? "active:scale-[0.98] cursor-pointer" : "cursor-not-allowed"} text-white text-sm font-semibold tracking-wide transition-all mb-4`}
+            onClick={handleLogin}
+          >
             Đăng nhập
           </button>
 
