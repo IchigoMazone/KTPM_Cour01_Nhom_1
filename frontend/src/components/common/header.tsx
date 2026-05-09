@@ -90,7 +90,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="w-full h-16 fixed top-0 left-0 right-0 bg-white border-b border-[var(--color-divider)] flex flex-cols px-4">
+      <header className="w-full h-16 fixed top-0 left-0 right-0 bg-white border-b border-[var(--color-divider)] flex flex-cols px-4 z-50">
         <div className="flex-2 flex items-center gap-2">
           <Panda
             className="hidden xl:block"
