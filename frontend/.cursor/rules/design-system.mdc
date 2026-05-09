@@ -1,0 +1,28 @@
+Design Style
+
+- modern SaaS aesthetic
+- inspired by Vercel, Linear, Stripe
+- generous whitespace
+- rounded-2xl corners
+- subtle borders
+- muted backgrounds
+- clean typography hierarchy
+- minimal color palette
+- responsive grid layouts
+- soft shadows only
+- avoid clutter
+- premium UI feel
+
+Components
+
+- use Card heavily
+- use Tabs for sections
+- use Sheet/Dialog for overlays
+- use Skeleton loading states
+- use HoverCard and Tooltip subtly
+
+Layout
+
+- spacing consistency
+- max-width containers
+- balanced visual hierarchy

@@ -134,11 +134,11 @@ export default function Page() {
             {/* Email */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-700 tracking-wide">
-                Mã xác thực
+                Email
               </label>
               <input
                 type="email"
-                placeholder="TETVUIVE2026"
+                placeholder="example@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
