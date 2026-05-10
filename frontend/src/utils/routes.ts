@@ -1,0 +1,93 @@
+import {
+  LayoutDashboard,
+  Panda,
+  ClipboardList,
+  CircleUser,
+  Tag,
+  FileCog,
+  BadgeCheck,
+  CalendarDays,
+  Package,
+  Wallet,
+  ChartArea,
+  CircleHelp,
+  UserCog,
+  Settings,
+  LogOut,
+} from "lucide-react";
+
+export const Routes = [
+  {
+    icon: LayoutDashboard,
+    label: "Tổng quan",
+    path: "/home",
+    exact: true,
+    description: "Thống kê doanh thu, đơn hàng và cảnh báo nhanh",
+  },
+  {
+    icon: ClipboardList,
+    label: "Đơn hàng",
+    path: "/home/orders",
+    description: "Quản lý và theo dõi trạng thái đơn giặt",
+  },
+  {
+    icon: CircleUser,
+    label: "Khách hàng",
+    path: "/home/customers",
+    description: "Thông tin khách hàng và lịch sử sử dụng dịch vụ",
+  },
+  {
+    icon: BadgeCheck,
+    label: "Dịch vụ & Giá",
+    path: "/home/services",
+    description: "Thiết lập dịch vụ giặt và bảng giá",
+  },
+  {
+    icon: CalendarDays,
+    label: "Giao nhận",
+    path: "/home/delivery",
+    description: "Quản lý lịch lấy/trả đồ và tài xế",
+  },
+  {
+    icon: Package,
+    label: "Kho & Vật tư",
+    path: "/home/inventory",
+    description: "Theo dõi hóa chất, vật tư và tồn kho",
+  },
+  {
+    icon: UserCog,
+    label: "Nhân viên",
+    path: "/home/staff",
+    description: "Quản lý ca làm và hiệu suất nhân viên",
+  },
+  {
+    icon: Wallet,
+    label: "Tài chính",
+    path: "/home/finance",
+    description: "Doanh thu, chi phí và quản lý thu chi",
+  },
+  {
+    icon: Tag,
+    label: "Khuyến mãi",
+    path: "/home/promotions",
+    description: "Mã giảm giá và chương trình khách hàng thân thiết",
+  },
+  {
+    icon: ChartArea,
+    label: "Báo cáo",
+    path: "/home/reports",
+    description: "Báo cáo thống kê và xuất dữ liệu",
+  },
+  {
+    icon: CircleHelp,
+    label: "Hỗ trợ",
+    path: "/home/support",
+    description: "Tiếp nhận phản hồi và xử lý khiếu nại",
+  },
+  {
+    icon: Settings,
+    label: "Cài đặt",
+    path: "/home/settings",
+    description: "Cấu hình hệ thống và phân quyền",
+  },
+];

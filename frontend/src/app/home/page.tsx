@@ -69,7 +69,7 @@ export default function Home() {
 
             <div className="bg-white  rounded-[20px] p-6  border border-gray-200 ">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                Tổng đơn hôm nay
+                Đơn đã xử lý
               </p>
               <p className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
                 {dashboardData.today.orders}
@@ -105,7 +105,7 @@ export default function Home() {
           </div>
 
           {/* Revenue Chart */}
-          <div className="grid grid-cols-[2fr_1fr] gap-5">
+          <div className="grid grid-cols-[2.5fr_1fr] gap-5">
             <div className="bg-white 0 rounded-[20px] p-6  border border-gray-200 ">
               <div className="mb-6 flex justify-between">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">

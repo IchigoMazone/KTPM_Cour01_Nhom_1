@@ -1,26 +1,10 @@
 "use client";
 
-import React from "react";
-import {
-  LayoutDashboard,
-  Panda,
-  ClipboardList,
-  CircleUser,
-  Tag,
-  FileCog,
-  BadgeCheck,
-  CalendarDays,
-  Package,
-  Wallet,
-  ChartArea,
-  CircleHelp,
-  UserCog,
-  Settings,
-  LogOut,
-} from "lucide-react";
+import React, { useState } from "react";
+import { Panda, Settings, LogOut, PanelLeft } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import Dropdown from "../ui/dropdown";
-import Support from "@/src/app/(main)/contact/support";
+import { Routes } from "@/src/utils/routes";
 
 export default function Sidebar() {
   const router = useRouter();
@@ -29,41 +13,59 @@ export default function Sidebar() {
   const iconSize = 18;
   const stroke = 1.5;
 
-  const menus = [
-    { icon: LayoutDashboard, path: "/home", exact: true },
-    { icon: ClipboardList, path: "/home/orders" },
-    { icon: CircleUser, path: "/home/customers" },
-    { icon: Tag, path: "/home/promotions" },
-    { icon: UserCog, path: "/home/staff" },
-    { icon: BadgeCheck, path: "/home/services" },
-    { icon: CalendarDays, path: "/home/delivery" },
-    { icon: Package, path: "/home/inventory" },
-    { icon: Wallet, path: "/home/finance" },
-    { icon: ChartArea, path: "/home/reports" },
-    { icon: CircleHelp, path: "/home/support" },
-  ];
-
-  const isActive = (item: (typeof menus)[0]) => {
+  const isActive = (item: (typeof Routes)[0]) => {
     if (item.exact) return pathname === item.path;
     return pathname.startsWith(item.path);
   };
 
+  const [active, setActive] = useState<boolean>(false);
+  const handleActive = () => {
+    setActive((active) => !active);
+  };
+
   return (
-    <aside className="w-[55px] h-screen border-r border-gray-200 bg-white flex flex-col">
+    <aside
+      className={`${active ? "w-[260px]" : "w-[57px]"}  h-screen border-r border-gray-200 bg-white flex flex-col`}
+    >
       <nav className="flex flex-col justify-between h-full">
         {/* Top */}
-        <div>
-          {/* Logo */}
-          <div className="h-[65px] flex items-center justify-center">
-            <Panda size={24} strokeWidth={stroke} />
+        <div className="">
+          <div
+            className={`h-[65px] flex items-center ${!active ? "justify-center" : "justify-between"} mx-2 cursor-pointer`}
+            onClick={handleActive}
+          >
+            <div
+              className="
+    group
+    flex
+    w-10 h-10
+    items-center justify-center
+    rounded-xl
+    hover:bg-gray-200
+  "
+            >
+              {/* Panda */}
+              <div className="flex items-center justify-center group-hover:hidden">
+                <Panda size={24} strokeWidth={stroke} />
+              </div>
+
+              {/* Panel */}
+              <div className="hidden items-center justify-center group-hover:flex">
+                <PanelLeft
+                  size={iconSize}
+                  strokeWidth={stroke}
+                  className="text-gray-500 group-hover:text-black"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Menu */}
           <div className="flex flex-col gap-1">
-            {menus.map((item, index) => {
+            {Routes.map((item, index) => {
               const Icon = item.icon;
               const active = isActive(item);
-
+              const Label = item.label;
               return (
                 <button
                   key={index}
