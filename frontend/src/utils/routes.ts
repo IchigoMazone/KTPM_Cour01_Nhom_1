@@ -4,7 +4,6 @@ import {
   ClipboardList,
   CircleUser,
   Tag,
-  FileCog,
   BadgeCheck,
   CalendarDays,
   Package,
@@ -13,10 +12,9 @@ import {
   CircleHelp,
   UserCog,
   Settings,
-  LogOut,
 } from "lucide-react";
 
-export const Routes = [
+export const menus = [
   {
     icon: LayoutDashboard,
     label: "Tổng quan",

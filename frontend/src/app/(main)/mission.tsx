@@ -1,146 +1,79 @@
-// "use client";
-
-// import { Leaf, HeartHandshake, Shirt, Clock, ShieldCheck } from "lucide-react";
-
-// export default function Mission() {
-//   const iconSize = 50;
-//   const stroke = 1.5;
-
-//   return (
-//     <section id="mission" className="h-screen flex items-center bg-gray-100">
-//       <div className="w-full px-8">
-//         <div className="max-w-6xl mx-auto">
-//           <div className="text-5xl mb-10 font-semibold text-center">
-//             Sứ mệnh của chúng tôi
-//           </div>
-//           <div className="text-center text-xl px-50">
-//             BeGauShop mang đến trải nghiệm chăm sóc sợi vải khác biệt, nơi mỗi
-//             món đồ không chỉ được làm sạch mà còn được hồi sinh sự mềm mại
-//             nguyên bản
-//           </div>
-//           <div className="mx-auto flex justify-center mb-10 mt-10 text-3xl font-medium">
-//             5 giá trị cốt lõi
-//           </div>
-//         </div>
-
-//         <div className="flex mt-10 justify-center px-20 gap-10">
-//           <div className="flex flex-col justify-center items-center gap-2">
-//             <ShieldCheck
-//               size={iconSize}
-//               strokeWidth={stroke}
-//               className="text-gray-500"
-//             />
-//             <div>Sạch sẽ tuyệt đối</div>
-//           </div>
-
-//           <div className="flex flex-col justify-center items-center gap-2">
-//             <Clock
-//               size={iconSize}
-//               strokeWidth={stroke}
-//               className="text-gray-500"
-//             />
-//             <div>Nhanh chóng đúng hẹn</div>
-//           </div>
-
-//           <div className="flex flex-col justify-center items-center gap-2">
-//             <Shirt
-//               size={iconSize}
-//               strokeWidth={stroke}
-//               className="text-gray-500"
-//             />
-//             <div>An toàn cho từng chất liệu</div>
-//           </div>
-
-//           <div className="flex flex-col justify-center items-center gap-2">
-//             <HeartHandshake
-//               size={iconSize}
-//               strokeWidth={stroke}
-//               className="text-gray-500"
-//             />
-//             <div>Tận tâm & uy tín</div>
-//           </div>
-
-//           <div className="flex flex-col justify-center items-center gap-2">
-//             <Leaf
-//               size={iconSize}
-//               strokeWidth={stroke}
-//               className="text-gray-500"
-//             />
-//             <div>Thân thiện môi trường</div>
-//           </div>
-//         </div>
-//       </div>
-//     </section>
-//   );
-// }
-
-
-
 
 "use client";
 
-import { Leaf, HeartHandshake, Shirt, Clock, ShieldCheck } from "lucide-react";
+import React from "react";
+import { Shield, Leaf, Heart, Award } from "lucide-react";
+import { GradientText } from "@/src/components/ui/gradient-text";
 
 export default function Mission() {
-  const iconSize = 40;
-  const stroke = 1.5;
-
   const values = [
     {
-      icon: <ShieldCheck size={iconSize} strokeWidth={stroke} />,
-      text: "Sạch sẽ tuyệt đối",
+      icon: Shield,
+      title: "An Toàn Tuyệt Đối",
+      description:
+        "Mỗi loại vải được xử lý riêng biệt theo công thức chuyên biệt. Chúng tôi phân loại kỹ lưỡng trước khi giặt, sử dụng nhiệt độ và chế độ phù hợp để đảm bảo không gây co rút, lem màu hay hư hại nào cho trang phục của bạn.",
     },
     {
-      icon: <Clock size={iconSize} strokeWidth={stroke} />,
-      text: "Nhanh chóng đúng hẹn",
+      icon: Leaf,
+      title: "Thân Thiện Môi Trường",
+      description:
+        "Chúng tôi sử dụng 100% sản phẩm giặt là sinh học, không chứa hoá chất độc hại. Quy trình xử lý nước thải đạt chuẩn, góp phần bảo vệ môi trường và đảm bảo an toàn tối đa cho sức khoẻ của khách hàng.",
     },
     {
-      icon: <Shirt size={iconSize} strokeWidth={stroke} />,
-      text: "An toàn cho từng chất liệu",
+      icon: Heart,
+      title: "Tận Tâm Phục Vụ",
+      description:
+        "Đội ngũ nhân viên được tuyển chọn kỹ lưỡng và đào tạo chuyên nghiệp. Chúng tôi lắng nghe mọi yêu cầu của khách hàng, tư vấn tận tình và luôn sẵn sàng hỗ trợ 24/7 qua điện thoại, Zalo hay trực tiếp tại cửa hàng.",
     },
     {
-      icon: <HeartHandshake size={iconSize} strokeWidth={stroke} />,
-      text: "Tận tâm & uy tín",
-    },
-    {
-      icon: <Leaf size={iconSize} strokeWidth={stroke} />,
-      text: "Thân thiện môi trường",
+      icon: Award,
+      title: "Chất Lượng Cam Kết",
+      description:
+        "Chúng tôi cam kết chất lượng đầu ra của từng sản phẩm. Nếu bạn không hài lòng với kết quả, chúng tôi sẽ giặt lại miễn phí hoặc hoàn tiền 100%. Sự tin tưởng của khách hàng là thước đo thành công duy nhất của BegauShop.",
+
     },
   ];
 
   return (
     <section
       id="mission"
-      className="min-h-screen flex items-center bg-white py-20"
+
+      className="min-h-screen flex items-center justify-center bg-white"
     >
-      <div className="w-full px-6">
-        <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-4xl md:text-5xl font-semibold mb-6">
-            Sứ mệnh của chúng tôi
-          </h2>
-
-          <p className="text-gray-600 text-lg md:text-xl max-w-3xl mx-auto">
-            BeGauShop mang đến trải nghiệm chăm sóc sợi vải khác biệt, nơi mỗi
-            món đồ không chỉ được làm sạch mà còn được hồi sinh sự mềm mại
-            nguyên bản.
+      <div className="w-full max-w-6xl mx-auto px-6 pt-20 xl:pt-12">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+            <GradientText>
+              Đồ của bạn xứng đáng được chăm sóc tốt nhất
+            </GradientText>
+          </h1>
+          <p className="text-gray-500 max-w-2xl mx-auto text-lg">
+            Với hơn 10 năm kinh nghiệm, BegauShop tự hào là điểm đến tin cậy của
+            hàng nghìn gia đình Hà Nội. Mỗi chiếc áo, mỗi bộ quần áo đều được
+            chúng tôi chăm sóc cẩn thận như đồ của chính mình.
           </p>
-
-          <h3 className="mt-12 text-2xl md:text-3xl font-medium">
-            5 giá trị cốt lõi
-          </h3>
         </div>
 
-        {/* GRID */}
-        <div className="mt-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 max-w-6xl mx-auto">
-          {values.map((item, index) => (
+        {/* Core Values */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {values.map((value, i) => (
             <div
-              key={index}
-              className="bg-white rounded-2xl shadow-sm p-6 flex flex-col items-center gap-3 
-                         hover:shadow-lg hover:-translate-y-1 transition duration-300 cursor-pointer"
+              key={i}
+              className="p-6 bg-white border border-gray-200 rounded-2xl hover:shadow-lg hover:border-gray-300 transition-all duration-300 group"
             >
-              <div className="text-gray-600">{item.icon}</div>
-              <p className="text-center text-sm md:text-base font-medium">
-                {item.text}
+              <div className="p-3 bg-blue-50 rounded-xl w-fit mb-5 group-hover:bg-blue-100 transition-colors">
+                <value.icon
+                  className="w-6 h-6 text-blue-500"
+                  strokeWidth={1.5}
+                />
+              </div>
+              <h4 className="text-lg font-bold text-gray-900 mb-3">
+                {value.title}
+              </h4>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                {value.description}
+
               </p>
             </div>
           ))}

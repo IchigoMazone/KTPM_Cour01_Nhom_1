@@ -1,3 +1,4 @@
 venv\Scripts\activate
 pip freeze > requirements.txt
 uvicorn app.main:app --reload
+deactivate
