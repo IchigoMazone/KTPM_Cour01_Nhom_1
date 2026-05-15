@@ -4,9 +4,31 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { GradientText } from "@/src/components/ui/gradient-text";
-import { validateEmail, validatePassword } from "@/src/lib/validators/auth";
+import {
+  LoginField,
+  validateLoginField,
+  validateLoginForm,
+} from "@/src/lib/validators/auth";
 
 const images = ["/summer (1).jfif", "/summer (2).jfif", "/summer (3).jfif"];
+
+const emptyTouched = {
+  email: false,
+  password: false,
+};
+
+function ValidationMessage({ message }: { message: string }) {
+  return (
+    <div
+      className={`overflow-hidden transition-all duration-300 ease-out ${
+        message ? "mt-0.5 max-h-5 opacity-100" : "mt-0 max-h-0 opacity-0"
+      }`}
+      aria-live="polite"
+    >
+      <p className="text-[11px] leading-4 text-[#f59e0b]">{message}</p>
+    </div>
+  );
+}
 
 export default function Page() {
   const [showPassword, setShowPassword] = useState(false);
@@ -15,18 +37,53 @@ export default function Page() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  const [errors, setErrors] = useState({
-    email: "",
-    password: "",
-  });
+  const [touched, setTouched] = useState(emptyTouched);
+  const [activeErrorField, setActiveErrorField] = useState<LoginField | null>(
+    null,
+  );
 
-  const isFormValid = email && password && !errors.email && !errors.password;
+  const loginErrors = validateLoginForm({ email, password });
+  const isFormValid = !loginErrors.email && !loginErrors.password;
+  const activeError =
+    activeErrorField && touched[activeErrorField]
+      ? loginErrors[activeErrorField]
+      : "";
+
+  const updateField = (field: LoginField, value: string) => {
+    if (field === "email") {
+      setEmail(value);
+    } else {
+      setPassword(value);
+    }
+
+    setActiveErrorField(field);
+  };
+
+  const markFieldTouched = (field: LoginField, value: string) => {
+    setTouched((currentTouched) => ({
+      ...currentTouched,
+      [field]: true,
+    }));
+    setActiveErrorField(validateLoginField(field, value) ? field : null);
+  };
 
   /*
     Call API Login tai day
   */
 
   const handleLogin = () => {
+    const nextErrors = validateLoginForm({ email, password });
+
+    setTouched({
+      email: true,
+      password: true,
+    });
+    setActiveErrorField(
+      nextErrors.email ? "email" : nextErrors.password ? "password" : null,
+    );
+
+    if (nextErrors.email || nextErrors.password) return;
+
     console.log("Call API LOGIN");
   };
 
@@ -43,7 +100,7 @@ export default function Page() {
       className="min-h-screen flex items-center justify-center bg-cover bg-center p-4"
       style={{ backgroundImage: "url('/summer (4).jfif')" }}
     >
-      <div className="w-full min-w-[330px] h-[540px] sm:w-[480px] sm:h-[620px] lg:w-[1000px] lg:h-[640px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
+      <div className="w-full min-w-[330px] h-[540px] sm:w-[480px] sm:h-[620px] lg:w-[1000px] lg:h-[670px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
         {/* ── TRÁI: Slider ── */}
         <div className="hidden lg:block lg:w-[52%] relative overflow-hidden rounded-l-2xl">
           {images.map((img, index) => {
@@ -120,7 +177,7 @@ export default function Page() {
           </div>
 
           {/* Fields */}
-          <div className="space-y-4 mb-4">
+          <div className="space-y-3 mb-4">
             {/* Email */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-700 tracking-wide">
@@ -130,21 +187,20 @@ export default function Page() {
                 type="email"
                 placeholder="example@gmail.com"
                 value={email}
+                aria-invalid={activeErrorField === "email" && Boolean(activeError)}
+                aria-describedby="email-error"
                 onChange={(e) => {
-                  const value = e.target.value;
-                  setEmail(value);
-
-                  setErrors((prev) => ({
-                    ...prev,
-                    email: validateEmail(value),
-                    password: "",
-                  }));
+                  updateField("email", e.target.value);
                 }}
+                onFocus={() => setActiveErrorField("email")}
+                onBlur={(e) => markFieldTouched("email", e.target.value)}
                 className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 transition-all"
               />
-              {errors.email && (
-                <p className="text-xs text-[#f59e0b]">{errors.email}</p>
-              )}
+              <div id="email-error">
+                <ValidationMessage
+                  message={activeErrorField === "email" ? activeError : ""}
+                />
+              </div>
             </div>
 
             {/* Mật khẩu */}
@@ -157,15 +213,15 @@ export default function Page() {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
+                  aria-invalid={
+                    activeErrorField === "password" && Boolean(activeError)
+                  }
+                  aria-describedby="password-error"
                   onChange={(e) => {
-                    const value = e.target.value;
-                    setPassword(value);
-
-                    setErrors((prev) => ({
-                      email: "",
-                      password: validatePassword(value),
-                    }));
+                    updateField("password", e.target.value);
                   }}
+                  onFocus={() => setActiveErrorField("password")}
+                  onBlur={(e) => markFieldTouched("password", e.target.value)}
                   className="w-full h-10 px-3 pr-10 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 transition-all"
                 />
                 <button
@@ -180,9 +236,11 @@ export default function Page() {
                   )}
                 </button>
               </div>
-              {errors.password && (
-                <p className="text-xs text-[#f59e0b]">{errors.password}</p>
-              )}
+              <div id="password-error">
+                <ValidationMessage
+                  message={activeErrorField === "password" ? activeError : ""}
+                />
+              </div>
             </div>
           </div>
 
