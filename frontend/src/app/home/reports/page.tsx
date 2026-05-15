@@ -144,7 +144,13 @@ export default function ReportStatistics() {
               <XAxis dataKey="date" />
               <YAxis yAxisId="left" />
               <YAxis yAxisId="right" orientation="right" />
-              <Tooltip formatter={(value: number, name) => (name === "revenue" ? `${value.toLocaleString("vi-VN")} đ` : value)} />
+              <Tooltip
+                formatter={(value, name) =>
+                  name === "revenue" || name === "Doanh thu"
+                    ? `${Number(value ?? 0).toLocaleString("vi-VN")} đ`
+                    : value
+                }
+              />
               <Line yAxisId="left" type="monotone" dataKey="orders" stroke="#0ea5e9" strokeWidth={2} dot={false} name="Đơn" />
               <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#16a34a" strokeWidth={2} dot={false} name="Doanh thu" />
             </LineChart>

@@ -186,7 +186,7 @@ export default function FinanceManagement() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
-                <Tooltip formatter={(v:number)=>`${v.toLocaleString("vi-VN")} đ`} />
+                <Tooltip formatter={(value) => `${Number(value ?? 0).toLocaleString("vi-VN")} đ`} />
                 <Line type="monotone" dataKey="amount" stroke="#16a34a" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
@@ -202,7 +202,7 @@ export default function FinanceManagement() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(v:number)=>`${v.toLocaleString("vi-VN")} đ`} />
+                <Tooltip formatter={(value) => `${Number(value ?? 0).toLocaleString("vi-VN")} đ`} />
                 <Line type="monotone" dataKey="amount" stroke="#0ea5e9" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
