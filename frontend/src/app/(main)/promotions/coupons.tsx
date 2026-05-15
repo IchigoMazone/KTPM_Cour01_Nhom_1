@@ -1,53 +1,63 @@
 "use client";
 
-import React, { useState } from "react";
-import { Ticket, Copy, Check, Clock, Tag, Gift } from "lucide-react";
+import { useState } from "react";
+import { Check, Clock, Copy, Gift, Tag, Ticket } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { GradientText } from "@/src/components/ui/gradient-text";
 
 const coupons = [
   {
     code: "GIATLA20",
     discount: "20%",
-    maxAmount: 50000,
     minOrder: 100000,
     title: "Giảm 20% cho đơn từ 100k",
     description: "Áp dụng cho dịch vụ giặt thường và giặt khô",
     validUntil: "31/05/2026",
     remaining: 156,
-    color: "from-blue-500 to-cyan-500",
   },
   {
     code: "SALE50K",
     discount: "50.000đ",
-    maxAmount: 50000,
     minOrder: 0,
     title: "Giảm 50.000đ toàn đơn",
     description: "Không giới hạn đơn hàng tối thiểu",
     validUntil: "15/06/2026",
     remaining: 89,
-    color: "from-purple-500 to-pink-500",
   },
   {
     code: "FREESHIP",
     discount: "Miễn phí",
-    maxAmount: 0,
     minOrder: 200000,
     title: "Miễn phí giao nhận",
     description: "Áp dụng cho đơn từ 200.000đ trong phạm vi 10km",
     validUntil: "30/06/2026",
     remaining: 234,
-    color: "from-green-500 to-emerald-500",
   },
   {
     code: "VIP30",
     discount: "30%",
-    maxAmount: 100000,
     minOrder: 300000,
     title: "VIP - Giảm 30% đơn lớn",
     description: "Chỉ dành cho khách hàng thân thiết, đơn từ 300k",
     validUntil: "31/12/2026",
     remaining: 45,
-    color: "from-amber-500 to-orange-500",
     isVip: true,
   },
 ];
@@ -64,126 +74,156 @@ export default function Coupons() {
   return (
     <section
       id="coupons"
-      className="min-h-screen flex items-center justify-center bg-white"
+      className="flex min-h-screen items-center px-4 py-24 sm:px-6 lg:px-8"
     >
-      <div className="w-full max-w-6xl mx-auto px-6 pt-20 pb-20">
-        {/* Header */}
-        <div className="text-center mb-12 pt-8">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-            <GradientText>Mã Giảm Giá</GradientText>
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="mx-auto mb-12 flex max-w-2xl flex-col items-center text-center sm:mb-16">
+          <h2 className="mb-3 text-3xl font-bold tracking-tight sm:text-4xl">
+            <GradientText>Mã giảm giá</GradientText>
           </h2>
-          <p className="text-gray-500 max-w-xl mx-auto">
-            Săn mã giảm giá hấp dẫn, tiết kiệm đến 30% cho mỗi đơn hàng
+          <p className="text-base leading-7 text-muted-foreground sm:text-lg">
+            Săn mã giảm giá hấp dẫn, tiết kiệm đến 30% cho mỗi đơn hàng.
           </p>
         </div>
 
-        {/* Coupons Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {coupons.map((coupon, index) => (
-            <div
-              key={coupon.code}
-              className={`relative bg-white border-2 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl ${
-                coupon.isVip
-                  ? "border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50"
-                  : "border-gray-200 hover:border-blue-300"
-              }`}
-            >
-              {/* Discount Badge */}
-              <div
-                className={`absolute top-4 right-4 bg-gradient-to-r ${coupon.color} text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg`}
+        <Card className="overflow-hidden border-blue-100 bg-card shadow-sm">
+          <CardHeader className="gap-2 border-b bg-card">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Ticket className="size-5 text-blue-600" />
+                  Danh sách mã ưu đãi
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  Sao chép mã phù hợp và áp dụng khi tạo đơn giặt.
+                </CardDescription>
+              </div>
+
+              <Badge
+                variant="secondary"
+                className="w-fit rounded-full bg-blue-50 text-blue-700"
               >
-                {coupon.discount}
-              </div>
-
-              {/* VIP Badge */}
-              {coupon.isVip && (
-                <div className="absolute top-0 left-0 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold px-4 py-1.5 rounded-br-xl">
-                  <Gift className="w-3 h-3 inline mr-1" />
-                  KHÁCH HÀNG THÂN THIẾT
-                </div>
-              )}
-
-              <div className={`p-6 ${coupon.isVip ? "pt-12" : "pt-6"}`}>
-                <div className="flex items-start gap-4 mb-4">
-                  <div
-                    className={`p-4 rounded-2xl flex-shrink-0 bg-gradient-to-r ${coupon.color}`}
-                  >
-                    <Ticket className="w-8 h-8 text-white" strokeWidth={1.5} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-xl font-bold text-gray-900 mb-1">
-                      {coupon.title}
-                    </h4>
-                    <p className="text-gray-500 text-sm">
-                      {coupon.description}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Code Box */}
-                <div
-                  className={`flex items-center gap-3 p-4 rounded-xl mb-4 ${
-                    coupon.isVip ? "bg-white/80" : "bg-gray-50"
-                  } border-2 border-dashed ${
-                    coupon.isVip ? "border-amber-300" : "border-gray-200"
-                  }`}
-                >
-                  <Tag className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                  <code className="flex-1 font-mono font-bold text-lg text-gray-800">
-                    {coupon.code}
-                  </code>
-                  <button
-                    onClick={() => copyCode(coupon.code)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                      copiedCode === coupon.code
-                        ? "bg-green-500 text-white"
-                        : coupon.isVip
-                        ? "bg-amber-500 text-white hover:bg-amber-600"
-                        : "bg-blue-600 text-white hover:bg-blue-700"
-                    }`}
-                  >
-                    {copiedCode === coupon.code ? (
-                      <>
-                        <Check className="w-4 h-4" />
-                        Đã copy
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4" />
-                        Copy
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Info */}
-                <div className="flex flex-wrap gap-4 text-sm">
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <Clock className="w-4 h-4" />
-                    Hết hạn: {coupon.validUntil}
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <Ticket className="w-4 h-4" />
-                    Còn lại: {coupon.remaining} mã
-                  </div>
-                  {coupon.minOrder > 0 && (
-                    <div className="flex items-center gap-2 text-gray-500">
-                      Đơn tối thiểu: {coupon.minOrder.toLocaleString()}đ
-                    </div>
-                  )}
-                </div>
-              </div>
+                {coupons.length} mã khả dụng
+              </Badge>
             </div>
-          ))}
-        </div>
+          </CardHeader>
 
-        {/* Note */}
-        <div className="mt-12 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-          <p className="text-blue-700 text-sm text-center">
-            Mỗi mã chỉ sử dụng được 1 lần cho mỗi tài khoản. Không áp dụng
-            đồng thời với các chương trình khuyến mãi khác.
-          </p>
-        </div>
+          <CardContent className="px-0">
+            <Table className="min-w-[900px]">
+              <TableHeader className="[&_tr]:border-border/60">
+                <TableRow className="bg-muted/20 hover:bg-muted/20">
+                  <TableHead className="h-11 w-[280px] pl-4 text-muted-foreground md:pl-8">
+                    Mã giảm giá
+                  </TableHead>
+                  <TableHead className="h-11 text-center text-muted-foreground">
+                    Ưu đãi
+                  </TableHead>
+                  <TableHead className="h-11 text-center text-muted-foreground">
+                    Điều kiện
+                  </TableHead>
+                  <TableHead className="h-11 text-center text-muted-foreground">
+                    Hạn dùng
+                  </TableHead>
+                  <TableHead className="h-11 pr-4 text-right text-muted-foreground md:pr-8">
+                    Thao tác
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody className="[&_tr]:border-border/60">
+                {coupons.map((coupon) => (
+                  <TableRow
+                    key={coupon.code}
+                    className="bg-card transition-colors hover:bg-muted/20"
+                  >
+                    <TableCell className="py-3 pl-4 md:pl-8">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 ring-1 ring-blue-200">
+                          <Tag className="size-5" />
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <code className="font-mono text-sm font-bold text-foreground">
+                              {coupon.code}
+                            </code>
+                            {coupon.isVip && (
+                              <Badge className="rounded-full bg-blue-600 text-white">
+                                <Gift className="size-3" />
+                                VIP
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {coupon.title}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground md:hidden">
+                            {coupon.description}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="py-3 text-center">
+                      <Badge className="rounded-full bg-blue-50 text-blue-700">
+                        {coupon.discount}
+                      </Badge>
+                      <p className="mt-1 hidden text-xs text-muted-foreground md:block">
+                        {coupon.description}
+                      </p>
+                    </TableCell>
+
+                    <TableCell className="py-3 text-center text-sm text-muted-foreground">
+                      {coupon.minOrder > 0
+                        ? `Từ ${coupon.minOrder.toLocaleString()}đ`
+                        : "Không tối thiểu"}
+                    </TableCell>
+
+                    <TableCell className="py-3 text-center">
+                      <Badge variant="outline" className="rounded-full">
+                        <Clock className="size-3" />
+                        {coupon.validUntil}
+                      </Badge>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Còn {coupon.remaining} mã
+                      </p>
+                    </TableCell>
+
+                    <TableCell className="py-3 pr-4 text-right md:pr-8">
+                      <Button
+                        size="sm"
+                        className={
+                          copiedCode === coupon.code
+                            ? "bg-blue-700 text-white hover:bg-blue-700"
+                            : "bg-blue-600 text-white hover:bg-blue-700"
+                        }
+                        onClick={() => copyCode(coupon.code)}
+                      >
+                        {copiedCode === coupon.code ? (
+                          <>
+                            <Check className="size-4" />
+                            Đã copy
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="size-4" />
+                            Copy
+                          </>
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+
+          <CardFooter className="justify-center border-t bg-muted/30 text-center text-xs text-muted-foreground">
+            <Ticket className="mr-1.5 size-3.5 text-blue-600" />
+            Mỗi mã chỉ sử dụng được 1 lần cho mỗi tài khoản. Không áp dụng đồng
+            thời với các chương trình khuyến mãi khác.
+          </CardFooter>
+        </Card>
       </div>
     </section>
   );
