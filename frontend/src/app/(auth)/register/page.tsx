@@ -3,13 +3,49 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
-import { GradientText } from "@/src/components/ui/gradient-text";
+import {
+  RegisterField,
+  validateRegisterForm,
+} from "@/src/lib/validators/auth";
 
 const images = [
   "/tải xuống (15).jfif",
   "/tải xuống (16).jfif",
   "/tải xuống (17).jfif",
 ];
+
+const emptyTouched = {
+  firstName: false,
+  lastName: false,
+  email: false,
+  username: false,
+  password: false,
+  confirm: false,
+  agreed: false,
+};
+
+const fieldOrder: RegisterField[] = [
+  "firstName",
+  "lastName",
+  "email",
+  "username",
+  "password",
+  "confirm",
+  "agreed",
+];
+
+function ValidationMessage({ message }: { message: string }) {
+  return (
+    <div
+      className={`overflow-hidden transition-all duration-300 ease-out ${
+        message ? "mt-0.5 max-h-5 opacity-100" : "mt-0 max-h-0 opacity-0"
+      }`}
+      aria-live="polite"
+    >
+      <p className="text-[11px] leading-4 text-pink-500">{message}</p>
+    </div>
+  );
+}
 
 export default function Page() {
   const [showPassword, setShowPassword] = useState(false);
@@ -23,6 +59,64 @@ export default function Page() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [agreed, setAgreed] = useState(false);
+  const [touched, setTouched] = useState(emptyTouched);
+  const [activeErrorField, setActiveErrorField] =
+    useState<RegisterField | null>(null);
+
+  const formValues = {
+    firstName,
+    lastName,
+    email,
+    username,
+    password,
+    confirm,
+    agreed,
+  };
+  const formErrors = validateRegisterForm(formValues);
+  const isFormValid = fieldOrder.every((field) => !formErrors[field]);
+  const activeError =
+    activeErrorField && touched[activeErrorField]
+      ? formErrors[activeErrorField]
+      : "";
+
+  const updateField = (field: RegisterField, value: string | boolean) => {
+    if (field === "firstName") setFirstName(String(value));
+    if (field === "lastName") setLastName(String(value));
+    if (field === "email") setEmail(String(value));
+    if (field === "username") setUsername(String(value));
+    if (field === "password") setPassword(String(value));
+    if (field === "confirm") setConfirm(String(value));
+    if (field === "agreed") setAgreed(Boolean(value));
+
+    setActiveErrorField(field);
+  };
+
+  const markFieldTouched = (field: RegisterField) => {
+    setTouched((currentTouched) => ({
+      ...currentTouched,
+      [field]: true,
+    }));
+    setActiveErrorField(formErrors[field] ? field : null);
+  };
+
+  const handleRegister = () => {
+    setTouched({
+      firstName: true,
+      lastName: true,
+      email: true,
+      username: true,
+      password: true,
+      confirm: true,
+      agreed: true,
+    });
+    setActiveErrorField(
+      fieldOrder.find((field) => formErrors[field]) ?? null,
+    );
+
+    if (!isFormValid) return;
+
+    console.log("Call API REGISTER");
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -37,7 +131,7 @@ export default function Page() {
       className="min-h-screen flex items-center justify-center bg-cover bg-center p-4"
       style={{ backgroundImage: "url('/tải xuống (14).jfif')" }}
     >
-      <div className="w-full min-w-[330px] h-[650px] sm:w-[480px] sm:h-[620px] lg:w-[1000px] lg:h-[640px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
+      <div className="w-full min-w-[330px] h-[700px] sm:w-[480px] sm:h-[620px] md:h-[700px] lg:w-[1000px] lg:h-[670px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
         {/* ── TRÁI: Slider ── */}
         <div className="hidden lg:block lg:w-[52%] relative overflow-hidden rounded-l-2xl">
           {images.map((img, index) => {
@@ -113,9 +207,22 @@ export default function Page() {
                   type="text"
                   placeholder="Nguyễn"
                   value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
+                  aria-invalid={
+                    activeErrorField === "firstName" && Boolean(activeError)
+                  }
+                  aria-describedby="first-name-error"
+                  onChange={(e) => updateField("firstName", e.target.value)}
+                  onFocus={() => setActiveErrorField("firstName")}
+                  onBlur={() => markFieldTouched("firstName")}
                   className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
                 />
+                <div id="first-name-error">
+                  <ValidationMessage
+                    message={
+                      activeErrorField === "firstName" ? activeError : ""
+                    }
+                  />
+                </div>
               </div>
               <div className="flex-1 space-y-1.5">
                 <label className="text-xs font-medium text-gray-700 tracking-wide">
@@ -125,9 +232,20 @@ export default function Page() {
                   type="text"
                   placeholder="Văn A"
                   value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
+                  aria-invalid={
+                    activeErrorField === "lastName" && Boolean(activeError)
+                  }
+                  aria-describedby="last-name-error"
+                  onChange={(e) => updateField("lastName", e.target.value)}
+                  onFocus={() => setActiveErrorField("lastName")}
+                  onBlur={() => markFieldTouched("lastName")}
                   className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
                 />
+                <div id="last-name-error">
+                  <ValidationMessage
+                    message={activeErrorField === "lastName" ? activeError : ""}
+                  />
+                </div>
               </div>
             </div>
 
@@ -140,9 +258,20 @@ export default function Page() {
                 type="email"
                 placeholder="example@gmail.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                aria-invalid={
+                  activeErrorField === "email" && Boolean(activeError)
+                }
+                aria-describedby="email-error"
+                onChange={(e) => updateField("email", e.target.value)}
+                onFocus={() => setActiveErrorField("email")}
+                onBlur={() => markFieldTouched("email")}
                 className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
               />
+              <div id="email-error">
+                <ValidationMessage
+                  message={activeErrorField === "email" ? activeError : ""}
+                />
+              </div>
             </div>
 
             {/* Tên đăng nhập */}
@@ -154,9 +283,20 @@ export default function Page() {
                 type="text"
                 placeholder="ichigomazone"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                aria-invalid={
+                  activeErrorField === "username" && Boolean(activeError)
+                }
+                aria-describedby="username-error"
+                onChange={(e) => updateField("username", e.target.value)}
+                onFocus={() => setActiveErrorField("username")}
+                onBlur={() => markFieldTouched("username")}
                 className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
               />
+              <div id="username-error">
+                <ValidationMessage
+                  message={activeErrorField === "username" ? activeError : ""}
+                />
+              </div>
             </div>
 
             {/* Mật khẩu */}
@@ -169,7 +309,13 @@ export default function Page() {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  aria-invalid={
+                    activeErrorField === "password" && Boolean(activeError)
+                  }
+                  aria-describedby="password-error"
+                  onChange={(e) => updateField("password", e.target.value)}
+                  onFocus={() => setActiveErrorField("password")}
+                  onBlur={() => markFieldTouched("password")}
                   className="w-full h-10 px-3 pr-10 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
                 />
                 <button
@@ -184,6 +330,11 @@ export default function Page() {
                   )}
                 </button>
               </div>
+              <div id="password-error">
+                <ValidationMessage
+                  message={activeErrorField === "password" ? activeError : ""}
+                />
+              </div>
             </div>
 
             {/* Xác nhận mật khẩu */}
@@ -196,7 +347,13 @@ export default function Page() {
                   type={showConfirm ? "text" : "password"}
                   placeholder="••••••••"
                   value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
+                  aria-invalid={
+                    activeErrorField === "confirm" && Boolean(activeError)
+                  }
+                  aria-describedby="confirm-error"
+                  onChange={(e) => updateField("confirm", e.target.value)}
+                  onFocus={() => setActiveErrorField("confirm")}
+                  onBlur={() => markFieldTouched("confirm")}
                   className="w-full h-10 px-3 pr-10 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
                 />
                 <button
@@ -211,13 +368,24 @@ export default function Page() {
                   )}
                 </button>
               </div>
+              <div id="confirm-error">
+                <ValidationMessage
+                  message={activeErrorField === "confirm" ? activeError : ""}
+                />
+              </div>
             </div>
           </div>
 
           {/* Điều khoản */}
           <label className="flex items-start gap-2 cursor-pointer select-none group mb-5">
             <div
-              onClick={() => setAgreed(!agreed)}
+              onClick={() => {
+                updateField("agreed", !agreed);
+                setTouched((currentTouched) => ({
+                  ...currentTouched,
+                  agreed: true,
+                }));
+              }}
               className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center border transition-all duration-200 shrink-0 ${
                 agreed
                   ? "bg-pink-400 border-pink-400"
@@ -253,9 +421,18 @@ export default function Page() {
               </Link>
             </span>
           </label>
+          <div id="agreed-error" className="-mt-4 mb-4">
+            <ValidationMessage
+              message={activeErrorField === "agreed" ? activeError : ""}
+            />
+          </div>
 
           {/* Nút đăng ký */}
-          <button className="w-full h-10 rounded-md bg-gradient-to-r from-pink-400 to-orange-400 hover:from-pink-500 hover:to-orange-500 active:scale-[0.98] text-white text-sm font-semibold tracking-wide transition-all mb-4">
+          <button
+            disabled={!isFormValid}
+            onClick={handleRegister}
+            className="w-full h-10 rounded-md bg-gradient-to-r from-pink-400 to-orange-400 hover:from-pink-500 hover:to-orange-500 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] text-white text-sm font-semibold tracking-wide transition-all mb-4"
+          >
             Đăng ký ngay
           </button>
 

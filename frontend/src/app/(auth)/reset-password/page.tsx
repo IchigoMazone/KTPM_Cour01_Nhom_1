@@ -4,12 +4,34 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { GradientText } from "@/src/components/ui/gradient-text";
+import {
+  ResetPasswordField,
+  validateResetPasswordForm,
+} from "@/src/lib/validators/auth";
 
 const images = [
   "/download (5).jfif",
   "/download (6).jfif",
   "/download (7).jfif",
 ];
+
+const emptyTouched = {
+  newPassword: false,
+  confirmPassword: false,
+};
+
+function ValidationMessage({ message }: { message: string }) {
+  return (
+    <div
+      className={`overflow-hidden transition-all duration-300 ease-out ${
+        message ? "mt-0.5 max-h-5 opacity-100" : "mt-0 max-h-0 opacity-0"
+      }`}
+      aria-live="polite"
+    >
+      <p className="text-[11px] leading-4 text-red-400">{message}</p>
+    </div>
+  );
+}
 
 export default function Page() {
   const [currentImage, setCurrentImage] = useState(0);
@@ -18,9 +40,52 @@ export default function Page() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [touched, setTouched] = useState(emptyTouched);
+  const [activeErrorField, setActiveErrorField] =
+    useState<ResetPasswordField | null>(null);
 
-  const passwordMismatch =
-    confirmPassword.length > 0 && newPassword !== confirmPassword;
+  const formValues = { newPassword, confirmPassword };
+  const formErrors = validateResetPasswordForm(formValues);
+  const isFormValid = !formErrors.newPassword && !formErrors.confirmPassword;
+  const activeError =
+    activeErrorField && touched[activeErrorField]
+      ? formErrors[activeErrorField]
+      : "";
+
+  const updateField = (field: ResetPasswordField, value: string) => {
+    if (field === "newPassword") {
+      setNewPassword(value);
+    } else {
+      setConfirmPassword(value);
+    }
+    setActiveErrorField(field);
+  };
+
+  const markFieldTouched = (field: ResetPasswordField) => {
+    setTouched((currentTouched) => ({
+      ...currentTouched,
+      [field]: true,
+    }));
+    setActiveErrorField(formErrors[field] ? field : null);
+  };
+
+  const handleResetPassword = () => {
+    setTouched({
+      newPassword: true,
+      confirmPassword: true,
+    });
+    setActiveErrorField(
+      formErrors.newPassword
+        ? "newPassword"
+        : formErrors.confirmPassword
+          ? "confirmPassword"
+          : null,
+    );
+
+    if (!isFormValid) return;
+
+    console.log("Call API RESET PASSWORD");
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -35,7 +100,7 @@ export default function Page() {
       className="min-h-screen flex items-center justify-center bg-cover bg-center p-4"
       style={{ backgroundImage: "url('/download (8).jfif')" }}
     >
-      <div className="w-full min-w-[330px] h-[540px] sm:w-[480px] sm:h-[620px] lg:w-[1000px] lg:h-[640px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
+      <div className="w-full min-w-[330px] h-[540px] sm:w-[480px] sm:h-[620px] lg:w-[1000px] lg:h-[670px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
         {/* ── TRÁI: Slider ── */}
         <div className="hidden lg:block lg:w-[52%] relative overflow-hidden rounded-l-2xl">
           {images.map((img, index) => {
@@ -125,7 +190,13 @@ export default function Page() {
                   type={showNew ? "text" : "password"}
                   placeholder="••••••••"
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  aria-invalid={
+                    activeErrorField === "newPassword" && Boolean(activeError)
+                  }
+                  aria-describedby="new-password-error"
+                  onChange={(e) => updateField("newPassword", e.target.value)}
+                  onFocus={() => setActiveErrorField("newPassword")}
+                  onBlur={() => markFieldTouched("newPassword")}
                   className="w-full h-10 px-3 pr-10 rounded-md border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400 transition-all"
                 />
                 <button
@@ -140,6 +211,13 @@ export default function Page() {
                   )}
                 </button>
               </div>
+              <div id="new-password-error">
+                <ValidationMessage
+                  message={
+                    activeErrorField === "newPassword" ? activeError : ""
+                  }
+                />
+              </div>
             </div>
 
             {/* Xác nhận mật khẩu */}
@@ -152,9 +230,18 @@ export default function Page() {
                   type={showConfirm ? "text" : "password"}
                   placeholder="••••••••"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  aria-invalid={
+                    activeErrorField === "confirmPassword" &&
+                    Boolean(activeError)
+                  }
+                  aria-describedby="confirm-password-error"
+                  onChange={(e) =>
+                    updateField("confirmPassword", e.target.value)
+                  }
+                  onFocus={() => setActiveErrorField("confirmPassword")}
+                  onBlur={() => markFieldTouched("confirmPassword")}
                   className={`w-full h-10 px-3 pr-10 rounded-md border bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
-                    passwordMismatch
+                    activeErrorField === "confirmPassword" && activeError
                       ? "border-red-300 focus:ring-red-300/50 focus:border-red-400"
                       : "border-slate-200 focus:ring-cyan-400/50 focus:border-cyan-400"
                   }`}
@@ -171,17 +258,20 @@ export default function Page() {
                   )}
                 </button>
               </div>
-              {passwordMismatch && (
-                <p className="text-xs text-red-400">
-                  Mật khẩu xác nhận không khớp.
-                </p>
-              )}
+              <div id="confirm-password-error">
+                <ValidationMessage
+                  message={
+                    activeErrorField === "confirmPassword" ? activeError : ""
+                  }
+                />
+              </div>
             </div>
           </div>
 
           {/* Nút xác nhận */}
           <button
-            disabled={passwordMismatch || !newPassword || !confirmPassword}
+            disabled={!isFormValid}
+            onClick={handleResetPassword}
             className="w-full h-10 rounded-md bg-cyan-700 hover:bg-cyan-800 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] text-white text-sm font-semibold tracking-wide transition-all mb-4"
           >
             Xác nhận đổi mật khẩu
