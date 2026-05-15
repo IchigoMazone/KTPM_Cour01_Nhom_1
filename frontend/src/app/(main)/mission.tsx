@@ -1,82 +1,110 @@
-
 "use client";
 
-import React from "react";
-import { Shield, Leaf, Heart, Award } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { Award, Check, Heart, Leaf, Shield } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { GradientText } from "@/src/components/ui/gradient-text";
 
+type Value = {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  label: string;
+};
+
+const values: Value[] = [
+  {
+    icon: Shield,
+    title: "An toàn tuyệt đối",
+    label: "Bảo vệ vải",
+    description:
+      "Mỗi loại vải được xử lý riêng theo công thức phù hợp để hạn chế co rút, lem màu và hư hại.",
+  },
+  {
+    icon: Leaf,
+    title: "Thân thiện môi trường",
+    label: "Quy trình xanh",
+    description:
+      "Ưu tiên sản phẩm giặt là sinh học, an toàn cho sức khỏe và giảm tác động đến môi trường.",
+  },
+  {
+    icon: Heart,
+    title: "Tận tâm phục vụ",
+    label: "Luôn hỗ trợ",
+    description:
+      "Đội ngũ tư vấn lắng nghe từng yêu cầu, hỗ trợ qua điện thoại, Zalo và trực tiếp tại cửa hàng.",
+  },
+  {
+    icon: Award,
+    title: "Chất lượng cam kết",
+    label: "Đảm bảo đầu ra",
+    description:
+      "Nếu kết quả chưa đạt kỳ vọng, chúng tôi hỗ trợ xử lý lại theo chính sách chất lượng.",
+  },
+];
+
 export default function Mission() {
-  const values = [
-    {
-      icon: Shield,
-      title: "An Toàn Tuyệt Đối",
-      description:
-        "Mỗi loại vải được xử lý riêng biệt theo công thức chuyên biệt. Chúng tôi phân loại kỹ lưỡng trước khi giặt, sử dụng nhiệt độ và chế độ phù hợp để đảm bảo không gây co rút, lem màu hay hư hại nào cho trang phục của bạn.",
-    },
-    {
-      icon: Leaf,
-      title: "Thân Thiện Môi Trường",
-      description:
-        "Chúng tôi sử dụng 100% sản phẩm giặt là sinh học, không chứa hoá chất độc hại. Quy trình xử lý nước thải đạt chuẩn, góp phần bảo vệ môi trường và đảm bảo an toàn tối đa cho sức khoẻ của khách hàng.",
-    },
-    {
-      icon: Heart,
-      title: "Tận Tâm Phục Vụ",
-      description:
-        "Đội ngũ nhân viên được tuyển chọn kỹ lưỡng và đào tạo chuyên nghiệp. Chúng tôi lắng nghe mọi yêu cầu của khách hàng, tư vấn tận tình và luôn sẵn sàng hỗ trợ 24/7 qua điện thoại, Zalo hay trực tiếp tại cửa hàng.",
-    },
-    {
-      icon: Award,
-      title: "Chất Lượng Cam Kết",
-      description:
-        "Chúng tôi cam kết chất lượng đầu ra của từng sản phẩm. Nếu bạn không hài lòng với kết quả, chúng tôi sẽ giặt lại miễn phí hoặc hoàn tiền 100%. Sự tin tưởng của khách hàng là thước đo thành công duy nhất của BegauShop.",
-
-    },
-  ];
-
   return (
     <section
       id="mission"
-
-      className="min-h-screen flex items-center justify-center bg-white"
+      className="flex min-h-screen items-center px-4 py-24 sm:px-6 lg:px-8"
     >
-      <div className="w-full max-w-6xl mx-auto px-6 pt-20 xl:pt-12">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-4xl font-bold tracking-tight mb-4">
-            <GradientText>
-              Đồ của bạn xứng đáng được chăm sóc tốt nhất
-            </GradientText>
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="mx-auto mb-12 flex max-w-3xl flex-col items-center text-center sm:mb-16">
+          <h1 className="mb-3 text-3xl font-bold tracking-tight sm:text-4xl">
+            <GradientText>Đồ của bạn xứng đáng được chăm sóc tốt nhất</GradientText>
           </h1>
-          <p className="text-gray-500 max-w-2xl mx-auto text-lg">
-            Với hơn 10 năm kinh nghiệm, BegauShop tự hào là điểm đến tin cậy của
-            hàng nghìn gia đình Hà Nội. Mỗi chiếc áo, mỗi bộ quần áo đều được
-            chúng tôi chăm sóc cẩn thận như đồ của chính mình.
+          <p className="text-base leading-7 text-muted-foreground sm:text-lg">
+            Với hơn 10 năm kinh nghiệm, BegauShop là điểm đến tin cậy của hàng
+            nghìn gia đình Hà Nội.
           </p>
         </div>
 
-        {/* Core Values */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {values.map((value, i) => (
-            <div
-              key={i}
-              className="p-6 bg-white border border-gray-200 rounded-2xl hover:shadow-lg hover:border-gray-300 transition-all duration-300 group"
-            >
-              <div className="p-3 bg-blue-50 rounded-xl w-fit mb-5 group-hover:bg-blue-100 transition-colors">
-                <value.icon
-                  className="w-6 h-6 text-blue-500"
-                  strokeWidth={1.5}
-                />
-              </div>
-              <h4 className="text-lg font-bold text-gray-900 mb-3">
-                {value.title}
-              </h4>
-              <p className="text-gray-500 text-sm leading-relaxed">
-                {value.description}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {values.map((value) => {
+            const Icon = value.icon;
 
-              </p>
-            </div>
-          ))}
+            return (
+              <Card
+                key={value.title}
+                className="border-blue-100 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg"
+              >
+                <CardHeader className="gap-4 pb-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex size-12 items-center justify-center rounded-lg bg-blue-50 text-blue-600 ring-1 ring-blue-200">
+                      <Icon className="size-6" />
+                    </div>
+                    <Badge
+                      variant="secondary"
+                      className="rounded-full bg-blue-50 text-blue-700"
+                    >
+                      {value.label}
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-lg">{value.title}</CardTitle>
+                </CardHeader>
+
+                <CardContent>
+                  <CardDescription className="leading-6">
+                    {value.description}
+                  </CardDescription>
+                </CardContent>
+
+                <CardFooter className="border-t bg-muted/30 text-xs font-medium text-muted-foreground">
+                  <Check className="mr-1.5 size-3.5 text-blue-600" />
+                  Tiêu chuẩn vận hành BegauShop
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
       </div>
     </section>

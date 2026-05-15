@@ -1,20 +1,16 @@
-// import React from "react";
-
-// export default function Catalog() {
-//   return (
-//     <section
-//       id="catalog"
-//       className="min-h-screen flex items-center justify-center bg-gray-100"
-//     >
-//       Catalog
-//     </section>
-//   );
-// }
-
 "use client";
 
-import React from "react";
-import { Shirt, Wind, Droplets, Briefcase } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { Briefcase, Check, Droplets, Shirt, Wind } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { GradientText } from "@/src/components/ui/gradient-text";
 
 /* DATA riêng trong cùng file */
@@ -25,87 +21,131 @@ const catalogData = {
 
   services: [
     {
-      icon: "normal",
+      icon: Shirt,
+      label: "Hằng ngày",
       title: "Giặt thường",
       desc: "Phù hợp quần áo mặc hằng ngày, xử lý sạch bụi bẩn và mùi khó chịu.",
       price: "Nhanh chóng - Tiết kiệm",
+      points: [
+        "Phân loại theo màu sắc",
+        "Giặt sạch mùi và bụi bẩn",
+        "Gấp gọn trước khi bàn giao",
+      ],
     },
     {
-      icon: "dry",
+      icon: Wind,
+      label: "Cao cấp",
       title: "Giặt khô",
       desc: "Dành cho vest, váy cao cấp và chất liệu cần bảo quản đặc biệt.",
       price: "An toàn - Cao cấp",
+      points: [
+        "Hạn chế biến dạng phom",
+        "Bảo vệ chất liệu nhạy cảm",
+        "Xử lý riêng từng sản phẩm",
+      ],
     },
     {
-      icon: "steam",
+      icon: Droplets,
+      label: "Khử mùi",
       title: "Giặt hấp",
       desc: "Khử mùi, làm mới trang phục bằng công nghệ hơi nước hiện đại.",
       price: "Sạch khuẩn - Thơm lâu",
+      points: [
+        "Làm mới bằng hơi nước",
+        "Giảm nhăn trên bề mặt vải",
+        "Giữ hương thơm dịu nhẹ",
+      ],
     },
     {
-      icon: "leather",
+      icon: Briefcase,
+      label: "Chuyên sâu",
       title: "Đồ da",
       desc: "Làm sạch và dưỡng bề mặt cho áo da, túi xách, giày da.",
       price: "Chuyên sâu - Tỉ mỉ",
+      points: [
+        "Làm sạch bề mặt nhẹ nhàng",
+        "Dưỡng mềm sau xử lý",
+        "Bảo quản phom và màu da",
+      ],
     },
-  ],
+  ] satisfies {
+    icon: LucideIcon;
+    label: string;
+    title: string;
+    desc: string;
+    price: string;
+    points: string[];
+  }[],
 };
 
 export default function Catalog() {
-  const iconMap = {
-    normal: Shirt,
-    dry: Wind,
-    steam: Droplets,
-    leather: Briefcase,
-  };
-
   return (
     <section
       id="catalog"
-      className="h-screen overflow-hidden px-4 flex items-center"
+      className="flex min-h-screen items-center px-4 py-24 sm:px-6 lg:px-8"
     >
-      <div className="max-w-6xl mx-auto w-full">
+      <div className="mx-auto w-full max-w-6xl">
         {/* Header */}
-        <div className="text-center mb-20">
-          <h1 className="text-4xl sm:text-5xl lg:text-4xl font-bold mb-3">
-            <GradientText >
-              {catalogData.title}
-            </GradientText>
+        <div className="mx-auto mb-12 flex max-w-2xl flex-col items-center text-center sm:mb-16">
+          <h1 className="mb-3 text-3xl font-bold tracking-tight sm:text-4xl">
+            <GradientText>{catalogData.title}</GradientText>
           </h1>
 
-          <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto">
+          <p className="text-base leading-7 text-muted-foreground sm:text-lg">
             {catalogData.subtitle}
           </p>
         </div>
 
         {/* Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {catalogData.services.map((item, index) => {
-            const Icon = iconMap[item.icon];
+            const Icon = item.icon;
 
             return (
-              <div
+              <Card
                 key={index}
-                className="bg-white rounded-3xl border border-gray-200 shadow-xl p-6 text-center"
+                className="border-blue-100 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center  mb-5">
-                    <Icon className="w-6 h-6 text-sky-500" />
+                <CardHeader className="gap-4 pb-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex size-12 items-center justify-center rounded-lg bg-blue-50 text-blue-600 ring-1 ring-blue-200">
+                      <Icon className="size-6" />
+                    </div>
+
+                    <Badge
+                      variant="secondary"
+                      className="rounded-full bg-blue-50 text-blue-700"
+                    >
+                      {item.label}
+                    </Badge>
                   </div>
 
-                  <span className="text-xl font-bold text-slate-900 mb-3">
-                    {item.title}
-                  </span>
-                </div>
+                  <CardTitle className="text-lg">{item.title}</CardTitle>
+                </CardHeader>
 
-                <p className="leading-relaxed mb-4 min-h-[72px]">
-                  {item.desc}
-                </p>
+                <CardContent className="space-y-5">
+                  <CardDescription className="min-h-18 leading-6">
+                    {item.desc}
+                  </CardDescription>
 
-                <span className="inline-block text-gray-500 text-sm font-medium px-4 py-2 rounded-full">
+                  <div className="space-y-3">
+                    {item.points.map((point) => (
+                      <div key={point} className="flex items-start gap-2 text-sm">
+                        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                          <Check className="size-3.5" />
+                        </span>
+                        <span className="leading-5 text-foreground/80">
+                          {point}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+
+                <CardFooter className="border-t bg-muted/30 text-xs font-medium text-muted-foreground">
                   {item.price}
-                </span>
-              </div>
+                </CardFooter>
+              </Card>
             );
           })}
         </div>
