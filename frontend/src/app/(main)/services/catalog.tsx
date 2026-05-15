@@ -62,12 +62,12 @@ export default function Catalog() {
   return (
     <section
       id="catalog"
-      className="h-screen overflow-hidden px-4 bg-gradient-to-b from-slate-50 via-white to-blue-50 scroll-mt-24 flex items-center"
+      className="h-screen overflow-hidden px-4 flex items-center"
     >
       <div className="max-w-6xl mx-auto w-full">
         {/* Header */}
         <div className="text-center mb-20">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-3">
+          <h1 className="text-4xl sm:text-5xl lg:text-4xl font-bold mb-3">
             <GradientText >
               {catalogData.title}
             </GradientText>
@@ -86,25 +86,25 @@ export default function Catalog() {
             return (
               <div
                 key={index}
-                className="bg-white rounded-3xl border border-blue-100 shadow-xl p-6 text-center"
+                className="bg-white rounded-3xl border border-gray-200 shadow-xl p-6 text-center"
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center  mb-5">
                     <Icon className="w-6 h-6 text-sky-500" />
                   </div>
 
-                  <GradientText className="text-xl font-bold text-slate-900 mb-3">
+                  <span className="text-xl font-bold text-slate-900 mb-3">
                     {item.title}
-                  </GradientText>
+                  </span>
                 </div>
 
-                <p className="text-slate-600 text-base leading-relaxed mb-4 min-h-[72px]">
+                <p className="leading-relaxed mb-4 min-h-[72px]">
                   {item.desc}
                 </p>
 
-                <GradientText className="inline-block bg-blue-50 text-sm font-medium px-4 py-2 rounded-full">
+                <span className="inline-block text-gray-500 text-sm font-medium px-4 py-2 rounded-full">
                   {item.price}
-                </GradientText>
+                </span>
               </div>
             );
           })}

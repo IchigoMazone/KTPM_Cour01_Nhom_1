@@ -43,7 +43,7 @@ export default function Mission() {
       <div className="w-full max-w-6xl mx-auto px-6 pt-20 xl:pt-12">
         {/* Header */}
         <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+          <h1 className="text-4xl md:text-4xl font-bold tracking-tight mb-4">
             <GradientText>
               Đồ của bạn xứng đáng được chăm sóc tốt nhất
             </GradientText>

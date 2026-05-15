@@ -1,553 +1,496 @@
 "use client";
-import React, { useState } from "react";
+
+import React, { useMemo, useState } from "react";
+
 import {
   Search,
-  Plus,
-  Download,
   MoreHorizontal,
+  Star,
+  Phone,
+  Mail,
+  MapPin,
+  Package,
+  ShoppingBag,
   ArrowLeft,
   ArrowRight,
 } from "lucide-react";
 
-export default function Home() {
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+
+/* ============================================================================
+   MOCK DATA
+============================================================================ */
+const customers = [
+  {
+    id: 1,
+    name: "Nguyễn Thị Hương",
+    phone: "0903123456",
+    email: "huong@gmail.com",
+    address: "123 Nguyễn Huệ, Quận 1, TP.HCM",
+    loyaltyPoints: 2400,
+    specialNotes: ["Dị ứng hóa chất mạnh", "Giặt riêng đồ trắng"],
+  },
+  {
+    id: 2,
+    name: "Trần Văn Minh",
+    phone: "0912456789",
+    email: "minh@gmail.com",
+    address: "45 Lê Lợi, Quận 5, TP.HCM",
+    loyaltyPoints: 1200,
+    specialNotes: ["Khách VIP", "Giao hàng sau 18h"],
+  },
+  {
+    id: 3,
+    name: "Phạm Thị Lan",
+    phone: "0938123456",
+    email: "lan@gmail.com",
+    address: "89 Pasteur, Quận 3, TP.HCM",
+    loyaltyPoints: 860,
+    specialNotes: ["Không dùng nước xả"],
+  },
+];
+
+const orders = [
+  {
+    id: "DH001",
+    customerId: 1,
+    customerName: "Nguyễn Thị Hương",
+    service: "Giặt sấy cao cấp",
+    createdAt: "08:30 01/05/2026",
+    completedAt: "17:00 01/05/2026",
+    note: "Giao trước 18h",
+    date: "2026-05-01",
+    quantity: 5,
+    total: 250000,
+    status: "Hoàn thành",
+    items: [
+      { name: "Áo sơ mi", quantity: 3, price: 30000 },
+      { name: "Quần tây", quantity: 2, price: 40000 },
+    ],
+  },
+  {
+    id: "DH002",
+    customerId: 1,
+    customerName: "Nguyễn Thị Hương",
+    service: "Giặt nhanh",
+    createdAt: "09:00 26/04/2026",
+    completedAt: "Đang xử lý",
+    note: "Không dùng nước xả",
+    date: "2026-04-26",
+    quantity: 3,
+    total: 180000,
+    status: "Đang xử lý",
+    items: [
+      { name: "Áo hoodie", quantity: 1, price: 80000 },
+      { name: "Quần jean", quantity: 2, price: 50000 },
+    ],
+  },
+  {
+    id: "DH003",
+    customerId: 2,
+    customerName: "Trần Văn Minh",
+    service: "Giặt hấp",
+    createdAt: "10:30 02/05/2026",
+    completedAt: "16:00 02/05/2026",
+    note: "Khách VIP",
+    date: "2026-05-02",
+    quantity: 7,
+    total: 420000,
+    status: "Hoàn thành",
+    items: [
+      { name: "Vest", quantity: 2, price: 120000 },
+      { name: "Sơ mi", quantity: 5, price: 36000 },
+    ],
+  },
+  {
+    id: "DH004",
+    customerId: 3,
+    customerName: "Phạm Thị Lan",
+    service: "Giặt thường",
+    createdAt: "13:00 03/05/2026",
+    completedAt: "Đang giao",
+    note: "Không dùng nước xả",
+    date: "2026-05-03",
+    quantity: 2,
+    total: 120000,
+    status: "Đang giao",
+    items: [{ name: "Đầm", quantity: 2, price: 60000 }],
+  },
+];
+
+const ITEMS_PER_PAGE = 10;
+
+export default function CustomerPage() {
+  /* ---------- State ---------- */
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(
+    null,
+  );
+  const [openCustomerDetail, setOpenCustomerDetail] = useState(false);
 
-  const [showInfor, setShowInfor] = useState(null);
+  /* ---------- Derived data ---------- */
+  const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
+  const customerOrders = orders.filter(
+    (o) => o.customerId === selectedCustomerId,
+  );
 
-  const [tooltip, setTooltip] = useState(null);
-  const customers = [
-    {
-      id: 1,
-      name: "Nguyễn Thị Hương",
-      phone: "0903123456",
-      address: "123 Nguyễn Huệ, Q1, TP.HCM",
+  const orderCountByCustomer = useMemo(() => {
+    const map: Record<number, number> = {};
+    orders.forEach((o) => (map[o.customerId] = (map[o.customerId] || 0) + 1));
+    return map;
+  }, []);
 
-      totalOrders: 24,
-      totalSpent: 4800000,
-      loyaltyPoints: 2400,
-      specialNotes: `Dị ứng với hóa chất tẩy trắng,
-        Yêu cầu giặt tay áo lụa`,
+  const filteredCustomers = useMemo(() => {
+    return customers.filter(
+      (customer) =>
+        customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        customer.phone.includes(searchQuery),
+    );
+  }, [searchQuery]);
 
-      orderHistory: [
-        {
-          id: "ORD-001",
-          date: "2024-04-28",
-          amount: 250000,
-          items: 5,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-002",
-          date: "2024-04-21",
-          amount: 180000,
-          items: 3,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-003",
-          date: "2024-04-14",
-          amount: 320000,
-          items: 8,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-004",
-          date: "2024-04-07",
-          amount: 150000,
-          items: 2,
-          status: "Hoàn thành",
-        },
-      ],
-    },
-    {
-      id: 2,
-      name: "Trần Văn Minh",
-      phone: "0912456789",
-      address: "456 Lê Lợi, Q5, TP.HCM",
-      joinDate: "2023-06-20",
-      totalOrders: 18,
-      totalSpent: 3200000,
-      loyaltyPoints: 1600,
+  const visibleCustomers = filteredCustomers.slice(0, ITEMS_PER_PAGE);
 
-      lastOrder: "2024-04-25",
-      avatar: "TVM",
-      specialNotes: `Yêu cầu giặt nhanh`,
-      orderHistory: [
-        {
-          id: "ORD-005",
-          date: "2024-04-25",
-          amount: 200000,
-          items: 4,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-006",
-          date: "2024-04-18",
-          amount: 175000,
-          items: 3,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-007",
-          date: "2024-04-11",
-          amount: 280000,
-          items: 6,
-          status: "Hoàn thành",
-        },
-      ],
-    },
-    {
-      id: 3,
-      name: "Phạm Thị Xuân",
-      phone: "0938789012",
-      address: "789 Pasteur, Q3, TP.HCM",
-      joinDate: "2024-01-10",
-      totalOrders: 5,
-      totalSpent: 850000,
-      loyaltyPoints: 425,
-
-      lastOrder: "2024-04-20",
-      avatar: "PTX",
-      specialNotes: `Khách hàng mới - tặng 10% cho 3 đơn đầu`,
-      orderHistory: [
-        {
-          id: "ORD-008",
-          date: "2024-04-20",
-          amount: 220000,
-          items: 4,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-009",
-          date: "2024-04-05",
-          amount: 170000,
-          items: 2,
-          status: "Hoàn thành",
-        },
-      ],
-    },
-    {
-      id: 4,
-      name: "Võ Đình Long",
-      phone: "0968234567",
-      address: "321 Trần Hưng Đạo, Q1, TP.HCM",
-
-      totalOrders: 42,
-      totalSpent: 8500000,
-      loyaltyPoints: 4250,
-
-      specialNotes: `
-        VIP - Nên gọi xác nhận trước khi giao,
-        Yêu cầu giặt riêng (không trộn với đơn khác)`,
-
-      orderHistory: [
-        {
-          id: "ORD-010",
-          date: "2024-04-29",
-          amount: 450000,
-          items: 10,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-011",
-          date: "2024-04-22",
-          amount: 380000,
-          items: 8,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-012",
-          date: "2024-04-15",
-          amount: 520000,
-          items: 12,
-          status: "Hoàn thành",
-        },
-      ],
-    },
-
-    {
-      id: 5,
-      name: "Võ Đình A",
-      phone: "0968234567",
-      address: "321 Trần Hưng Đạo, Q1, TP.HCM",
-
-      totalOrders: 42,
-      totalSpent: 8500000,
-      loyaltyPoints: 4250,
-
-      specialNotes: `
-        VIP - Nên gọi xác nhận trước khi giao,
-        Yêu cầu giặt riêng (không trộn với đơn khác)`,
-
-      orderHistory: [
-        {
-          id: "ORD-010",
-          date: "2024-04-29",
-          amount: 450000,
-          items: 10,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-011",
-          date: "2024-04-22",
-          amount: 380000,
-          items: 8,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-012",
-          date: "2024-04-15",
-          amount: 520000,
-          items: 12,
-          status: "Hoàn thành",
-        },
-      ],
-    },
-    {
-      id: 6,
-      name: "Võ Đình B",
-      phone: "0968-234-567",
-      address: "321 Trần Hưng Đạo, Q1, TP.HCM",
-
-      totalOrders: 42,
-      totalSpent: 8500000,
-      loyaltyPoints: 4250,
-
-      specialNotes: `
-        VIP - Nên gọi xác nhận trước khi giao,
-        Yêu cầu giặt riêng (không trộn với đơn khác)`,
-
-      orderHistory: [
-        {
-          id: "ORD-010",
-          date: "2024-04-29",
-          amount: 450000,
-          items: 10,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-011",
-          date: "2024-04-22",
-          amount: 380000,
-          items: 8,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-012",
-          date: "2024-04-15",
-          amount: 520000,
-          items: 12,
-          status: "Hoàn thành",
-        },
-      ],
-    },
-    {
-      id: 7,
-      name: "Võ Đình C",
-      phone: "0968234567",
-      address: "321 Trần Hưng Đạo, Q1, TP.HCM",
-
-      totalOrders: 42,
-      totalSpent: 8500000,
-      loyaltyPoints: 4250,
-
-      specialNotes: `
-        VIP - Nên gọi xác nhận trước khi giao,
-        Yêu cầu giặt riêng (không trộn với đơn khác)`,
-
-      orderHistory: [
-        {
-          id: "ORD-010",
-          date: "2024-04-29",
-          amount: 450000,
-          items: 10,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-011",
-          date: "2024-04-22",
-          amount: 380000,
-          items: 8,
-          status: "Hoàn thành",
-        },
-        {
-          id: "ORD-012",
-          date: "2024-04-15",
-          amount: 520000,
-          items: 12,
-          status: "Hoàn thành",
-        },
-      ],
-    },
-  ];
-
-  const selectedCustomer = customers.find((c) => c.id === showInfor);
-
+  /* ---------- UI ---------- */
   return (
-    <div className="min-h-screen p-6 mx-auto ">
-      <div className="flex justify-between items-start mb-6">
-        <h1 className="text-2xl font-bold mb-2">Quản Lý Khách Hàng</h1>
-      </div>
-
-      <div className="border-[1px] border-solid border-gray-200 rounded-[12px] overflow-hidden">
-        <div className="p-5 flex justify-between  border-b border-gray-200">
+    <div className="min-h-screen bg-[#f4f7fb]">
+      <div className="mx-auto p-6">
+        {/* HEADER */}
+        <div className="mb-8 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold">Danh Sách Khách Hàng</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Quản lý và theo dõi thông tin khách hàng
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Quản lý khách hàng
+            </h1>
+            <p className="mt-2 text-slate-500">
+              Quản lý hồ sơ khách hàng và lịch sử đơn giặt
             </p>
           </div>
+        </div>
 
-          <div className="flex gap-3">
-            <button className="flex items-center gap-2 border-[1px] border-solid border-gray-300 px-4 py-3 rounded-lg text-sm">
-              Xuất dữ liệu
-              <Download size={18} />
-            </button>
-            <button className="flex items-center gap-2 bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 active:bg-blue-600 text-sm">
-              <Plus size={18} />
-              Thêm khách hàng
-            </button>
+        <Card className="overflow-hidden rounded-[20px] border-0 bg-white ">
+          {/* TOP */}
+          <div className="flex items-center justify-between border-b border-gray-200 px-8 py-7">
+            {/* SEARCH */}
+            <div className="relative w-[360px]">
+              <Search className="absolute left-4 top-4 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Tìm kiếm khách hàng..."
+                className="h-12 rounded-2xl border-slate-200 bg-slate-50 pl-11"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
-        </div>
 
-        <div className="border-b border-gray-300 p-5 relative">
-          <Search className="absolute left-8 top-8 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Tìm kiếm theo tên hoặc số điện thoại..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-[30%] pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 "
-          />
-        </div>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-gray-200 bg-slate-50/60 hover:bg-slate-50/60">
+                  <TableHead className="px-8 py-5">Khách hàng</TableHead>
+                  <TableHead>Số điện thoại</TableHead>
+                  <TableHead>Địa chỉ</TableHead>
+                  <TableHead>Điểm</TableHead>
+                  <TableHead>Ghi chú</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
 
-        {/* Main Content */}
-        <div className="">
-          <table className="w-full bg-white shadow-sm overflow-hidden">
-            <thead className="bg-gray-100 text-gray-600 text-sm font-base ">
-              <tr>
-                <th className="p-4 text-left flex gap-3">Khách hàng</th>
-                <th className="text-left p-4">Số điện thoại</th>
-                <th className="text-left p-4">Địa chỉ</th>
-                <th className="text-left flex gap-3 p-4">Điểm tích lũy</th>
-                <th className="text-left p-4">Ghi chú</th>
-                <th></th>
-              </tr>
-            </thead>
+              <TableBody>
+                {visibleCustomers.map((customer) => (
+                  <TableRow
+                    key={customer.id}
+                    className="border-b border-gray-200 transition-all hover:bg-slate-50/70"
+                  >
+                    {/* CUSTOMER */}
+                    <TableCell className="px-8 py-6">
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <p className="">{customer.name}</p>
+                        </div>
+                      </div>
+                    </TableCell>
 
-            <tbody className="text-sm text-gray-600">
-              {customers.map((c) => (
-                <tr
-                  key={c.id}
-                  className="border-t border-gray-300 hover:bg-gray-50 transition"
-                >
-                  <td className="p-4 font-medium">{c.name}</td>
-                  <td className="p-4">{c.phone}</td>
-                  <td className="p-4">{c.address}</td>
-                  <td className="p-4 ">{c.loyaltyPoints}</td>
-                  <td className="p-4 text-gray-600">{c.specialNotes || "-"}</td>
-                  <td className="p-4 text-center relative">
-                    <button
-                      className="p-2 rounded-lg hover:bg-gray-200 transition"
-                      onClick={() => setTooltip(tooltip === c.id ? null : c.id)}
-                    >
-                      <MoreHorizontal className="w-4 h-4 text-gray-600" />
-                    </button>
-                    {tooltip === c.id && (
-                      <div className="tooltip z-10 absolute top-10 right-5 bg-white w-40 flex flex-col border-[1px] border-gray-300 p-2 rounded-[12px] gap-1">
-                        <button
-                          className="px-3 py-2 flex justify-start hover:bg-gray-200 hover:rounded-[8px]"
-                          onClick={() => {
-                            setShowInfor(tooltip);
-                            setTooltip(null);
-                          }}
+                    {/* PHONE */}
+                    <TableCell className="font-medium text-slate-700">
+                      {customer.phone}
+                    </TableCell>
+
+                    {/* ADDRESS */}
+                    <TableCell className="text-slate-900">
+                      {customer.address}
+                    </TableCell>
+
+                    <TableCell className="font-medium text-slate-900">
+                      {customer.loyaltyPoints}
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex flex-wrap gap-2">
+                        {customer.specialNotes.map((note, index) => (
+                          <Badge
+                            key={index}
+                            className="rounded-full bg-slate-100 px-4 py-1.5 text-slate-700 hover:bg-slate-100"
+                          >
+                            {note}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+
+                    {/* ACTION */}
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-xl"
+                          >
+                            <MoreHorizontal className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+
+                        <DropdownMenuContent
+                          align="end"
+                          className="w-44 rounded-2xl"
                         >
-                          Xem Thêm
-                        </button>
-                        <button className="px-3 py-2 flex justify-start hover:bg-gray-200 hover:rounded-[8px]">
-                          Xóa
-                        </button>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedCustomerId(customer.id);
+                              setOpenCustomerDetail(true);
+                            }}
+                          >
+                            Xem chi tiết
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem className="text-red-500">
+                            Xóa khách hàng
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+
+              <TableFooter>
+                <TableRow>
+                  <TableCell rowSpan={7} className="flex justify-between items-center">
+                    <span>hiển thị 10/20</span>
+                    <div>
+                      <Button className="px-2 py-2">
+                        <ArrowLeft size={18}></ArrowLeft>
+                      </Button>
+                      <Button className="px-2 py-2">
+                        <ArrowRight size={18}></ArrowRight>
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {selectedCustomer && openCustomerDetail && (
+          <div className="fixed left-1/2 top-20 z-50 h-[80%] w-[90%] -translate-x-1/2 overflow-hidden rounded-[40px] border border-slate-200 bg-[#f4f7fb] shadow-xl">
+            <Card className="h-full rounded-[40px] border border-slate-200 bg-white shadow-sm">
+              <div className="grid h-full grid-cols-[380px_1fr]">
+                {/* LEFT INFO */}
+                <div className="border-r border-slate-100 bg-slate-50/50 p-8">
+                  {/* PROFILE */}
+                  <div className="flex items-center gap-5">
+                    <Avatar className="h-24 w-24 rounded-3xl shadow-sm">
+                      <AvatarFallback className="rounded-3xl bg-gradient-to-br from-slate-900 to-slate-700 text-3xl font-bold text-white">
+                        {selectedCustomer.name
+                          .split(" ")
+                          .slice(-2)
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900">
+                        {selectedCustomer.name}
+                      </h2>
+                      <p className="text-slate-500">Khách hàng thân thiết</p>
+
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        <Badge className="rounded-full bg-slate-900 px-4 py-1.5 text-white hover:bg-slate-900">
+                          {selectedCustomer.loyaltyPoints} điểm
+                        </Badge>
+                        <Badge className="rounded-full bg-slate-200 px-4 py-1.5 text-slate-700 hover:bg-slate-200">
+                          <ShoppingBag className="mr-2 h-4 w-4" />
+                          {customerOrders.length} đơn
+                        </Badge>
                       </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-
-            <tfoot className="border-t border-gray-300">
-              <tr>
-                <td colSpan={7} className="p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">
-                      Showing 1 to 7 of 20
-                    </span>
-
-                    <div className="flex gap-2">
-                      <button className="w-10 h-10 flex justify-center items-center rounded-[8px] border-[1px] border-gray-200 text-gray-900">
-                        <ArrowLeft size={20} />
-                      </button>
-                      <div className="flex gap-1">
-                        <button className="w-10 h-10 hover:bg-blue-600 hover:text-white hover:rounded-[8px]">
-                          1
-                        </button>
-                        <button className="w-10 h-10 hover:bg-blue-600 hover:text-white hover:rounded-[8px]">
-                          2
-                        </button>
-                        <button className="w-10 h-10 hover:bg-blue-600 hover:text-white hover:rounded-[8px]">
-                          3
-                        </button>
-                      </div>
-
-                      <button className="w-10 h-10 flex justify-center items-center rounded-[8px] border-[1px] border-gray-200 text-gray-900">
-                        <ArrowRight size={20} />
-                      </button>
                     </div>
                   </div>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
 
-          {selectedCustomer && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-              <div className="w-[75%] h-[85%] bg-white rounded-2xl shadow-2xl overflow-hidden">
-                {/* HEADER */}
-                <div className="flex justify-between items-center border-b border-gray-200 p-6">
-                  <div>
-                    <h2 className="text-2xl font-bold">Thông tin khách hàng</h2>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Chi tiết hồ sơ và lịch sử đơn hàng
-                    </p>
+                  {/* CONTACT + NOTES */}
+                  <div className="mt-10 space-y-6">
+                    {/* PHONE */}
+                    <InfoBlock icon={Phone} label="Số điện thoại">
+                      {selectedCustomer.phone}
+                    </InfoBlock>
+                    {/* EMAIL */}
+                    <InfoBlock icon={Mail} label="Email">
+                      {selectedCustomer.email}
+                    </InfoBlock>
+                    {/* ADDRESS */}
+                    <InfoBlock icon={MapPin} label="Địa chỉ">
+                      {selectedCustomer.address}
+                    </InfoBlock>
+                    {/* NOTES */}
+                    <InfoBlock icon={Package} label="Ghi chú đặc biệt">
+                      <div className="flex flex-wrap gap-3">
+                        {selectedCustomer.specialNotes.map((note, idx) => (
+                          <Badge
+                            key={idx}
+                            className="rounded-full bg-red-50 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                          >
+                            {note}
+                          </Badge>
+                        ))}
+                      </div>
+                    </InfoBlock>
                   </div>
-
-                  <button
-                    onClick={() => setShowInfor(null)}
-                    className="w-10 h-10 rounded-lg hover:bg-gray-100 text-xl"
-                  >
-                    ✕
-                  </button>
                 </div>
 
-                {/* CONTENT */}
-                <div className="p-6 overflow-y-auto h-[calc(100%-88px)]">
-                  {/* TOP INFO */}
-                  <div className="p-5 mb-6 border border-gray-200 rounded-2xl ">
-                    {/* PROFILE */}
-
-                    <h3 className="text-lg font-semibold mb-5 pb-5 border-b border-gray-300">
-                      Hồ sơ khách hàng
-                    </h3>
-
-                    <div className="grid grid-cols-2 w-full flex justify-between text-sm col-span-2 ">
-                      {/* LEFT */}
-                      <div className="space-y-5 border-r border-gray-200">
-                        <div>
-                          <p className="text-gray-500 mb-1">Họ tên</p>
-                          <p className="font-medium">{selectedCustomer.name}</p>
-                        </div>
-
-                        <div>
-                          <p className="text-gray-500 mb-1">Số điện thoại</p>
-                          <p className="font-medium">
-                            {selectedCustomer.phone}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-gray-500 mb-1">Địa chỉ</p>
-                          <p className="font-medium">
-                            {selectedCustomer.address}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* RIGHT */}
-                      <div className="space-y-5 text-right">
-                        <div>
-                          <p className="text-gray-500 text-sm">Tổng đơn hàng</p>
-                          <p className="text-sm font-semibold">
-                            {selectedCustomer.totalOrders}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-gray-500 text-sm">Tổng chi tiêu</p>
-                          <p className="text-sm font-bold text-green-500">
-                            {selectedCustomer.totalSpent.toLocaleString()}đ
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-gray-500 text-sm">Điểm tích lũy</p>
-                          <p className="text-sm font-bold text-blue-500">
-                            {selectedCustomer.loyaltyPoints}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* NOTES */}
-                  <div className="border border-gray-200 rounded-2xl p-5 mb-6">
-                    <h3 className="text-lg font-semibold mb-3 ">
-                      Ghi chú đặc biệt
-                    </h3>
-
-                    <p className="text-sm text-gray-700 whitespace-pre-line">
-                      {selectedCustomer.specialNotes}
-                    </p>
-                  </div>
-
-                  {/* ORDER HISTORY */}
-                  <div className="border border-gray-200 rounded-2xl overflow-hidden">
-                    <div className="p-5 border-b border-gray-200">
-                      <h3 className="text-lg font-semibold">
+                {/* RIGHT CONTENT – ORDER HISTORY */}
+                <div className="h-full flex flex-col ">
+                  {/* HEADER */}
+                  <div className="flex items-center justify-between border-b border-slate-100 px-8 py-7">
+                    <div>
+                      <h2 className="text-3xl font-bold tracking-tight text-slate-900">
                         Lịch sử đơn hàng
-                      </h3>
+                      </h2>
+                      <p className="mt-2 text-slate-500">
+                        Theo dõi toàn bộ đơn giặt của khách hàng
+                      </p>
                     </div>
+                    {/* SEARCH IN ORDERS (placeholder) */}
+                    <div className="relative w-[340px]">
+                      <Search className="absolute left-4 top-4 h-4 w-4 text-slate-400" />
+                      <Input
+                        placeholder="Tìm mã đơn..."
+                        className="h-12 rounded-2xl border-slate-200 bg-slate-50 pl-11"
+                      />
+                    </div>
+                  </div>
 
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50 text-gray-600">
-                        <tr>
-                          <th className="p-4 text-left">Mã đơn</th>
-                          <th className="text-left">Ngày</th>
-                          <th className="text-left">Số lượng</th>
-                          <th className="text-left">Tổng tiền</th>
-                          <th className="text-left">Trạng thái</th>
-                        </tr>
-                      </thead>
+                  {/* ORDER TABLE */}
+                  <div className="flex-1 overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
+                          <TableHead className="px-8 py-5">Mã đơn</TableHead>
+                          <TableHead>Dịch vụ</TableHead>
+                          <TableHead>Ngày tạo</TableHead>
+                          <TableHead>Tổng tiền</TableHead>
+                          <TableHead>Trạng thái</TableHead>
+                        </TableRow>
+                      </TableHeader>
 
-                      <tbody>
-                        {selectedCustomer.orderHistory.map((order) => (
-                          <tr
+                      <TableBody>
+                        {customerOrders.map((order) => (
+                          <TableRow
                             key={order.id}
-                            className="border-t border-gray-200 hover:bg-gray-50"
+                            className="cursor-pointer border-b border-slate-100 transition-all hover:bg-slate-50/70"
                           >
-                            <td className="p-4 font-medium">{order.id}</td>
+                            <TableCell className="px-8 py-6">
+                              <p className="font-semibold text-slate-900">
+                                {order.id}
+                              </p>
+                              <p className="mt-1 text-sm text-slate-500">
+                                {order.quantity} sản phẩm
+                              </p>
+                            </TableCell>
 
-                            <td>{order.date}</td>
+                            <TableCell>
+                              <p className="font-medium text-slate-900">
+                                {order.service}
+                              </p>
+                              <p className="mt-1 text-sm text-slate-500">
+                                {order.createdAt}
+                              </p>
+                            </TableCell>
 
-                            <td>{order.items} món</td>
+                            <TableCell className="text-slate-600">
+                              {order.date}
+                            </TableCell>
 
-                            <td className="font-medium">
-                              {order.amount.toLocaleString()}đ
-                            </td>
+                            <TableCell>
+                              <p className="text-sm font-semibold text-slate-900">
+                                {order.total.toLocaleString()}đ
+                              </p>
+                            </TableCell>
 
-                            <td>
-                              <span className="px-3 py-1 rounded-full bg-green-100 text-green-600 text-xs font-medium">
+                            <TableCell>
+                              <Badge
+                                className={
+                                  order.status === "Hoàn thành"
+                                    ? "rounded-full bg-green-100 px-4 py-2 text-green-700 hover:bg-green-100"
+                                    : "rounded-full bg-yellow-100 px-4 py-2 text-yellow-700 hover:bg-yellow-100"
+                                }
+                              >
                                 {order.status}
-                              </span>
-                            </td>
-                          </tr>
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
                         ))}
-                      </tbody>
-                    </table>
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            </Card>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================================
+   SMALL SUB-COMPONENTS
+============================================================================ */
+function InfoBlock({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: any;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-3 text-slate-500">
+        <Icon className="h-5 w-5" />
+        <span className="text-sm font-medium">{label}</span>
+      </div>
+      <div className="mt-4 text-lg font-semibold text-slate-900">
+        {children}
       </div>
     </div>
   );

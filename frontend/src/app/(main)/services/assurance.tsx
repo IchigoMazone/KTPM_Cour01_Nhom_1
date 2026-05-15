@@ -58,12 +58,12 @@ export default function Assurance() {
   return (
     <section
       id="assurance"
-      className="h-screen flex items-center bg-gradient-to-b from-slate-50 via-white to-blue-50"
+      className="h-screen flex items-center"
     >
       <div className="max-w-6xl mx-auto w-full">
         {/* Header */}
         <div className="text-center mb-20">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-3">
+          <h1 className="text-4xl sm:text-5xl lg:text-4xl font-bold mb-3">
             <GradientText >
               {assuranceData.title}
             </GradientText>
