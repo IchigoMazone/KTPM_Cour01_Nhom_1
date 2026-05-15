@@ -106,12 +106,12 @@ export default function DashboardOverview() {
             Doanh số theo tháng (Đơn)
           </h3>
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={salesMonthly} radius={[8, 8, 0, 0]} maxBarSize={28}>
+            <BarChart data={salesMonthly} maxBarSize={28}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="month" stroke="#94a3b8" />
               <YAxis stroke="#94a3b8" />
-              <Tooltip formatter={(v: number) => v} />
-              <Bar dataKey="sales" fill="#2563eb" />
+              <Tooltip formatter={(value) => value} />
+              <Bar dataKey="sales" fill="#2563eb" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
