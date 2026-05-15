@@ -21,7 +21,6 @@ const emptyTouched = {
   username: false,
   password: false,
   confirm: false,
-  agreed: false,
 };
 
 const fieldOrder: RegisterField[] = [
@@ -31,7 +30,6 @@ const fieldOrder: RegisterField[] = [
   "username",
   "password",
   "confirm",
-  "agreed",
 ];
 
 function ValidationMessage({ message }: { message: string }) {
@@ -75,7 +73,9 @@ export default function Page() {
   const formErrors = validateRegisterForm(formValues);
   const isFormValid = fieldOrder.every((field) => !formErrors[field]);
   const activeError =
-    activeErrorField && touched[activeErrorField]
+    activeErrorField &&
+    activeErrorField !== "agreed" &&
+    touched[activeErrorField]
       ? formErrors[activeErrorField]
       : "";
 
@@ -88,7 +88,9 @@ export default function Page() {
     if (field === "confirm") setConfirm(String(value));
     if (field === "agreed") setAgreed(Boolean(value));
 
-    setActiveErrorField(field);
+    if (field !== "agreed") {
+      setActiveErrorField(field);
+    }
   };
 
   const markFieldTouched = (field: RegisterField) => {
@@ -107,7 +109,6 @@ export default function Page() {
       username: true,
       password: true,
       confirm: true,
-      agreed: true,
     });
     setActiveErrorField(
       fieldOrder.find((field) => formErrors[field]) ?? null,
@@ -381,10 +382,6 @@ export default function Page() {
             <div
               onClick={() => {
                 updateField("agreed", !agreed);
-                setTouched((currentTouched) => ({
-                  ...currentTouched,
-                  agreed: true,
-                }));
               }}
               className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center border transition-all duration-200 shrink-0 ${
                 agreed
@@ -421,11 +418,6 @@ export default function Page() {
               </Link>
             </span>
           </label>
-          <div id="agreed-error" className="-mt-4 mb-4">
-            <ValidationMessage
-              message={activeErrorField === "agreed" ? activeError : ""}
-            />
-          </div>
 
           {/* Nút đăng ký */}
           <button
