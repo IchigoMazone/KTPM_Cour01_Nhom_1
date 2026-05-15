@@ -3,6 +3,7 @@
 import React from "react";
 import Sidebar from "@/src/components/common/sidebar";
 import Search from "@/src/components/common/search";
+
 import { useNavbarStore } from "@/src/context/useNavbarStore";
 
 export default function HomeLayout({
@@ -14,6 +15,7 @@ export default function HomeLayout({
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
+
       <div className="flex flex-col flex-1 relative">
         {open && (
           <div

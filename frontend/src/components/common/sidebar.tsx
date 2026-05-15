@@ -1,5 +1,6 @@
 "use client";
 
+
 import React, { useState, useEffect } from "react";
 import { Panda, Settings, LogOut, PanelLeft } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
@@ -14,12 +15,14 @@ export default function Sidebar() {
 
   const iconSize = 18;
   const stroke = 1.5;
+
   const [activeX, setActiveX] = useState<boolean>(false);
 
   const isActive = (item: (typeof menus)[0]) => {
     if (item.exact) return pathname === item.path;
     return pathname.startsWith(item.path);
   };
+
 
   useEffect(() => {
     if (open) {
@@ -89,8 +92,8 @@ export default function Sidebar() {
             {menus.map((item, index) => {
               const Icon = item.icon;
               const active = isActive(item);
-              const label = item.label;
 
+              const label = item.label;
               return (
                 <button
                   key={index}

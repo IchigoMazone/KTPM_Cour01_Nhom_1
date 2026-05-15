@@ -1,28 +1,39 @@
 "use client";
 
-import React, { useState } from "react";
-import { Package, Check } from "lucide-react";
+import { useState } from "react";
+import { Check, Package, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { GradientText } from "@/src/components/ui/gradient-text";
 
 const bundles = [
   {
     name: "Gói Cơ Bản",
+    description: "Phù hợp đơn nhỏ, nhu cầu giặt sấy hằng ngày.",
     price: 99000,
     originalPrice: 120000,
     services: ["Giặt thường 3kg", "Sấy khô", "Giao trong 48h"],
     popular: false,
-    color: "blue",
   },
   {
     name: "Gói Tiết Kiệm",
+    description: "Cân bằng chi phí và tốc độ cho đơn gia đình.",
     price: 189000,
     originalPrice: 250000,
     services: ["Giặt thường 5kg", "Sấy khô", "Ủi cơ bản", "Giao trong 24h"],
     popular: true,
-    color: "purple",
   },
   {
     name: "Gói Premium",
+    description: "Dành cho đơn nhiều đồ, cần xử lý kỹ và giao nhanh.",
     price: 349000,
     originalPrice: 450000,
     services: [
@@ -33,115 +44,112 @@ const bundles = [
       "Giao hỏa tốc 4h",
     ],
     popular: false,
-    color: "amber",
   },
 ];
 
-const colorMap: Record<string, { bg: string; text: string }> = {
-  blue: { bg: "bg-blue-100", text: "text-blue-600" },
-  purple: { bg: "bg-purple-100", text: "text-purple-600" },
-  amber: { bg: "bg-amber-100", text: "text-amber-600" },
-};
-
 export default function Bundles() {
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(1);
 
   return (
     <section
       id="bundles"
-      className="min-h-screen flex items-center justify-center bg-white"
+      className="flex min-h-screen items-center px-4 py-24 sm:px-6 lg:px-8"
     >
-      <div className="w-full max-w-6xl mx-auto px-6 pt-20 pb-20">
-        <div className="text-center mb-12 pt-8">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-            <GradientText>Combo Tiết Kiệm</GradientText>
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="mx-auto mb-12 flex max-w-2xl flex-col items-center text-center sm:mb-16">
+          <h2 className="mb-3 text-3xl font-bold tracking-tight sm:text-4xl">
+            <GradientText>Combo tiết kiệm</GradientText>
           </h2>
-          <p className="text-gray-500 max-w-xl mx-auto">
-            Chọn gói dịch vụ phù hợp, tiết kiệm đến 30%
+          <p className="text-base leading-7 text-muted-foreground sm:text-lg">
+            Chọn gói dịch vụ phù hợp, tiết kiệm đến 30%.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 items-stretch gap-5 md:grid-cols-3">
           {bundles.map((bundle, index) => {
-            const colors = colorMap[bundle.color];
+            const saving = Math.round(
+              (1 - bundle.price / bundle.originalPrice) * 100,
+            );
+            const isSelected = selected === index;
+
             return (
-              <div
+              <Card
                 key={bundle.name}
-                className={`flex flex-col h-full p-6 rounded-2xl border transition-all duration-300 hover:shadow-xl ${
-                  bundle.popular
-                    ? "border-purple-300 bg-purple-50"
-                    : "border-gray-200 hover:border-blue-300"
+                className={`flex h-full border-blue-100 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg ${
+                  bundle.popular ? "ring-1 ring-blue-200" : ""
                 }`}
               >
-                <div className="flex-1">
-                  {bundle.popular && (
-                    <div className="inline-block mb-3 bg-purple-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                      PHỔ BIẾN NHẤT
+                <CardHeader className="gap-4 pb-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex size-12 items-center justify-center rounded-lg bg-blue-50 text-blue-600 ring-1 ring-blue-200">
+                      <Package className="size-6" />
                     </div>
-                  )}
-
-                  <div className="flex items-center gap-4 mb-4">
-                    <div
-                      className={`p-4 ${colors.bg} rounded-2xl flex-shrink-0`}
+                    <Badge
+                      className={
+                        bundle.popular
+                          ? "rounded-full bg-blue-600 text-white"
+                          : "rounded-full bg-blue-50 text-blue-700"
+                      }
+                      variant={bundle.popular ? "default" : "secondary"}
                     >
-                      <Package
-                        className={`w-8 h-8 ${colors.text}`}
-                        strokeWidth={1.5}
-                      />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">
-                        {bundle.name}
-                      </h3>
-                      <p
-                        className={`text-2xl font-bold ${bundle.popular ? "text-purple-600" : "text-gray-900"}`}
-                      >
+                      {bundle.popular && <Sparkles className="size-3" />}
+                      {bundle.popular ? "Phổ biến nhất" : `Tiết kiệm ${saving}%`}
+                    </Badge>
+                  </div>
+
+                  <div>
+                    <CardTitle className="text-lg">{bundle.name}</CardTitle>
+                    <CardDescription className="mt-2 min-h-10 leading-5">
+                      {bundle.description}
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="flex flex-1 flex-col gap-5">
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
+                      <span className="text-3xl font-bold leading-none text-blue-600">
                         {bundle.price.toLocaleString()}đ
-                      </p>
+                      </span>
+                      <span className="text-sm text-muted-foreground line-through">
+                        {bundle.originalPrice.toLocaleString()}đ
+                      </span>
                     </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Đã bao gồm các hạng mục trong gói.
+                    </p>
                   </div>
 
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-sm text-gray-400 line-through">
-                      {bundle.originalPrice.toLocaleString()}đ
-                    </span>
-                    <span className="px-2 py-0.5 bg-green-100 text-green-600 text-xs font-medium rounded-full">
-                      -
-                      {Math.round(
-                        (1 - bundle.price / bundle.originalPrice) * 100,
-                      )}
-                      %
-                    </span>
-                  </div>
-
-                  <ul className="space-y-2 mb-6">
+                  <div className="space-y-3">
                     {bundle.services.map((service) => (
-                      <li
+                      <div
                         key={service}
-                        className="flex items-center gap-2 text-sm text-gray-600"
+                        className="flex items-start gap-2 text-sm"
                       >
-                        <span
-                          className={`w-5 h-5 ${colors.bg} rounded-full flex items-center justify-center flex-shrink-0`}
-                        >
-                          <Check className={`w-3 h-3 ${colors.text}`} />
+                        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                          <Check className="size-3.5" />
                         </span>
-                        {service}
-                      </li>
+                        <span className="leading-5 text-foreground/80">
+                          {service}
+                        </span>
+                      </div>
                     ))}
-                  </ul>
-                </div>
+                  </div>
+                </CardContent>
 
-                <button
-                  onClick={() => setSelected(selected === index ? null : index)}
-                  className={`w-full py-3 rounded-xl font-bold transition-all ${
-                    selected === index
-                      ? "bg-purple-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-purple-600 hover:text-white"
-                  }`}
-                >
-                  {selected === index ? "Đã chọn" : "Chọn gói này"}
-                </button>
-              </div>
+                <CardFooter className="mt-auto border-t bg-muted/30">
+                  <Button
+                    className={
+                      isSelected
+                        ? "h-10 w-full bg-blue-700 text-white hover:bg-blue-700"
+                        : "h-10 w-full bg-blue-600 text-white hover:bg-blue-700"
+                    }
+                    onClick={() => setSelected(isSelected ? null : index)}
+                  >
+                    {isSelected ? "Đã chọn" : "Chọn gói này"}
+                  </Button>
+                </CardFooter>
+              </Card>
             );
           })}
         </div>
