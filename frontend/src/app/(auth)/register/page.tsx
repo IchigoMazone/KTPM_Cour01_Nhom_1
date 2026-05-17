@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 import {
   RegisterField,
   validateRegisterForm,
@@ -114,9 +115,15 @@ export default function Page() {
       fieldOrder.find((field) => formErrors[field]) ?? null,
     );
 
-    if (!isFormValid) return;
+    if (!isFormValid) {
+      toast.error("Vui lòng kiểm tra lại thông tin đăng ký.");
+      return;
+    }
 
     console.log("Call API REGISTER");
+    toast.success("Đăng ký thành công", {
+      description: "Tài khoản của bạn đã được tạo. Vui lòng đăng nhập để tiếp tục.",
+    });
   };
 
   useEffect(() => {
@@ -436,7 +443,14 @@ export default function Page() {
           </div>
 
           {/* Nút Google */}
-          <button className="w-full h-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.98] text-sm font-medium text-gray-700 flex items-center justify-center gap-2.5 transition-all mb-6">
+          <button
+            className="w-full h-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.98] text-sm font-medium text-gray-700 flex items-center justify-center gap-2.5 transition-all mb-6"
+            onClick={() => {
+              toast.info("Đăng ký Google", {
+                description: "Chức năng đăng ký Google sẽ được kết nối với API sau.",
+              });
+            }}
+          >
             <img src="/google.png" alt="Google" className="w-[18px] h-[18px]" />
             Tiếp tục với Google
           </button>

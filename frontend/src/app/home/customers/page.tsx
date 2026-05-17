@@ -1,29 +1,10 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-
-import {
-  Search,
-  MoreHorizontal,
-  Star,
-  Phone,
-  Mail,
-  MapPin,
-  Package,
-  ShoppingBag,
-  ArrowLeft,
-  ArrowRight,
-} from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+import { useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, Gift, MapPin, Phone, Search, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -33,275 +14,444 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 
-/* ============================================================================
-   MOCK DATA
-============================================================================ */
-const customers = [
+type Customer = {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  points: number;
+  note: string;
+};
+
+type LaundryOrder = {
+  id: string;
+  customerId: string;
+  service: string;
+  status: string;
+  total: string;
+  date: string;
+};
+
+const initialCustomers: Customer[] = [
   {
-    id: 1,
-    name: "Nguyễn Thị Hương",
-    phone: "0903123456",
-    email: "huong@gmail.com",
-    address: "123 Nguyễn Huệ, Quận 1, TP.HCM",
-    loyaltyPoints: 2400,
-    specialNotes: ["Dị ứng hóa chất mạnh", "Giặt riêng đồ trắng"],
+    id: "KH-001",
+    name: "Nguyễn Minh Anh",
+    phone: "0901 234 567",
+    address: "25 Lê Lợi, Quận 1",
+    points: 1240,
+    note: "Dị ứng nước xả mạnh",
   },
   {
-    id: 2,
-    name: "Trần Văn Minh",
-    phone: "0912456789",
-    email: "minh@gmail.com",
-    address: "45 Lê Lợi, Quận 5, TP.HCM",
-    loyaltyPoints: 1200,
-    specialNotes: ["Khách VIP", "Giao hàng sau 18h"],
+    id: "KH-002",
+    name: "Trần Hoàng Nam",
+    phone: "0912 456 789",
+    address: "18 Nguyễn Đình Chiểu, Quận 3",
+    points: 860,
+    note: "Gấp áo sơ mi theo nếp",
   },
   {
-    id: 3,
-    name: "Phạm Thị Lan",
-    phone: "0938123456",
-    email: "lan@gmail.com",
-    address: "89 Pasteur, Quận 3, TP.HCM",
-    loyaltyPoints: 860,
-    specialNotes: ["Không dùng nước xả"],
+    id: "KH-003",
+    name: "Lê Thu Hà",
+    phone: "0988 111 222",
+    address: "92 Điện Biên Phủ, Bình Thạnh",
+    points: 2100,
+    note: "Ưu tiên giặt riêng đồ trẻ em",
+  },
+  {
+    id: "KH-004",
+    name: "Phạm Gia Hân",
+    phone: "0933 777 888",
+    address: "41 Hoa Sứ, Phú Nhuận",
+    points: 540,
+    note: "Nhận đồ sau 19:00",
+  },
+  {
+    id: "KH-005",
+    name: "Đỗ Quang Huy",
+    phone: "0909 345 678",
+    address: "12 Trần Hưng Đạo, Quận 5",
+    points: 320,
+    note: "Không dùng nước xả có mùi nồng, ưu tiên giao buổi sáng.",
+  },
+  {
+    id: "KH-006",
+    name: "Vũ Bảo Ngọc",
+    phone: "0977 654 321",
+    address: "77 Nguyễn Văn Trỗi, Phú Nhuận",
+    points: 1780,
+    note: "Đồ lụa cần giặt tay và đóng gói riêng từng món.",
+  },
+  {
+    id: "KH-007",
+    name: "Hoàng Đức Long",
+    phone: "0966 222 333",
+    address: "9 Pasteur, Quận 1",
+    points: 940,
+    note: "Áo vest cần treo móc, không gấp.",
+  },
+  {
+    id: "KH-008",
+    name: "Mai Thanh Tâm",
+    phone: "0944 888 999",
+    address: "63 Võ Văn Tần, Quận 3",
+    points: 1320,
+    note: "Dị ứng hóa chất tẩy mạnh. Khi xử lý vết bẩn cần gọi xác nhận trước.",
+  },
+  {
+    id: "KH-009",
+    name: "Ngô Hải Yến",
+    phone: "0922 101 202",
+    address: "31 Cộng Hòa, Tân Bình",
+    points: 760,
+    note: "Giao hàng tại quầy lễ tân tầng trệt.",
+  },
+  {
+    id: "KH-010",
+    name: "Bùi Quốc Khánh",
+    phone: "0919 303 404",
+    address: "120 Nguyễn Thị Minh Khai, Quận 3",
+    points: 2500,
+    note: "Khách VIP, ưu tiên kiểm tra kỹ trước khi bàn giao.",
+  },
+  {
+    id: "KH-011",
+    name: "Tạ Minh Châu",
+    phone: "0981 505 606",
+    address: "46 Phan Xích Long, Phú Nhuận",
+    points: 410,
+    note: "Chỉ nhận hàng sau 18:30.",
+  },
+  {
+    id: "KH-012",
+    name: "Lý Anh Khoa",
+    phone: "0938 707 808",
+    address: "5 Nguyễn Hữu Cảnh, Bình Thạnh",
+    points: 1190,
+    note: "Giặt riêng đồ thể thao, không sấy nhiệt cao.",
+  },
+  {
+    id: "KH-013",
+    name: "Phan Mỹ Linh",
+    phone: "0903 909 010",
+    address: "88 Lý Thường Kiệt, Quận 10",
+    points: 680,
+    note: "Yêu cầu đóng gói bằng túi giấy nếu có.",
+  },
+  {
+    id: "KH-014",
+    name: "Cao Nhật Minh",
+    phone: "0972 121 314",
+    address: "14 Ba Tháng Hai, Quận 10",
+    points: 1510,
+    note: "Chăn ga cần hút chân không sau khi giặt.",
+  },
+  {
+    id: "KH-015",
+    name: "Hồ Khánh Vy",
+    phone: "0968 151 617",
+    address: "72 Nguyễn Trãi, Quận 5",
+    points: 990,
+    note: "Không dùng chất tạo hương. Ghi chú này cố tình dài để kiểm tra bố cục khi nội dung nhiều: kiểm tra kỹ nhãn áo, tách riêng đồ màu trắng, báo trước nếu phát hiện sờn chỉ hoặc thiếu nút.",
+  },
+  {
+    id: "KH-016",
+    name: "Trịnh Gia Bảo",
+    phone: "0955 181 920",
+    address: "27 Hoàng Sa, Quận 1",
+    points: 350,
+    note: "Liên hệ trước khi giao 30 phút.",
   },
 ];
 
-const orders = [
+const initialOrders: LaundryOrder[] = [
   {
-    id: "DH001",
-    customerId: 1,
-    customerName: "Nguyễn Thị Hương",
-    service: "Giặt sấy cao cấp",
-    createdAt: "08:30 01/05/2026",
-    completedAt: "17:00 01/05/2026",
-    note: "Giao trước 18h",
-    date: "2026-05-01",
-    quantity: 5,
-    total: 250000,
+    id: "DH-1057",
+    customerId: "KH-001",
+    service: "Combo sơ mi",
     status: "Hoàn thành",
-    items: [
-      { name: "Áo sơ mi", quantity: 3, price: 30000 },
-      { name: "Quần tây", quantity: 2, price: 40000 },
-    ],
+    total: "320.000đ",
+    date: "17/05/2026",
   },
   {
-    id: "DH002",
-    customerId: 1,
-    customerName: "Nguyễn Thị Hương",
-    service: "Giặt nhanh",
-    createdAt: "09:00 26/04/2026",
-    completedAt: "Đang xử lý",
-    note: "Không dùng nước xả",
-    date: "2026-04-26",
-    quantity: 3,
-    total: 180000,
+    id: "DH-1051",
+    customerId: "KH-002",
+    service: "Giặt khô áo vest",
     status: "Đang xử lý",
-    items: [
-      { name: "Áo hoodie", quantity: 1, price: 80000 },
-      { name: "Quần jean", quantity: 2, price: 50000 },
-    ],
+    total: "180.000đ",
+    date: "17/05/2026",
   },
   {
-    id: "DH003",
-    customerId: 2,
-    customerName: "Trần Văn Minh",
-    service: "Giặt hấp",
-    createdAt: "10:30 02/05/2026",
-    completedAt: "16:00 02/05/2026",
-    note: "Khách VIP",
-    date: "2026-05-02",
-    quantity: 7,
-    total: 420000,
+    id: "DH-1048",
+    customerId: "KH-003",
+    service: "Chăn ga 5kg",
+    status: "Chờ giao",
+    total: "250.000đ",
+    date: "16/05/2026",
+  },
+  {
+    id: "DH-1042",
+    customerId: "KH-001",
+    service: "Giặt sấy 8kg",
     status: "Hoàn thành",
-    items: [
-      { name: "Vest", quantity: 2, price: 120000 },
-      { name: "Sơ mi", quantity: 5, price: 36000 },
-    ],
+    total: "210.000đ",
+    date: "15/05/2026",
   },
   {
-    id: "DH004",
-    customerId: 3,
-    customerName: "Phạm Thị Lan",
-    service: "Giặt thường",
-    createdAt: "13:00 03/05/2026",
-    completedAt: "Đang giao",
-    note: "Không dùng nước xả",
-    date: "2026-05-03",
-    quantity: 2,
-    total: 120000,
-    status: "Đang giao",
-    items: [{ name: "Đầm", quantity: 2, price: 60000 }],
+    id: "DH-1039",
+    customerId: "KH-001",
+    service: "Giặt khô áo dài",
+    status: "Hoàn thành",
+    total: "160.000đ",
+    date: "14/05/2026",
+  },
+  {
+    id: "DH-1034",
+    customerId: "KH-001",
+    service: "Vệ sinh giày",
+    status: "Hoàn thành",
+    total: "120.000đ",
+    date: "12/05/2026",
+  },
+  {
+    id: "DH-1030",
+    customerId: "KH-001",
+    service: "Giặt rèm cửa",
+    status: "Hoàn thành",
+    total: "480.000đ",
+    date: "10/05/2026",
+  },
+  {
+    id: "DH-1024",
+    customerId: "KH-001",
+    service: "Combo văn phòng",
+    status: "Hoàn thành",
+    total: "290.000đ",
+    date: "08/05/2026",
+  },
+  {
+    id: "DH-1020",
+    customerId: "KH-001",
+    service: "Tẩy vết bẩn áo trắng",
+    status: "Hoàn thành",
+    total: "90.000đ",
+    date: "06/05/2026",
+  },
+  {
+    id: "DH-1015",
+    customerId: "KH-001",
+    service: "Giặt hấp áo khoác",
+    status: "Hoàn thành",
+    total: "220.000đ",
+    date: "03/05/2026",
+  },
+  {
+    id: "DH-1054",
+    customerId: "KH-005",
+    service: "Giặt sấy 5kg",
+    status: "Đang xử lý",
+    total: "135.000đ",
+    date: "17/05/2026",
+  },
+  {
+    id: "DH-1053",
+    customerId: "KH-006",
+    service: "Giặt tay đồ lụa",
+    status: "Chờ giao",
+    total: "260.000đ",
+    date: "17/05/2026",
+  },
+  {
+    id: "DH-1052",
+    customerId: "KH-008",
+    service: "Tẩy vết bẩn",
+    status: "Đang xử lý",
+    total: "95.000đ",
+    date: "17/05/2026",
+  },
+  {
+    id: "DH-1045",
+    customerId: "KH-010",
+    service: "Giặt khô vest",
+    status: "Hoàn thành",
+    total: "300.000đ",
+    date: "15/05/2026",
+  },
+  {
+    id: "DH-1041",
+    customerId: "KH-012",
+    service: "Giặt đồ thể thao",
+    status: "Hoàn thành",
+    total: "170.000đ",
+    date: "14/05/2026",
+  },
+  {
+    id: "DH-1037",
+    customerId: "KH-015",
+    service: "Giặt sơ mi",
+    status: "Hoàn thành",
+    total: "145.000đ",
+    date: "13/05/2026",
   },
 ];
 
-const ITEMS_PER_PAGE = 10;
+const CUSTOMERS_PER_PAGE = 10;
 
-export default function CustomerPage() {
-  /* ---------- State ---------- */
+export default function CustomersPage() {
+  const [customers] = useState<Customer[]>(initialCustomers);
+  const [orders] = useState<LaundryOrder[]>(initialOrders);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(
-    null,
-  );
-  const [openCustomerDetail, setOpenCustomerDetail] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  /* ---------- Derived data ---------- */
-  const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
-  const customerOrders = orders.filter(
-    (o) => o.customerId === selectedCustomerId,
-  );
-
-  const orderCountByCustomer = useMemo(() => {
-    const map: Record<number, number> = {};
-    orders.forEach((o) => (map[o.customerId] = (map[o.customerId] || 0) + 1));
-    return map;
-  }, []);
+  const selectedCustomer =
+    customers.find((customer) => customer.id === selectedCustomerId) ?? null;
 
   const filteredCustomers = useMemo(() => {
-    return customers.filter(
-      (customer) =>
-        customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        customer.phone.includes(searchQuery),
+    const query = searchQuery.trim().toLowerCase();
+
+    if (!query) {
+      return customers;
+    }
+
+    return customers.filter((customer) =>
+      [customer.id, customer.name, customer.phone, customer.address, customer.note]
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
     );
-  }, [searchQuery]);
+  }, [customers, searchQuery]);
 
-  const visibleCustomers = filteredCustomers.slice(0, ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / CUSTOMERS_PER_PAGE));
+  const activePage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (activePage - 1) * CUSTOMERS_PER_PAGE;
+  const visibleCustomers = filteredCustomers.slice(
+    pageStartIndex,
+    pageStartIndex + CUSTOMERS_PER_PAGE
+  );
+  const resultStart = filteredCustomers.length ? pageStartIndex + 1 : 0;
+  const resultEnd = Math.min(pageStartIndex + visibleCustomers.length, filteredCustomers.length);
 
-  /* ---------- UI ---------- */
+  const selectedOrders = useMemo(
+    () => orders.filter((order) => order.customerId === selectedCustomer?.id),
+    [orders, selectedCustomer?.id]
+  );
+
   return (
-    <div className="min-h-screen bg-[#f4f7fb]">
-      <div className="mx-auto p-6">
-        {/* HEADER */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Quản lý khách hàng
-            </h1>
-            <p className="mt-2 text-slate-500">
-              Quản lý hồ sơ khách hàng và lịch sử đơn giặt
-            </p>
-          </div>
-        </div>
+    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 pb-10 sm:px-6 lg:px-8">
+      <header className="relative overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,_#ffffff_0%,_#f8fbff_55%,_#eff6ff_100%)] p-6 shadow-sm ring-1 ring-white/70">
+        <Badge className="mb-3 rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 ring-1 ring-blue-100 hover:bg-blue-50">
+          Quản lý khách hàng
+        </Badge>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          Hồ sơ khách hàng
+        </h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+          Quản lý tên, số điện thoại, địa chỉ, lịch sử đơn giặt, điểm tích lũy
+          và ghi chú đặc biệt như dị ứng hóa chất hoặc yêu cầu riêng.
+        </p>
+      </header>
 
-        <Card className="overflow-hidden rounded-[20px] border-0 bg-white ">
-          {/* TOP */}
-          <div className="flex items-center justify-between border-b border-gray-200 px-8 py-7">
-            {/* SEARCH */}
-            <div className="relative w-[360px]">
-              <Search className="absolute left-4 top-4 h-4 w-4 text-slate-400" />
+      <section>
+        <Card className="overflow-hidden rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70">
+          <CardHeader className="gap-3 border-b border-slate-100 bg-white lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle>Danh sách khách hàng</CardTitle>
+              <p className="mt-1 text-sm text-slate-500">
+                Bấm vào một dòng để xem chi tiết khách hàng và lịch sử đơn đặt.
+              </p>
+            </div>
+            <div className="relative w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
               <Input
-                placeholder="Tìm kiếm khách hàng..."
-                className="h-12 rounded-2xl border-slate-200 bg-slate-50 pl-11"
+                className="pl-9"
+                placeholder="Tìm tên, số điện thoại hoặc mã khách"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  setCurrentPage(1);
+                }}
               />
             </div>
-          </div>
-
-          <CardContent className="p-0">
+          </CardHeader>
+          <CardContent className="px-0">
             <Table>
-              <TableHeader>
-                <TableRow className="border-b border-gray-200 bg-slate-50/60 hover:bg-slate-50/60">
-                  <TableHead className="px-8 py-5">Khách hàng</TableHead>
+              <TableHeader className="bg-slate-50/80">
+                <TableRow>
+                  <TableHead className="pl-4">Mã</TableHead>
+                  <TableHead>Tên</TableHead>
                   <TableHead>Số điện thoại</TableHead>
                   <TableHead>Địa chỉ</TableHead>
                   <TableHead>Điểm</TableHead>
-                  <TableHead>Ghi chú</TableHead>
-                  <TableHead />
+                  <TableHead className="pr-4">Ghi chú đặc biệt</TableHead>
                 </TableRow>
               </TableHeader>
-
               <TableBody>
-                {visibleCustomers.map((customer) => (
-                  <TableRow
-                    key={customer.id}
-                    className="border-b border-gray-200 transition-all hover:bg-slate-50/70"
-                  >
-                    {/* CUSTOMER */}
-                    <TableCell className="px-8 py-6">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <p className="">{customer.name}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-
-                    {/* PHONE */}
-                    <TableCell className="font-medium text-slate-700">
-                      {customer.phone}
-                    </TableCell>
-
-                    {/* ADDRESS */}
-                    <TableCell className="text-slate-900">
-                      {customer.address}
-                    </TableCell>
-
-                    <TableCell className="font-medium text-slate-900">
-                      {customer.loyaltyPoints}
-                    </TableCell>
-
-                    <TableCell>
-                      <div className="flex flex-wrap gap-2">
-                        {customer.specialNotes.map((note, index) => (
-                          <Badge
-                            key={index}
-                            className="rounded-full bg-slate-100 px-4 py-1.5 text-slate-700 hover:bg-slate-100"
-                          >
-                            {note}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-
-                    {/* ACTION */}
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="rounded-xl"
-                          >
-                            <MoreHorizontal className="h-5 w-5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-
-                        <DropdownMenuContent
-                          align="end"
-                          className="w-44 rounded-2xl"
-                        >
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedCustomerId(customer.id);
-                              setOpenCustomerDetail(true);
-                            }}
-                          >
-                            Xem chi tiết
-                          </DropdownMenuItem>
-
-                          <DropdownMenuItem className="text-red-500">
-                            Xóa khách hàng
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                {visibleCustomers.length ? (
+                  visibleCustomers.map((customer) => (
+                    <TableRow
+                      key={customer.id}
+                      className={`cursor-pointer transition-colors hover:bg-blue-50/60 ${
+                        selectedCustomerId === customer.id ? "bg-blue-50/80" : ""
+                      }`}
+                      onClick={() => setSelectedCustomerId(customer.id)}
+                    >
+                      <TableCell className="pl-4 font-semibold text-slate-900">{customer.id}</TableCell>
+                      <TableCell>{customer.name}</TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center gap-1">
+                          <Phone className="size-3.5 text-blue-600" />
+                          {customer.phone}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin className="size-3.5 text-blue-600" />
+                          {customer.address}
+                        </span>
+                      </TableCell>
+                      <TableCell>{customer.points.toLocaleString("vi-VN")} điểm</TableCell>
+                      <TableCell className="pr-4 text-slate-500">{customer.note}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-28 text-center text-slate-500">
+                      Không tìm thấy khách hàng phù hợp.
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
-
-              <TableFooter>
-                <TableRow>
-                  <TableCell rowSpan={7} className="flex justify-between items-center">
-                    <span>hiển thị 10/20</span>
-                    <div>
-                      <Button className="px-2 py-2">
-                        <ArrowLeft size={18}></ArrowLeft>
-                      </Button>
-                      <Button className="px-2 py-2">
-                        <ArrowRight size={18}></ArrowRight>
-                      </Button>
+              <TableFooter className="bg-white">
+                <TableRow className="hover:bg-white">
+                  <TableCell colSpan={6} className="px-4 py-3">
+                    <div className="flex flex-col gap-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                      <span>
+                        Hiển thị {resultStart}-{resultEnd} trong tổng {filteredCustomers.length} khách hàng
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={activePage === 1}
+                          onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                        >
+                          <ChevronLeft className="size-4" />
+                          Trước
+                        </button>
+                        <span className="min-w-20 text-center font-medium text-slate-700">
+                          {activePage}/{totalPages}
+                        </span>
+                        <button
+                          type="button"
+                          className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={activePage === totalPages}
+                          onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                        >
+                          Sau
+                          <ChevronRight className="size-4" />
+                        </button>
+                      </div>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -309,189 +459,119 @@ export default function CustomerPage() {
             </Table>
           </CardContent>
         </Card>
+      </section>
 
-        {selectedCustomer && openCustomerDetail && (
-          <div className="fixed left-1/2 top-20 z-50 h-[80%] w-[90%] -translate-x-1/2 overflow-hidden rounded-[40px] border border-slate-200 bg-[#f4f7fb] shadow-xl">
-            <Card className="h-full rounded-[40px] border border-slate-200 bg-white shadow-sm">
-              <div className="grid h-full grid-cols-[380px_1fr]">
-                {/* LEFT INFO */}
-                <div className="border-r border-slate-100 bg-slate-50/50 p-8">
-                  {/* PROFILE */}
-                  <div className="flex items-center gap-5">
-                    <Avatar className="h-24 w-24 rounded-3xl shadow-sm">
-                      <AvatarFallback className="rounded-3xl bg-gradient-to-br from-slate-900 to-slate-700 text-3xl font-bold text-white">
-                        {selectedCustomer.name
-                          .split(" ")
-                          .slice(-2)
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
-                    </Avatar>
+      {selectedCustomer ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
+              <div>
+                <Badge className="mb-2 rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 ring-1 ring-blue-100 hover:bg-blue-50">
+                  {selectedCustomer.id}
+                </Badge>
+                <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+                  {selectedCustomer.name}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Chi tiết khách hàng và lịch sử đơn đặt
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Đóng chi tiết khách hàng"
+                className="inline-flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900"
+                onClick={() => setSelectedCustomerId(null)}
+              >
+                <X className="size-5" />
+              </button>
+            </div>
 
-                    <div>
-                      <h2 className="text-xl font-bold text-slate-900">
-                        {selectedCustomer.name}
-                      </h2>
-                      <p className="text-slate-500">Khách hàng thân thiết</p>
-
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        <Badge className="rounded-full bg-slate-900 px-4 py-1.5 text-white hover:bg-slate-900">
-                          {selectedCustomer.loyaltyPoints} điểm
-                        </Badge>
-                        <Badge className="rounded-full bg-slate-200 px-4 py-1.5 text-slate-700 hover:bg-slate-200">
-                          <ShoppingBag className="mr-2 h-4 w-4" />
-                          {customerOrders.length} đơn
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* CONTACT + NOTES */}
-                  <div className="mt-10 space-y-6">
-                    {/* PHONE */}
-                    <InfoBlock icon={Phone} label="Số điện thoại">
-                      {selectedCustomer.phone}
-                    </InfoBlock>
-                    {/* EMAIL */}
-                    <InfoBlock icon={Mail} label="Email">
-                      {selectedCustomer.email}
-                    </InfoBlock>
-                    {/* ADDRESS */}
-                    <InfoBlock icon={MapPin} label="Địa chỉ">
-                      {selectedCustomer.address}
-                    </InfoBlock>
-                    {/* NOTES */}
-                    <InfoBlock icon={Package} label="Ghi chú đặc biệt">
-                      <div className="flex flex-wrap gap-3">
-                        {selectedCustomer.specialNotes.map((note, idx) => (
-                          <Badge
-                            key={idx}
-                            className="rounded-full bg-red-50 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                          >
-                            {note}
-                          </Badge>
-                        ))}
-                      </div>
-                    </InfoBlock>
-                  </div>
-                </div>
-
-                {/* RIGHT CONTENT – ORDER HISTORY */}
-                <div className="h-full flex flex-col ">
-                  {/* HEADER */}
-                  <div className="flex items-center justify-between border-b border-slate-100 px-8 py-7">
-                    <div>
-                      <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-                        Lịch sử đơn hàng
-                      </h2>
-                      <p className="mt-2 text-slate-500">
-                        Theo dõi toàn bộ đơn giặt của khách hàng
+            <div className="grid min-h-0 flex-1 gap-5 overflow-hidden p-5 sm:p-6 lg:grid-cols-[0.9fr_1.1fr]">
+              <Card className="self-start rounded-[20px] border-slate-200 bg-slate-50/60 shadow-none">
+                <CardHeader>
+                  <CardTitle className="text-base">Thông tin khách hàng</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="text-xs font-medium uppercase text-slate-400">Số điện thoại</p>
+                      <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+                        <Phone className="size-4 text-blue-600" />
+                        {selectedCustomer.phone}
                       </p>
                     </div>
-                    {/* SEARCH IN ORDERS (placeholder) */}
-                    <div className="relative w-[340px]">
-                      <Search className="absolute left-4 top-4 h-4 w-4 text-slate-400" />
-                      <Input
-                        placeholder="Tìm mã đơn..."
-                        className="h-12 rounded-2xl border-slate-200 bg-slate-50 pl-11"
-                      />
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="text-xs font-medium uppercase text-slate-400">Điểm tích lũy</p>
+                      <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+                        <Gift className="size-4 text-blue-600" />
+                        {selectedCustomer.points.toLocaleString("vi-VN")} điểm
+                      </p>
                     </div>
                   </div>
 
-                  {/* ORDER TABLE */}
-                  <div className="flex-1 overflow-y-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                          <TableHead className="px-8 py-5">Mã đơn</TableHead>
-                          <TableHead>Dịch vụ</TableHead>
-                          <TableHead>Ngày tạo</TableHead>
-                          <TableHead>Tổng tiền</TableHead>
-                          <TableHead>Trạng thái</TableHead>
-                        </TableRow>
-                      </TableHeader>
-
-                      <TableBody>
-                        {customerOrders.map((order) => (
-                          <TableRow
-                            key={order.id}
-                            className="cursor-pointer border-b border-slate-100 transition-all hover:bg-slate-50/70"
-                          >
-                            <TableCell className="px-8 py-6">
-                              <p className="font-semibold text-slate-900">
-                                {order.id}
-                              </p>
-                              <p className="mt-1 text-sm text-slate-500">
-                                {order.quantity} sản phẩm
-                              </p>
-                            </TableCell>
-
-                            <TableCell>
-                              <p className="font-medium text-slate-900">
-                                {order.service}
-                              </p>
-                              <p className="mt-1 text-sm text-slate-500">
-                                {order.createdAt}
-                              </p>
-                            </TableCell>
-
-                            <TableCell className="text-slate-600">
-                              {order.date}
-                            </TableCell>
-
-                            <TableCell>
-                              <p className="text-sm font-semibold text-slate-900">
-                                {order.total.toLocaleString()}đ
-                              </p>
-                            </TableCell>
-
-                            <TableCell>
-                              <Badge
-                                className={
-                                  order.status === "Hoàn thành"
-                                    ? "rounded-full bg-green-100 px-4 py-2 text-green-700 hover:bg-green-100"
-                                    : "rounded-full bg-yellow-100 px-4 py-2 text-yellow-700 hover:bg-yellow-100"
-                                }
-                              >
-                                {order.status}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-medium uppercase text-slate-400">Địa chỉ</p>
+                    <p className="mt-2 inline-flex items-start gap-2 text-sm font-medium text-slate-900">
+                      <MapPin className="mt-0.5 size-4 shrink-0 text-blue-600" />
+                      {selectedCustomer.address}
+                    </p>
                   </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
-/* ============================================================================
-   SMALL SUB-COMPONENTS
-============================================================================ */
-function InfoBlock({
-  icon: Icon,
-  label,
-  children,
-}: {
-  icon: any;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="flex items-center gap-3 text-slate-500">
-        <Icon className="h-5 w-5" />
-        <span className="text-sm font-medium">{label}</span>
-      </div>
-      <div className="mt-4 text-lg font-semibold text-slate-900">
-        {children}
-      </div>
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+                    <p className="text-xs font-medium uppercase text-blue-500">Ghi chú đặc biệt</p>
+                    <div className="mt-2 min-h-32 rounded-xl border border-blue-100 bg-white/80 p-3 text-sm font-medium leading-6 text-blue-900 shadow-inner">
+                      {selectedCustomer.note}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="flex min-h-0 flex-col rounded-[20px] border-slate-200 bg-white shadow-none">
+                <CardHeader>
+                  <CardTitle className="text-base">Lịch sử đơn đặt</CardTitle>
+                  <p className="text-sm text-slate-500">
+                    Các đơn giặt đã ghi nhận cho khách hàng này.
+                  </p>
+                </CardHeader>
+                <CardContent className="min-h-0 flex-1">
+                  <div className="h-full min-h-56 space-y-3 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/70 p-3 shadow-inner">
+                  {selectedOrders.length ? (
+                    selectedOrders.map((order) => (
+                      <div
+                        key={order.id}
+                        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-slate-950">{order.id}</p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {order.service} · {order.date}
+                            </p>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 ring-1 ring-blue-100"
+                          >
+                            {order.status}
+                          </Badge>
+                        </div>
+                        <div className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
+                          Tổng tiền: {order.total}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-5 text-sm text-slate-500">
+                      Khách hàng này chưa có lịch sử đơn đặt.
+                    </div>
+                  )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

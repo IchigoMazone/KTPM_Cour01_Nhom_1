@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Award, Clock, Heart, MapPin, Star, Users } from "lucide-react";
+import { Award, Clock, Heart, MapPin, Star, Users, ZoomIn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -25,7 +26,27 @@ const stats: OverviewStat[] = [
   { icon: Clock, value: "24/7", label: "Phục vụ mọi lúc" },
 ];
 
+const galleryImages = [
+  {
+    src: "/washer(2).jfif",
+    alt: "BegauShop - Cơ sở giặt là",
+    className: "aspect-[4/3] w-full object-cover",
+  },
+  {
+    src: "/washer(1).jfif",
+    alt: "Máy giặt công nghiệp",
+    className: "aspect-square w-full object-cover",
+  },
+  {
+    src: "/washer(4).jfif",
+    alt: "Đồ giặt sạch bóng",
+    className: "aspect-square w-full object-cover",
+  },
+];
+
 export default function Overview() {
+  const [previewImage, setPreviewImage] = useState<(typeof galleryImages)[number] | null>(null);
+
   return (
     <section
       id="overview"
@@ -106,27 +127,38 @@ export default function Overview() {
           <Card className="overflow-hidden border-blue-100 bg-card p-0 shadow-sm">
             <CardContent className="space-y-4 p-4">
               <div className="overflow-hidden rounded-lg border">
-                <img
-                  src="/washer(2).jfif"
-                  alt="BegauShop - Cơ sở giặt là"
-                  className="aspect-[4/3] w-full object-cover"
-                />
+                <button
+                  type="button"
+                  className="group relative block w-full cursor-zoom-in"
+                  aria-label={`Phóng to ảnh ${galleryImages[0].alt}`}
+                  onClick={() => setPreviewImage(galleryImages[0])}
+                >
+                  <img
+                    src={galleryImages[0].src}
+                    alt={galleryImages[0].alt}
+                    className={galleryImages[0].className}
+                  />
+                  <span className="absolute right-3 top-3 flex size-10 items-center justify-center rounded-full bg-black/45 text-white opacity-0 shadow-lg backdrop-blur transition-opacity group-hover:opacity-100">
+                    <ZoomIn className="size-5" />
+                  </span>
+                </button>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="overflow-hidden rounded-lg border">
-                  <img
-                    src="/washer(1).jfif"
-                    alt="Máy giặt công nghiệp"
-                    className="aspect-square w-full object-cover"
-                  />
-                </div>
-                <div className="overflow-hidden rounded-lg border">
-                  <img
-                    src="/washer(4).jfif"
-                    alt="Đồ giặt sạch bóng"
-                    className="aspect-square w-full object-cover"
-                  />
-                </div>
+                {galleryImages.slice(1).map((image) => (
+                  <div key={image.src} className="overflow-hidden rounded-lg border">
+                    <button
+                      type="button"
+                      className="group relative block w-full cursor-zoom-in"
+                      aria-label={`Phóng to ảnh ${image.alt}`}
+                      onClick={() => setPreviewImage(image)}
+                    >
+                      <img src={image.src} alt={image.alt} className={image.className} />
+                      <span className="absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-black/45 text-white opacity-0 shadow-lg backdrop-blur transition-opacity group-hover:opacity-100">
+                        <ZoomIn className="size-4" />
+                      </span>
+                    </button>
+                  </div>
+                ))}
               </div>
               <CardDescription className="flex items-center gap-2">
                 <MapPin className="size-4 text-blue-600" />
@@ -136,6 +168,24 @@ export default function Overview() {
           </Card>
         </div>
       </div>
+
+      {previewImage ? (
+        <div
+          className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label={previewImage.alt}
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="flex max-h-[92vh] max-w-[96vw] items-center justify-center">
+            <img
+              src={previewImage.src}
+              alt={previewImage.alt}
+              className="max-h-[92vh] max-w-[96vw] rounded-2xl object-contain shadow-2xl"
+            />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -1,311 +1,160 @@
 "use client";
 
-/*
-  Module: Finance Management
-  - Daily & monthly revenue charts (Recharts)
-  - Customer receivables (debts)
-  - Operating expenses
-  - Profit summary (Revenue - Expense)
-  - Add income / expense records
-*/
-
-import React, { useMemo, useState } from "react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import React, { useState } from "react";
+import { Banknote, CreditCard, ReceiptText, TrendingUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Table,
-  TableHeader,
-  TableRow,
-  TableHead,
   TableBody,
   TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import { Plus, X } from "lucide-react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 
-interface RevenueRecord {
-  date: string; // YYYY-MM-DD
-  amount: number;
-}
-
-interface ExpenseRecord {
-  id: number;
-  category: string;
-  amount: number;
-  date: string; // YYYY-MM-DD
-}
-
-interface Receivable {
-  id: number;
-  customer: string;
-  amount: number;
-  dueDate: string; // YYYY-MM-DD
-}
-
-const seedRevenue: RevenueRecord[] = [
-  { date: "2024-05-10", amount: 3500000 },
-  { date: "2024-05-11", amount: 4200000 },
-  { date: "2024-05-12", amount: 3800000 },
-  { date: "2024-05-13", amount: 4500000 },
-  { date: "2024-05-14", amount: 5200000 },
-  { date: "2024-05-15", amount: 4800000 },
-  { date: "2024-05-16", amount: 6100000 },
+const initialCashflow = [
+  ["PT-1204", "Thu đơn DH-1062", "Tiền mặt", "+120.000đ", "Đã thu"],
+  ["PT-1205", "Thu đơn DH-1061", "VNPay", "+210.000đ", "Đã thu"],
+  ["PC-044", "Mua nước tẩy oxy", "Chuyển khoản", "-680.000đ", "Đã chi"],
+  ["PC-045", "Xăng giao nhận", "Tiền mặt", "-220.000đ", "Chờ duyệt"],
 ];
 
-const seedExpenses: ExpenseRecord[] = [
-  { id: 1, category: "Tiền điện", amount: 1500000, date: "2024-05-12" },
-  { id: 2, category: "Lương tài xế", amount: 3000000, date: "2024-05-13" },
-  { id: 3, category: "Bảo trì máy giặt", amount: 1200000, date: "2024-05-14" },
-];
+export default function FinancePage() {
+  const [cashflow, setCashflow] = useState(initialCashflow);
+  const [message, setMessage] = useState("");
+  const [form, setForm] = useState({ content: "", method: "", amount: "" });
 
-const seedReceivables: Receivable[] = [
-  { id: 1, customer: "Công ty ABC", amount: 2500000, dueDate: "2024-05-20" },
-  { id: 2, customer: "Shop XYZ", amount: 1800000, dueDate: "2024-05-18" },
-];
+  const addCashflow = () => {
+    if (!form.content.trim() || !form.amount.trim()) {
+      setMessage("Vui lòng nhập nội dung và số tiền trước khi lưu thu chi.");
+      return;
+    }
 
-export default function FinanceManagement() {
-  const [revenue] = useState<RevenueRecord[]>(seedRevenue);
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>(seedExpenses);
-  const [receivables, setReceivables] = useState<Receivable[]>(seedReceivables);
-
-  // modal add expense / income
-  const [showExpense, setShowExpense] = useState(false);
-  const [exCategory, setExCategory] = useState("");
-  const [exAmount, setExAmount] = useState("0");
-  const [exDate, setExDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
-
-  const openExpense = () => {
-    setExCategory("");
-    setExAmount("0");
-    setExDate(new Date().toISOString().slice(0, 10));
-    setShowExpense(true);
+    const nextIndex = cashflow.length + 1;
+    setCashflow((current) => [
+      [`PT-${1205 + nextIndex}`, form.content.trim(), form.method.trim() || "Tiền mặt", form.amount.trim(), "Đã lưu"],
+      ...current,
+    ]);
+    setForm({ content: "", method: "", amount: "" });
+    setMessage("Đã lưu khoản thu chi mới vào sổ.");
   };
-
-  const saveExpense = () => {
-    const amt = parseFloat(exAmount);
-    if (!exCategory.trim() || isNaN(amt) || amt <= 0) return;
-    const newRec: ExpenseRecord = {
-      id: Date.now(),
-      category: exCategory,
-      amount: amt,
-      date: exDate,
-    };
-    setExpenses((prev) => [...prev, newRec]);
-    setShowExpense(false);
-  };
-
-  const totalRevenue = useMemo(
-    () => revenue.reduce((sum, r) => sum + r.amount, 0),
-    [revenue]
-  );
-  const totalExpense = useMemo(
-    () => expenses.reduce((sum, e) => sum + e.amount, 0),
-    [expenses]
-  );
-  const profit = totalRevenue - totalExpense;
-
-  // Group monthly revenue
-  const monthlyRevenue = useMemo(() => {
-    const map: Record<string, number> = {};
-    revenue.forEach((r) => {
-      const month = r.date.slice(0, 7); // YYYY-MM
-      map[month] = (map[month] || 0) + r.amount;
-    });
-    return Object.entries(map).map(([month, amount]) => ({ month, amount }));
-  }, [revenue]);
 
   return (
-    <div className="flex flex-col gap-8 p-6 w-full">
-      <div className="flex items-start justify-between flex-wrap gap-4">
+    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 pb-10 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-4 relative overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,_#ffffff_0%,_#f8fbff_55%,_#eff6ff_100%)] p-6 shadow-sm ring-1 ring-white/70 md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">Tài chính</h2>
-          <p className="text-muted-foreground text-sm">
-            Doanh thu, chi phí & lợi nhuận
+          <Badge className="mb-3 rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 ring-1 ring-blue-100 hover:bg-blue-50">
+            Tài chính vận hành
+          </Badge>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Tài chính</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+            Theo dõi doanh thu theo ngày/tháng, công nợ khách hàng, chi phí vận
+            hành, lợi nhuận và quản lý thu chi.
           </p>
         </div>
-        <Button className="gap-2" onClick={openExpense}>
-          <Plus className="h-4 w-4" /> Ghi chi phí
-        </Button>
-      </div>
-
-      {/* KPI Summary */}
-      <div className="grid md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Doanh thu</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold text-green-600">
-            {totalRevenue.toLocaleString("vi-VN")} đ
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Chi phí</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold text-red-600">
-            {totalExpense.toLocaleString("vi-VN")} đ
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Lợi nhuận</CardTitle>
-          </CardHeader>
-          <CardContent
-            className={`text-2xl font-semibold ${profit >= 0 ? "text-green-700" : "text-red-700"}`}
-          >
-            {profit.toLocaleString("vi-VN")} đ
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Revenue Charts */}
-      <div className="grid lg:grid-cols-2 gap-4">
-        <Card className="border shadow-sm">
-          <CardHeader>
-            <CardTitle>Doanh thu theo ngày</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={revenue} margin={{ left: 0, right: 16, top: 16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip formatter={(value) => `${Number(value ?? 0).toLocaleString("vi-VN")} đ`} />
-                <Line type="monotone" dataKey="amount" stroke="#16a34a" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        <Card className="border shadow-sm">
-          <CardHeader>
-            <CardTitle>Doanh thu theo tháng</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={monthlyRevenue} margin={{ left: 0, right: 16, top: 16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip formatter={(value) => `${Number(value ?? 0).toLocaleString("vi-VN")} đ`} />
-                <Line type="monotone" dataKey="amount" stroke="#0ea5e9" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Receivables */}
-      <Card className="border shadow-sm">
-        <CardHeader>
-          <CardTitle>Công nợ khách hàng</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table className="min-w-[600px]">
-            <colgroup>
-              <col />
-              <col className="w-40" />
-              <col className="w-40" />
-            </colgroup>
-            <TableHeader>
-              <TableRow className="bg-muted/50 text-left">
-                <TableHead>Khách hàng</TableHead>
-                <TableHead>Số tiền</TableHead>
-                <TableHead>Hạn</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {receivables.map((r) => (
-                <TableRow key={r.id} className="border-b">
-                  <TableCell>{r.customer}</TableCell>
-                  <TableCell>{r.amount.toLocaleString("vi-VN")} đ</TableCell>
-                  <TableCell>{r.dueDate}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Expenses */}
-      <Card className="border shadow-sm">
-        <CardHeader>
-          <CardTitle>Chi phí vận hành</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 max-h-64 overflow-y-auto">
-          <Table className="min-w-[600px]">
-            <colgroup>
-              <col />
-              <col className="w-40" />
-              <col className="w-40" />
-            </colgroup>
-            <TableHeader>
-              <TableRow className="bg-muted/50 text-left">
-                <TableHead>Hạng mục</TableHead>
-                <TableHead>Số tiền</TableHead>
-                <TableHead>Ngày</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {expenses.map((e) => (
-                <TableRow key={e.id} className="border-b">
-                  <TableCell>{e.category}</TableCell>
-                  <TableCell>{e.amount.toLocaleString("vi-VN")} đ</TableCell>
-                  <TableCell>{e.date}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Expense modal */}
-      {showExpense && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-medium">Ghi chi phí</CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setShowExpense(false)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Hạng mục</Label>
-                <Input value={exCategory} onChange={(e) => setExCategory(e.target.value)} placeholder="Tiền điện" />
-              </div>
-              <div className="space-y-2">
-                <Label>Số tiền (đ)</Label>
-                <Input type="number" value={exAmount} onChange={(e) => setExAmount(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Ngày</Label>
-                <Input type="date" value={exDate} onChange={(e) => setExDate(e.target.value)} />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full" onClick={saveExpense}>
-                Lưu
-              </Button>
-            </CardFooter>
-          </Card>
+        <div className="flex gap-2">
+          <Button className="bg-blue-600 text-white shadow-sm hover:bg-blue-700" onClick={addCashflow}>
+            <ReceiptText className="mr-2 size-4" />
+            Ghi nhận và lưu
+          </Button>
         </div>
-      )}
+      </header>
+
+      {message ? (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">{message}</div>
+      ) : null}
+
+      <Card className="rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70">
+        <CardHeader>
+          <CardTitle>Nhập khoản thu chi</CardTitle>
+          <p className="text-sm text-slate-500">Khoản mới sẽ hiện ngay trong sổ thu chi.</p>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-3">
+          <Input value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} placeholder="Nội dung" />
+          <Input value={form.method} onChange={(event) => setForm((current) => ({ ...current, method: event.target.value }))} placeholder="Phương thức" />
+          <Input value={form.amount} onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))} placeholder="Số tiền" />
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-4 md:grid-cols-4">
+        {[
+          ["8,6 triệu", "Doanh thu hôm nay", Banknote],
+          ["154 triệu", "Doanh thu tháng", TrendingUp],
+          ["12,4 triệu", "Công nợ", CreditCard],
+          ["38 triệu", "Lợi nhuận tạm tính", ReceiptText],
+        ].map(([value, label, Icon]) => (
+          <Card key={label as string} className="rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm text-slate-500">{label as string}</CardTitle>
+              {React.createElement(Icon as React.ElementType, { className: "size-5 text-blue-600" })}
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold tracking-tight">{value as string}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1fr_1.4fr]">
+        <Card className="rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <CardHeader>
+            <CardTitle>Cơ cấu vận hành tháng</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {[
+              ["Doanh thu dịch vụ", "154 triệu", "bg-blue-600", "100%"],
+              ["Chi phí nhân sự", "46 triệu", "bg-blue-400", "30%"],
+              ["Vật tư & hóa chất", "22 triệu", "bg-blue-300", "14%"],
+              ["Giao nhận", "11 triệu", "bg-blue-200", "7%"],
+            ].map((item) => (
+              <div key={item[0]} className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium">{item[0]}</span>
+                  <span className="text-slate-500">{item[1]}</span>
+                </div>
+                <div className="h-2 rounded-full bg-muted">
+                  <div className={`h-2 rounded-full ${item[2]}`} style={{ width: item[3] }} />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <CardHeader className="border-b border-slate-100 bg-white">
+            <CardTitle>Sổ thu chi</CardTitle>
+          </CardHeader>
+          <CardContent className="px-0">
+            <Table>
+              <TableHeader className="bg-slate-50/80">
+                <TableRow>
+                  <TableHead className="pl-4">Mã phiếu</TableHead>
+                  <TableHead>Nội dung</TableHead>
+                  <TableHead>Phương thức</TableHead>
+                  <TableHead>Số tiền</TableHead>
+                  <TableHead className="pr-4">Trạng thái</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cashflow.map((item) => (
+                  <TableRow key={item[0]}>
+                    <TableCell className="pl-4 font-semibold text-slate-900">{item[0]}</TableCell>
+                    <TableCell>{item[1]}</TableCell>
+                    <TableCell>{item[2]}</TableCell>
+                    <TableCell className={item[3].startsWith("+") ? "text-blue-700" : "text-red-600"}>{item[3]}</TableCell>
+                    <TableCell className="pr-4">
+                      <Badge variant="secondary" className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 ring-1 ring-blue-100">{item[4]}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }

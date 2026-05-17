@@ -1,275 +1,170 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Bike, CalendarDays, MapPinned, Route, Truck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Table,
-  TableHeader,
-  TableRow,
-  TableHead,
   TableBody,
   TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Plus, X, MapPin } from "lucide-react";
 
-export type DeliveryStatus =
-  | "chờ lấy"
-  | "đang lấy"
-  | "đang giao"
-  | "hoàn thành";
-
-interface Delivery {
-  id: number;
-  customerName: string;
-  address: string;
-  pickupAt: string;
-  returnAt: string;
-  driver: string;
-  status: DeliveryStatus;
-}
-
-const DRIVERS = ["Anh Minh", "Chị Lan", "Anh Tuấn"];
-const STATUSES: DeliveryStatus[] = [
-  "chờ lấy",
-  "đang lấy",
-  "đang giao",
-  "hoàn thành",
+const initialDeliveries = [
+  ["GN-210", "Lấy đồ", "Nguyễn Minh Anh", "08:30", "Quận 1", "Tài xế Bình", "Đang đi"],
+  ["GN-211", "Trả đồ", "Trần Hoàng Nam", "10:00", "Quận 3", "Tài xế An", "Đã nhận"],
+  ["GN-212", "Lấy đồ", "Lê Thu Hà", "14:30", "Bình Thạnh", "Tài xế Bình", "Chờ phân công"],
+  ["GN-213", "Trả đồ", "Phạm Gia Hân", "18:00", "Phú Nhuận", "Tài xế Khoa", "Đang giao"],
 ];
 
-const STATUS_COLOR: Record<DeliveryStatus, "outline" | "secondary" | "default"> = {
-  "chờ lấy": "outline",
-  "đang lấy": "secondary",
-  "đang giao": "secondary",
-  "hoàn thành": "default",
-};
+export default function DeliveryPage() {
+  const [deliveries, setDeliveries] = useState(initialDeliveries);
+  const [message, setMessage] = useState("");
+  const [form, setForm] = useState({
+    type: "",
+    customer: "",
+    time: "",
+    area: "",
+    driver: "",
+  });
 
-const seedDeliveries: Delivery[] = [
-  {
-    id: 1,
-    customerName: "Nguyễn Văn A",
-    address: "12 Trần Phú, Hà Nội",
-    pickupAt: "2024-05-12T08:30",
-    returnAt: "2024-05-12T17:00",
-    driver: "Anh Minh",
-    status: "đang giao",
-  },
-  {
-    id: 2,
-    customerName: "Trần Thị B",
-    address: "90 Lý Thường Kiệt, Hà Nội",
-    pickupAt: "2024-05-12T09:00",
-    returnAt: "2024-05-13T10:00",
-    driver: "Chị Lan",
-    status: "chờ lấy",
-  },
-];
+  const addDelivery = () => {
+    if (!form.type.trim() || !form.customer.trim() || !form.time.trim()) {
+      setMessage("Vui lòng nhập loại lịch, khách hàng và giờ giao nhận trước khi lưu.");
+      return;
+    }
 
-export default function DeliveryManagement() {
-  const [deliveries, setDeliveries] = useState<Delivery[]>(seedDeliveries);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Delivery | null>(null);
-
-  const [customer, setCustomer] = useState("");
-  const [address, setAddress] = useState("");
-  const [pickupAt, setPickupAt] = useState("");
-  const [returnAt, setReturnAt] = useState("");
-  const [driver, setDriver] = useState(DRIVERS[0]);
-  const [status, setStatus] = useState<DeliveryStatus>("chờ lấy");
-
-  const resetForm = () => {
-    setCustomer("");
-    setAddress("");
-    setPickupAt("");
-    setReturnAt("");
-    setDriver(DRIVERS[0]);
-    setStatus("chờ lấy");
-    setEditing(null);
-  };
-
-  const openNew = () => {
-    resetForm();
-    setShowForm(true);
-  };
-
-  const openEdit = (d: Delivery) => {
-    setEditing(d);
-    setCustomer(d.customerName);
-    setAddress(d.address);
-    setPickupAt(d.pickupAt);
-    setReturnAt(d.returnAt);
-    setDriver(d.driver);
-    setStatus(d.status);
-    setShowForm(true);
-  };
-
-  const saveDelivery = () => {
-    if (!customer || !address || !pickupAt) return;
-    const newDelivery: Delivery = {
-      id: editing ? editing.id : Date.now(),
-      customerName: customer,
-      address,
-      pickupAt,
-      returnAt,
-      driver,
-      status,
-    };
-    setDeliveries((prev) =>
-      editing ? prev.map((x) => (x.id === editing.id ? newDelivery : x)) : [...prev, newDelivery]
-    );
-    setShowForm(false);
-    resetForm();
+    const nextIndex = deliveries.length + 1;
+    setDeliveries((current) => [
+      [`GN-${210 + nextIndex}`, form.type.trim(), form.customer.trim(), form.time.trim(), form.area.trim() || "Chưa cập nhật", form.driver.trim() || "Chưa phân công", "Chờ phân công"],
+      ...current,
+    ]);
+    setForm({ type: "", customer: "", time: "", area: "", driver: "" });
+    setMessage("Đã lưu lịch giao nhận mới vào bảng.");
   };
 
   return (
-    <div className="flex flex-col gap-8 p-6 w-full">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 pb-10 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-4 relative overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,_#ffffff_0%,_#f8fbff_55%,_#eff6ff_100%)] p-6 shadow-sm ring-1 ring-white/70 md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">Quản lý giao nhận</h2>
-          <p className="text-muted-foreground text-sm">
-            Lịch lấy & trả, phân công tài xế, trạng thái giao nhận
+          <Badge className="mb-3 rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 ring-1 ring-blue-100 hover:bg-blue-50">
+            Điều phối giao nhận
+          </Badge>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Quản lý giao nhận</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+            Lên lịch lấy đồ và trả đồ, phân công tài xế, theo dõi trạng thái
+            giao nhận và tuyến đường trong ngày.
           </p>
         </div>
-        <Button className="gap-2" onClick={openNew}>
-          <Plus className="h-4 w-4" /> Thêm lịch
-        </Button>
-      </div>
+        <div className="flex gap-2">
+          <Button className="bg-blue-600 text-white shadow-sm hover:bg-blue-700" onClick={addDelivery}>
+            <CalendarDays className="mr-2 size-4" />
+            Tạo và lưu lịch
+          </Button>
+        </div>
+      </header>
 
-      {/* Table */}
-      <Card className="shadow-sm border overflow-x-auto">
-        <CardContent className="p-0">
-          <Table className="min-w-[900px]">
-            <colgroup>
-              <col className="w-56" />
-              <col />
-              <col className="w-40" />
-              <col className="w-40" />
-              <col className="w-32" />
-              <col className="w-28" />
-            </colgroup>
-            <TableHeader>
-              <TableRow className="bg-muted/50 text-left">
-                <TableHead>Khách hàng</TableHead>
-                <TableHead>Địa chỉ</TableHead>
-                <TableHead>Lấy lúc</TableHead>
-                <TableHead>Trả lúc</TableHead>
-                <TableHead>Tài xế</TableHead>
-                <TableHead className="text-right">Trạng thái</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {deliveries.map((d) => (
-                <TableRow
-                  key={d.id}
-                  className="border-b hover:bg-muted/50 cursor-pointer"
-                  onClick={() => openEdit(d)}
-                >
-                  <TableCell className="font-medium whitespace-nowrap">
-                    {d.customerName}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">{d.address}</TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {d.pickupAt.replace("T", " ")}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {d.returnAt ? d.returnAt.replace("T", " ") : "-"}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">{d.driver}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant={STATUS_COLOR[d.status]}>{d.status}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+      {message ? (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+          {message}
+        </div>
+      ) : null}
+
+      <Card className="rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70">
+        <CardHeader>
+          <CardTitle>Nhập lịch giao nhận</CardTitle>
+          <p className="text-sm text-slate-500">
+            Thông tin sau khi lưu sẽ xuất hiện trong bảng lịch lấy và trả đồ.
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <Input value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))} placeholder="Loại: lấy đồ / trả đồ" />
+          <Input value={form.customer} onChange={(event) => setForm((current) => ({ ...current, customer: event.target.value }))} placeholder="Khách hàng" />
+          <Input value={form.time} onChange={(event) => setForm((current) => ({ ...current, time: event.target.value }))} placeholder="Giờ" />
+          <Input value={form.area} onChange={(event) => setForm((current) => ({ ...current, area: event.target.value }))} placeholder="Khu vực" />
+          <Input value={form.driver} onChange={(event) => setForm((current) => ({ ...current, driver: event.target.value }))} placeholder="Tài xế" />
         </CardContent>
       </Card>
 
-      {/* Modal add/edit */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
-          <Card className="w-full max-w-lg">
+      <section className="grid gap-4 md:grid-cols-4">
+        {[
+          ["18", "Lịch hôm nay", CalendarDays],
+          ["7", "Đang lấy đồ", Bike],
+          ["9", "Đang trả đồ", Truck],
+          ["3", "Tuyến cần tối ưu", Route],
+        ].map(([value, label, Icon]) => (
+          <Card key={label as string} className="rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-medium">
-                {editing ? "Cập nhật lịch" : "Thêm lịch giao nhận"}
-              </CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setShowForm(false)}>
-                <X className="h-4 w-4" />
-              </Button>
+              <CardTitle className="text-sm text-slate-500">{label as string}</CardTitle>
+              {React.createElement(Icon as React.ElementType, { className: "size-5 text-blue-600" })}
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2 md:col-span-2">
-                <Label>Khách hàng</Label>
-                <Input value={customer} onChange={(e) => setCustomer(e.target.value)} />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label>Địa chỉ</Label>
-                <Input value={address} onChange={(e) => setAddress(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Lấy lúc</Label>
-                <Input type="datetime-local" value={pickupAt} onChange={(e) => setPickupAt(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Trả lúc</Label>
-                <Input type="datetime-local" value={returnAt} onChange={(e) => setReturnAt(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Tài x xế</Label>
-                <Select value={driver} onValueChange={setDriver}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn tài xế" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DRIVERS.map((d) => (
-                      <SelectItem key={d} value={d}>
-                        {d}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Trạng thái</Label>
-                <Select value={status} onValueChange={(v) => setStatus(v as DeliveryStatus)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn trạng thái" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUSES.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <CardContent>
+              <p className="text-2xl font-semibold tracking-tight">{value as string}</p>
             </CardContent>
-            <CardFooter>
-              <Button className="w-full" onClick={saveDelivery}>
-                {editing ? "Lưu thay đổi" : "Thêm"}
-              </Button>
-            </CardFooter>
           </Card>
-        </div>
-      )}
+        ))}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+        <Card className="overflow-hidden rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <CardHeader className="border-b border-slate-100 bg-white">
+            <CardTitle>Lịch lấy và trả đồ</CardTitle>
+          </CardHeader>
+          <CardContent className="px-0">
+            <Table>
+              <TableHeader className="bg-slate-50/80">
+                <TableRow>
+                  <TableHead className="pl-4">Mã lịch</TableHead>
+                  <TableHead>Loại</TableHead>
+                  <TableHead>Khách hàng</TableHead>
+                  <TableHead>Giờ</TableHead>
+                  <TableHead>Khu vực</TableHead>
+                  <TableHead>Tài xế</TableHead>
+                  <TableHead className="pr-4">Trạng thái</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {deliveries.map((item) => (
+                  <TableRow key={item[0]}>
+                    <TableCell className="pl-4 font-semibold text-slate-900">{item[0]}</TableCell>
+                    <TableCell>{item[1]}</TableCell>
+                    <TableCell>{item[2]}</TableCell>
+                    <TableCell>{item[3]}</TableCell>
+                    <TableCell>{item[4]}</TableCell>
+                    <TableCell>{item[5]}</TableCell>
+                    <TableCell className="pr-4">
+                      <Badge variant="secondary" className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 ring-1 ring-blue-100">{item[6]}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <CardHeader>
+            <CardTitle>Bản đồ tuyến đường</CardTitle>
+            <p className="text-sm text-slate-500">Mô phỏng tuyến giao nhận theo cụm khu vực.</p>
+          </CardHeader>
+          <CardContent>
+            <div className="relative min-h-80 rounded-lg border border-slate-200 bg-blue-50/60 p-4">
+              <div className="absolute left-8 top-8 rounded-full bg-blue-600 px-3 py-1 text-xs text-white">Kho</div>
+              <div className="absolute right-8 top-16 rounded-full bg-white px-3 py-1 text-xs shadow-sm">Q.1</div>
+              <div className="absolute left-16 bottom-20 rounded-full bg-white px-3 py-1 text-xs shadow-sm">Q.3</div>
+              <div className="absolute right-14 bottom-10 rounded-full bg-white px-3 py-1 text-xs shadow-sm">B.Thạnh</div>
+              <MapPinned className="absolute left-1/2 top-1/2 size-12 -translate-x-1/2 -translate-y-1/2 text-blue-600" />
+              <div className="absolute inset-x-10 top-1/2 h-px bg-blue-200" />
+              <div className="absolute bottom-20 left-1/2 h-28 w-px bg-blue-200" />
+            </div>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }

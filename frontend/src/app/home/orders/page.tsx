@@ -1,355 +1,172 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import React, { useState } from "react";
+import { FileText, Plus, Shirt, Truck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Table,
-  TableHeader,
-  TableRow,
-  TableHead,
   TableBody,
   TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import {
-  Plus,
-  Search,
-  ChevronRight,
-  Printer,
-  X,
-  ChevronLeft,
-  MoreHorizontal,
-} from "lucide-react";
-import Dropdown from "@/src/components/ui/dropdown";
 
-export type OrderStatus =
-  | "tiếp nhận"
-  | "đang giặt"
-  | "phơi/sấy"
-  | "gấp"
-  | "giao trả";
-
-interface Order {
-  id: number;
-  customerName: string;
-  items: string;
-  status: OrderStatus;
-  createdAt: Date;
-}
-
-const STATUSES: OrderStatus[] = [
-  "tiếp nhận",
-  "đang giặt",
-  "phơi/sấy",
-  "gấp",
-  "giao trả",
+const stages = ["Tiếp nhận", "Đang giặt", "Phơi/sấy", "Gấp", "Giao trả"];
+const initialOrders = [
+  ["DH-1062", "Mai Thanh Tú", "Giặt thường 4kg", "Đang giặt", "120.000đ"],
+  ["DH-1061", "Ngô Huyền", "Giặt khô váy", "Phơi/sấy", "210.000đ"],
+  ["DH-1060", "Đỗ Quốc Bảo", "Chăn ga 6kg", "Gấp", "280.000đ"],
+  ["DH-1059", "Vũ An", "Combo sơ mi", "Giao trả", "160.000đ"],
 ];
 
-const STATUS_COLOR: Record<
-  OrderStatus,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  "tiếp nhận": "outline",
-  "đang giặt": "secondary",
-  "phơi/sấy": "secondary",
-  gấp: "default",
-  "giao trả": "destructive",
-};
+export default function OrdersPage() {
+  const [orders, setOrders] = useState(initialOrders);
+  const [message, setMessage] = useState("");
+  const [form, setForm] = useState({
+    customer: "",
+    phone: "",
+    service: "",
+    amount: "",
+  });
 
-// Fake seed data for demo (15 orders to test pagination)
-const seedOrders: Order[] = Array.from({ length: 15 }, (_, i) => ({
-  id: 1001 + i,
-  customerName: `Khách hàng ${i + 1}`,
-  items: i % 2 === 0 ? "Áo sơ mi x3, Quần tây x2" : "Chăn lông x2",
-  status: STATUSES[i % STATUSES.length],
-  createdAt: new Date(Date.now() - i * 36_000_00), // trừ giờ cho khác nhau
-}));
+  const addOrder = () => {
+    if (!form.customer.trim() || !form.service.trim()) {
+      setMessage("Vui lòng nhập tên khách hàng và dịch vụ trước khi lưu đơn.");
+      return;
+    }
 
-export default function OrderManagement() {
-  const [orders, setOrders] = useState<Order[]>(seedOrders);
-  const [customerName, setCustomerName] = useState("");
-  const [items, setItems] = useState("");
-  const [search, setSearch] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [showInvoice, setShowInvoice] = useState<Order | null>(null);
-  const [page, setPage] = useState(1);
-  const pageSize = 10;
+    const nextCode = `DH-${1062 + orders.length}`;
+    const nextOrder = [
+      nextCode,
+      form.customer || "Khách mới",
+      form.service || "Giặt thường",
+      "Tiếp nhận",
+      form.amount || "120.000đ",
+    ];
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return orders;
-    return orders.filter(
-      (o) =>
-        o.customerName.toLowerCase().includes(search.toLowerCase()) ||
-        o.items.toLowerCase().includes(search.toLowerCase()),
-    );
-  }, [orders, search]);
-
-  const pageCount = Math.ceil(filtered.length / pageSize);
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-  const createOrder = () => {
-    if (!customerName.trim()) return;
-    const newOrder: Order = {
-      id: Date.now(),
-      customerName,
-      items,
-      status: "tiếp nhận",
-      createdAt: new Date(),
-    };
-    setOrders((prev) => [newOrder, ...prev]);
-    setCustomerName("");
-    setItems("");
-    setShowForm(false);
-    setPage(1); // về trang đầu khi thêm mới
+    setOrders((current) => [nextOrder, ...current]);
+    setForm({ customer: "", phone: "", service: "", amount: "" });
+    setMessage(`Đã lưu đơn ${nextCode} vào danh sách đang xử lý.`);
   };
 
-  const nextStatus = (id: number) => {
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === id
-          ? {
-              ...o,
-              status:
-                STATUSES[
-                  Math.min(STATUSES.indexOf(o.status) + 1, STATUSES.length - 1)
-                ],
-            }
-          : o,
-      ),
-    );
-  };
-
-  const handlePrintInvoice = (order: Order) => {
-    const printContent = document.getElementById("invoice-modal-content");
-    if (!printContent) return;
-
-    const pri = window.open("", "print", "width=600,height=800");
-    if (!pri) return;
-    pri.document.write(
-      `<!DOCTYPE html><html><head><title>Phiếu đơn hàng #${order.id}</title></head><body>${printContent.innerHTML}</body></html>`,
-    );
-    pri.document.close();
-    pri.focus();
-    pri.onload = () => pri.print();
-  };
-
-  /** Page Layout **/
   return (
-    <div className="flex flex-col gap-8 p-6 w-full">
-      {/* Top bar */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 pb-10 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-4 relative overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,_#ffffff_0%,_#f8fbff_55%,_#eff6ff_100%)] p-6 shadow-sm ring-1 ring-white/70 md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Đơn hàng</h2>
-          <p className="text-muted-foreground text-sm">
-            Quản lý tiến trình giặt ủi & giao trả
+          <Badge className="mb-3 rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 ring-1 ring-blue-100 hover:bg-blue-50">
+            Quản lý vận hành
+          </Badge>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Quản lý đơn hàng</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+            Tạo đơn giặt mới, theo dõi trạng thái từ tiếp nhận đến giao trả và
+            in phiếu đơn hàng cho khách.
           </p>
         </div>
-
-        <div className="flex gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:flex-initial">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-9 h-10"
-              placeholder="Tìm theo khách hàng hoặc mặt hàng..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
-          <Button onClick={() => setShowForm(true)} className="gap-2 h-10">
-            <Plus className="h-4 w-4" />
-            Thêm đơn
-          </Button>
-        </div>
-      </div>
-
-      {/* Table List */}
-      <Card className="shadow-sm border-[1px] border-gray-200 overflow-x-auto">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="text-center">Mã đơn</TableHead>
-                <TableHead className="text-center">Khách hàng</TableHead>
-                <TableHead className="text-center">Mặt hàng</TableHead>
-                <TableHead className="text-center">Trạng thái</TableHead>
-                <TableHead className="text-center">Ngày tạo</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginated.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="text-center py-6 text-muted-foreground"
-                  >
-                    Không tìm thấy đơn phù hợp.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginated.map((order) => (
-                  <TableRow
-                    key={order.id}
-                    className="border-b hover:bg-muted/50"
-                  >
-                    <TableCell className="text-center">#{order.id}</TableCell>
-                    <TableCell className="text-center">{order.customerName}</TableCell>
-                    <TableCell className="text-center">{order.items}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant={STATUS_COLOR[order.status]}>
-                        {order.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {order.createdAt.toLocaleDateString("vi-VN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </TableCell>
-                    <TableCell className="flex justify-center">
-                      
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-
-        {/* ---- Pagination Footer ---- */}
-        <CardFooter className="flex items-center justify-between py-3 px-4 text-sm text-muted-foreground">
-          <span>
-            Hiển thị {paginated.length} / {filtered.length} đơn
-          </span>
-          <div className="flex gap-2 items-center">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setPage((p) => Math.max(p - 1, 1))}
-              disabled={page === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span>
-              {page}/{pageCount || 1}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setPage((p) => Math.min(p + 1, pageCount))}
-              disabled={page === pageCount || pageCount === 0}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardFooter>
-      </Card>
-
-      {/* ===== Centered Add Order Modal ===== */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-medium">
-                Tạo đơn giặt mới
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowForm(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="customer">Khách hàng</Label>
-                <Input
-                  id="customer"
-                  placeholder="Tên khách"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="items">Mặt hàng</Label>
-                <Input
-                  id="items"
-                  placeholder="Áo sơ mi x3, Quần x2..."
-                  value={items}
-                  onChange={(e) => setItems(e.target.value)}
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={createOrder} className="w-full">
-                Lưu đơn
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      )}
-
-      {/* ===== Centered Invoice Modal ===== */}
-      {showInvoice && (
-        <div
-          className="fixed inset-0 bg bg-black/40 z-40 flex items-center justify-center p-4"
-          role="dialog"
+        <Button
+          className="bg-blue-600 text-white shadow-sm hover:bg-blue-700"
+          onClick={() => setMessage("Nhập thông tin ở phiếu nhận đồ rồi bấm lưu để thêm đơn vào bảng.")}
         >
-          <Card
-            id="invoice-modal-content"
-            className="w-full max-w-md print:w-full print:max-w-none"
-          >
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-medium">
-                Phiếu đơn hàng #{showInvoice.id}
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowInvoice(null)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p>
-                <strong>Khách hàng:</strong> {showInvoice.customerName}
-              </p>
-              <p>
-                <strong>Mặt hàng:</strong> {showInvoice.items}
-              </p>
-              <p>
-                <strong>Trạng thái hiện tại:</strong> {showInvoice.status}
-              </p>
-              <p>
-                <strong>Ngày tạo:</strong>{" "}
-                {showInvoice.createdAt.toLocaleString("vi-VN")}
-              </p>
-            </CardContent>
-            <CardFooter className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => handlePrintInvoice(showInvoice)}
-              >
-                In phiếu
-              </Button>
-            </CardFooter>
-          </Card>
+          <Plus className="mr-2 size-4" />
+          Tạo đơn mới
+        </Button>
+      </header>
+
+      {message ? (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+          {message}
         </div>
-      )}
+      ) : null}
+
+      <section className="grid gap-4 xl:grid-cols-[360px_1fr]">
+        <Card className="rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <CardHeader>
+            <CardTitle>Phiếu nhận đồ</CardTitle>
+            <p className="text-sm text-slate-500">Nhập nhanh thông tin đơn mới.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Tên khách hàng</Label>
+              <Input value={form.customer} onChange={(event) => setForm((current) => ({ ...current, customer: event.target.value }))} className="focus-visible:border-blue-500 focus-visible:ring-blue-500/30" />
+            </div>
+            <div className="space-y-2">
+              <Label>Số điện thoại</Label>
+              <Input value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} className="focus-visible:border-blue-500 focus-visible:ring-blue-500/30" />
+            </div>
+            <div className="space-y-2">
+              <Label>Dịch vụ</Label>
+              <Input value={form.service} onChange={(event) => setForm((current) => ({ ...current, service: event.target.value }))} className="focus-visible:border-blue-500 focus-visible:ring-blue-500/30" />
+            </div>
+            <div className="space-y-2">
+              <Label>Tổng tiền</Label>
+              <Input value={form.amount} onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))} className="focus-visible:border-blue-500 focus-visible:ring-blue-500/30" />
+            </div>
+            <Button
+              className="w-full bg-blue-600 text-white hover:bg-blue-700"
+              onClick={addOrder}
+            >
+              <FileText className="mr-2 size-4" />
+              Lưu đơn vào bảng
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+          <CardHeader className="border-b border-slate-100 bg-white">
+            <CardTitle>Danh sách đơn đang xử lý</CardTitle>
+          </CardHeader>
+          <CardContent className="px-0">
+            <Table>
+              <TableHeader className="bg-slate-50/80">
+                <TableRow>
+                  <TableHead className="pl-4">Mã đơn</TableHead>
+                  <TableHead>Khách hàng</TableHead>
+                  <TableHead>Dịch vụ</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                  <TableHead>Tổng tiền</TableHead>
+                  <TableHead className="pr-4 text-right">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orders.map((order) => (
+                  <TableRow key={order[0]}>
+                    <TableCell className="pl-4 font-semibold text-slate-900">{order[0]}</TableCell>
+                    <TableCell>{order[1]}</TableCell>
+                    <TableCell>{order[2]}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 ring-1 ring-blue-100">{order[3]}</Badge>
+                    </TableCell>
+                    <TableCell>{order[4]}</TableCell>
+                    <TableCell className="pr-4 text-right text-slate-500">Đã lưu</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card className="rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+        <CardHeader>
+          <CardTitle>Tiến trình xử lý chuẩn</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-5">
+          {stages.map((stage, index) => (
+            <div key={stage} className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+              <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                {index === stages.length - 1 ? <Truck className="size-5" /> : <Shirt className="size-5" />}
+              </div>
+              <p className="font-medium">{stage}</p>
+              <Progress value={(index + 1) * 20} className="mt-3 h-2" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   );
 }

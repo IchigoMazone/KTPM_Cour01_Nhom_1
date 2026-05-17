@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 import { GradientText } from "@/src/components/ui/gradient-text";
 import {
   LoginField,
@@ -82,9 +83,19 @@ export default function Page() {
       nextErrors.email ? "email" : nextErrors.password ? "password" : null,
     );
 
-    if (nextErrors.email || nextErrors.password) return;
+    if (nextErrors.email || nextErrors.password) {
+      toast.error("Đăng nhập chưa hợp lệ", {
+        description: nextErrors.email || nextErrors.password,
+      });
+      return;
+    }
 
     console.log("Call API LOGIN");
+    toast.success("Đăng nhập thành công", {
+      description: rememberMe
+        ? "Tài khoản sẽ được ghi nhớ trên thiết bị này."
+        : "Đang chuyển bạn vào hệ thống.",
+    });
   };
 
   useEffect(() => {
@@ -280,8 +291,8 @@ export default function Page() {
 
           {/* Nút đăng nhập */}
           <button
-            disabled={!isFormValid}
-            className={`w-full h-10 rounded-md bg-amber-500 hover:bg-amber-600 ${isFormValid ? "active:scale-[0.98] cursor-pointer" : "cursor-not-allowed"} text-white text-sm font-semibold tracking-wide transition-all mb-4`}
+            type="button"
+            className={`w-full h-10 rounded-md bg-amber-500 hover:bg-amber-600 ${isFormValid ? "active:scale-[0.98]" : "opacity-70"} cursor-pointer text-white text-sm font-semibold tracking-wide transition-all mb-4`}
             onClick={handleLogin}
           >
             Đăng nhập
@@ -295,7 +306,15 @@ export default function Page() {
           </div>
 
           {/* Nút Google */}
-          <button className="w-full h-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.98] text-sm font-medium text-gray-700 flex items-center justify-center gap-2.5 transition-all mb-6">
+          <button
+            type="button"
+            className="w-full h-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.98] text-sm font-medium text-gray-700 flex items-center justify-center gap-2.5 transition-all mb-6"
+            onClick={() => {
+              toast.info("Đăng nhập Google", {
+                description: "Chức năng đăng nhập Google sẽ được kết nối với API sau.",
+              });
+            }}
+          >
             <img src="/google.png" alt="Google" className="w-[18px] h-[18px]" />
             Tiếp tục với Google
           </button>

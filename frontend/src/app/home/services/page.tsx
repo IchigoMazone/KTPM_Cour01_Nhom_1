@@ -1,214 +1,150 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { BadgeCheck, Plus, Shirt, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Table,
-  TableHeader,
-  TableRow,
-  TableHead,
   TableBody,
   TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from "@/components/ui/select";
-import { Plus, X, Pencil } from "lucide-react";
 
-export type Unit = "kg" | "món";
-
-interface Service {
-  id: number;
-  name: string;
-  unit: Unit;
-  price: number; // giá trên đơn vị
-}
-
-const seedServices: Service[] = [
-  { id: 1, name: "Giặt thường", unit: "kg", price: 15000 },
-  { id: 2, name: "Giặt khô", unit: "kg", price: 30000 },
-  { id: 3, name: "Giặt hấp", unit: "món", price: 40000 },
-  { id: 4, name: "Giặt đồ da", unit: "món", price: 80000 },
+const initialServices = [
+  ["Giặt thường", "Theo kg", "25.000đ/kg", "Quần áo hằng ngày", "Đang bán"],
+  ["Giặt khô", "Theo món", "80.000đ/món", "Vest, áo khoác, váy", "Đang bán"],
+  ["Giặt hấp", "Theo món", "120.000đ/món", "Đồ cao cấp cần giữ form", "Đang bán"],
+  ["Giặt đồ da", "Theo món", "180.000đ/món", "Áo da, túi da", "Cần xác nhận"],
 ];
 
-export default function ServiceManagement() {
-  const [services, setServices] = useState<Service[]>(seedServices);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Service | null>(null);
+export default function ServicesPage() {
+  const [services, setServices] = useState(initialServices);
+  const [message, setMessage] = useState("");
+  const [form, setForm] = useState({
+    name: "",
+    pricing: "",
+    price: "",
+    scope: "",
+  });
 
-  // form fields
-  const [name, setName] = useState("Giặt thường");
-  const [unit, setUnit] = useState<Unit>("kg");
-  const [price, setPrice] = useState<string>("15000");
-
-  const resetForm = () => {
-    setName("");
-    setUnit("kg");
-    setPrice("");
-    setEditing(null);
-  };
-
-  const openNewForm = () => {
-    resetForm();
-    setShowForm(true);
-  };
-
-  const openEditForm = (srv: Service) => {
-    setEditing(srv);
-    setName(srv.name);
-    setUnit(srv.unit);
-    setPrice(String(srv.price));
-    setShowForm(true);
-  };
-
-  const saveService = () => {
-    if (!name.trim() || !price) return;
-    const numericPrice = parseInt(price, 10);
-    if (isNaN(numericPrice)) return;
-
-    if (editing) {
-      setServices((prev) =>
-        prev.map((s) =>
-          s.id === editing.id ? { ...editing, name, unit, price: numericPrice } : s
-        )
-      );
-    } else {
-      const newService: Service = {
-        id: Date.now(),
-        name,
-        unit,
-        price: numericPrice,
-      };
-      setServices((prev) => [...prev, newService]);
+  const addService = () => {
+    if (!form.name.trim() || !form.price.trim()) {
+      setMessage("Vui lòng nhập tên dịch vụ và đơn giá trước khi lưu.");
+      return;
     }
-    setShowForm(false);
-    resetForm();
+
+    setServices((current) => [
+      [
+        form.name.trim(),
+        form.pricing.trim() || "Theo kg",
+        form.price.trim(),
+        form.scope.trim() || "Dịch vụ mới thêm",
+        "Đang bán",
+      ],
+      ...current,
+    ]);
+    setMessage(`Đã thêm dịch vụ ${form.name.trim()} vào bảng giá.`);
+    setForm({ name: "", pricing: "", price: "", scope: "" });
   };
 
   return (
-    <div className="flex flex-col gap-8 p-6 w-full">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 pb-10 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-4 relative overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,_#ffffff_0%,_#f8fbff_55%,_#eff6ff_100%)] p-6 shadow-sm ring-1 ring-white/70 md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Dịch vụ & Bảng giá</h2>
-          <p className="text-muted-foreground text-sm">
-            Quản lý các loại dịch vụ và giá theo kg hoặc theo món
+          <Badge className="mb-3 rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 ring-1 ring-blue-100 hover:bg-blue-50">
+            Dịch vụ & bảng giá
+          </Badge>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Dịch vụ & Bảng giá</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+            Quản lý các loại dịch vụ giặt thường, giặt khô, giặt hấp, giặt đồ
+            da và thiết lập giá theo kg hoặc theo món đồ.
           </p>
         </div>
-        <Button className="gap-2" onClick={openNewForm}>
-          <Plus className="h-4 w-4" /> Thêm dịch vụ
-        </Button>
-      </div>
+        <div className="flex gap-2">
+          <Button className="bg-blue-600 text-white shadow-sm hover:bg-blue-700" onClick={addService}>
+            <Plus className="mr-2 size-4" />
+            Lưu dịch vụ
+          </Button>
+        </div>
+      </header>
 
-      <Card className="shadow-sm border max-w-full overflow-x-auto">
-        <CardContent className="p-0">
-          <Table className="min-w-[600px]">
-            <colgroup>
-              <col className="w-56" />
-              <col className="w-24" />
-              <col className="w-32" />
-              <col className="w-24" />
-            </colgroup>
-            <TableHeader>
-              <TableRow className="bg-muted/50 text-left">
-                <TableHead>Tên dịch vụ</TableHead>
-                <TableHead>Đơn vị</TableHead>
-                <TableHead>Giá (đ)</TableHead>
-                <TableHead className="text-right">Thao tác</TableHead>
+      {message ? (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+          {message}
+        </div>
+      ) : null}
+
+      <Card className="rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70">
+        <CardHeader>
+          <CardTitle>Nhập dịch vụ mới</CardTitle>
+          <p className="text-sm text-slate-500">
+            Dữ liệu sau khi lưu sẽ xuất hiện ngay trong bảng giá dịch vụ.
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Tên dịch vụ" />
+          <Input value={form.pricing} onChange={(event) => setForm((current) => ({ ...current, pricing: event.target.value }))} placeholder="Cách tính: theo kg / theo món" />
+          <Input value={form.price} onChange={(event) => setForm((current) => ({ ...current, price: event.target.value }))} placeholder="Đơn giá" />
+          <Input value={form.scope} onChange={(event) => setForm((current) => ({ ...current, scope: event.target.value }))} placeholder="Áp dụng cho" />
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        {[
+          ["14", "Dịch vụ đang bán", BadgeCheck],
+          ["8", "Giá theo kg", Shirt],
+          ["6", "Giá theo món", Sparkles],
+        ].map(([value, label, Icon]) => (
+          <Card key={label as string} className="rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm text-slate-500">{label as string}</CardTitle>
+              {React.createElement(Icon as React.ElementType, { className: "size-5 text-blue-600" })}
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold tracking-tight">{value as string}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <Card className="overflow-hidden rounded-[22px] border-slate-200 bg-white/95 shadow-sm ring-1 ring-white/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+        <CardHeader className="border-b border-slate-100 bg-white">
+          <CardTitle>Bảng giá dịch vụ</CardTitle>
+        </CardHeader>
+        <CardContent className="px-0">
+          <Table>
+            <TableHeader className="bg-slate-50/80">
+              <TableRow>
+                <TableHead className="pl-4">Dịch vụ</TableHead>
+                <TableHead>Cách tính</TableHead>
+                <TableHead>Đơn giá</TableHead>
+                <TableHead>Áp dụng cho</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead className="pr-4 text-right">Sửa</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {services.map((srv) => (
-                <TableRow key={srv.id} className="border-b hover:bg-muted/50">
-                  <TableCell className="whitespace-nowrap font-medium">
-                    {srv.name}
+              {services.map((item) => (
+                <TableRow key={item[0]}>
+                  <TableCell className="pl-4 font-semibold text-slate-900">{item[0]}</TableCell>
+                  <TableCell>{item[1]}</TableCell>
+                  <TableCell>{item[2]}</TableCell>
+                  <TableCell>{item[3]}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 ring-1 ring-blue-100">{item[4]}</Badge>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap uppercase">{srv.unit}</TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {srv.price.toLocaleString("vi-VN")}
-                  </TableCell>
-                  <TableCell className="flex justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Sửa"
-                      onClick={() => openEditForm(srv)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+                  <TableCell className="pr-4 text-right text-slate-500">Đã lưu</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-
-      {/* Modal Form */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4" role="dialog">
-          <Card className="w-full max-w-md">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-medium">
-                {editing ? "Cập nhật dịch vụ" : "Thêm dịch vụ"}
-              </CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setShowForm(false)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Tên dịch vụ</Label>
-                <Input
-                  id="name"
-                  placeholder="Giặt khô..."
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Đơn vị</Label>
-                <Select value={unit} onValueChange={(v) => setUnit(v as Unit)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn đơn vị" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="kg">kg</SelectItem>
-                    <SelectItem value="món">món</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="price">Giá (đ)</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  placeholder="30000"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full" onClick={saveService}>
-                {editing ? "Lưu thay đổi" : "Thêm"}
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }

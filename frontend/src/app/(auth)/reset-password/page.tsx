@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 import { GradientText } from "@/src/components/ui/gradient-text";
 import {
   ResetPasswordField,
@@ -82,9 +83,15 @@ export default function Page() {
           : null,
     );
 
-    if (!isFormValid) return;
+    if (!isFormValid) {
+      toast.error("Vui lòng kiểm tra lại mật khẩu mới.");
+      return;
+    }
 
     console.log("Call API RESET PASSWORD");
+    toast.success("Đổi mật khẩu thành công", {
+      description: "Bạn có thể quay lại trang đăng nhập bằng mật khẩu mới.",
+    });
   };
 
   useEffect(() => {

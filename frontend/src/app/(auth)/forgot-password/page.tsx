@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { GradientText } from "@/src/components/ui/gradient-text";
 import {
   ForgotPasswordField,
@@ -74,9 +75,15 @@ export default function Page() {
       formErrors.account ? "account" : formErrors.email ? "email" : null,
     );
 
-    if (!isFormValid) return;
+    if (!isFormValid) {
+      toast.error("Vui lòng nhập đúng tài khoản và email.");
+      return;
+    }
 
     console.log("Call API FORGOT PASSWORD");
+    toast.success("Đã gửi yêu cầu đặt lại mật khẩu", {
+      description: "Vui lòng kiểm tra email để tiếp tục xác minh.",
+    });
   };
 
   useEffect(() => {

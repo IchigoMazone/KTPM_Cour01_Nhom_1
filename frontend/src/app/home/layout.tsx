@@ -13,7 +13,7 @@ export default function HomeLayout({
 }) {
   const { open, toggle } = useNavbarStore();
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_#eff6ff_0,_#f8fafc_32rem,_#f1f5f9_100%)]">
       <Sidebar />
 
       <div className="flex flex-col flex-1 relative">
@@ -24,7 +24,7 @@ export default function HomeLayout({
           ></div>
         )}
         <Search />
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-transparent">{children}</main>
       </div>
     </div>
   );
