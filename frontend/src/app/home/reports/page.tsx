@@ -1,219 +1,306 @@
 "use client";
 
-/*
-  Report & Statistics Dashboard
-  - Order & revenue summary charts (Recharts)
-  - Most-used services table
-  - Frequent customers table
-  - Export CSV / Print PDF stubs
-  Note: install recharts: `npm i recharts`
-*/
-
-import React, { useMemo } from "react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
+import { useState } from "react";
+import { FileDown, FileText, Send, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
-  LineChart,
-  Line,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
 } from "recharts";
 import {
   Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
   TableHeader,
   TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
 } from "@/components/ui/table";
-import { FileDown, Printer } from "lucide-react";
+import {
+  PageShell,
+  Period,
+  PeriodTabs,
+  SectionCard,
+  StatusBadge,
+} from "../_components/dashboard-primitives";
 
-// ---------- Seed data ----------
-const orderDaily = [
-  { date: "2024-05-10", orders: 120, revenue: 3500000 },
-  { date: "2024-05-11", orders: 140, revenue: 4200000 },
-  { date: "2024-05-12", orders: 128, revenue: 3800000 },
-  { date: "2024-05-13", orders: 156, revenue: 4500000 },
-  { date: "2024-05-14", orders: 172, revenue: 5200000 },
-  { date: "2024-05-15", orders: 160, revenue: 4800000 },
-  { date: "2024-05-16", orders: 185, revenue: 6100000 },
+const reportData = [
+  { name: "Giặt thường", orders: 340, revenue: 52000000 },
+  { name: "Giặt khô", orders: 180, revenue: 46000000 },
+  { name: "Giặt hấp", orders: 95, revenue: 26000000 },
+  { name: "Chăn màn", orders: 72, revenue: 21000000 },
 ];
 
-const servicesUsage = [
-  { service: "Giặt thường", count: 340 },
-  { service: "Giặt khô", count: 180 },
-  { service: "Giặt hấp", count: 95 },
-  { service: "Giặt đồ da", count: 40 },
+const topCustomers = [
+  ["Công ty ABC", "45 đơn", "18.600.000đ"],
+  ["Nguyễn Thị Hương", "28 đơn", "6.800.000đ"],
+  ["Shop Linen", "22 đơn", "5.400.000đ"],
 ];
 
-const frequentCustomers = [
-  { customer: "Nguyễn Văn A", orders: 45 },
-  { customer: "Công ty ABC", orders: 38 },
-  { customer: "Shop XYZ", orders: 30 },
-  { customer: "Trần Thị B", orders: 28 },
+const roles = [
+  ["Admin", "Toàn bộ hệ thống", "Bật"],
+  ["Quản lý", "Dashboard, đơn, nhân viên, báo cáo", "Bật"],
+  ["Nhân viên giặt", "Đơn hàng, trạng thái xử lý", "Bật"],
+  ["Tài xế", "Giao nhận", "Bật"],
+  ["Thu ngân", "Đơn hàng, tài chính", "Bật"],
 ];
 
-// ---------- Helpers ----------
-function downloadCSV(filename: string, rows: string[][]) {
-  const csvContent = rows.map((r) => r.join(",")).join("\n");
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", filename);
-  link.click();
-}
+const complaints = [
+  ["Mất đồ", "Nguyễn Văn A", "Đang xử lý", "Thiếu 1 tất đen trong DH-1022"],
+  ["Giao trễ", "Trần Thị B", "Mới", "Trễ 45 phút so với lịch hẹn"],
+  ["Hỏng đồ", "Phạm Lan", "Đã giải quyết", "Đền bù theo chính sách"],
+];
 
-// ---------- Component ----------
-export default function ReportStatistics() {
-  const totalOrders = useMemo(() => orderDaily.reduce((s, d) => s + d.orders, 0), []);
-  const totalRevenue = useMemo(() => orderDaily.reduce((s, d) => s + d.revenue, 0), []);
-
-  const exportOrdersCSV = () => {
-    const rows = [["Date", "Orders", "Revenue"]].concat(
-      orderDaily.map((o) => [o.date, String(o.orders), String(o.revenue)])
-    );
-    downloadCSV("orders_report.csv", rows);
-  };
-
-  const exportServicesCSV = () => {
-    const rows = [["Service", "Count"]].concat(
-      servicesUsage.map((s) => [s.service, String(s.count)])
-    );
-    downloadCSV("services_report.csv", rows);
-  };
-
-  const handlePrint = () => {
-    window.print(); // simple print PDF
-  };
+export default function ReportsSettingsPage() {
+  const [tab, setTab] = useState("Báo cáo");
+  const [period, setPeriod] = useState<Period>("Tháng");
 
   return (
-    <div className="flex flex-col gap-8 p-6 w-full">
-      <div className="flex items-center justify-between flex-wrap gap-4 print:hidden">
-        <h2 className="text-2xl font-semibold">Báo cáo & Thống kê</h2>
-        <div className="flex gap-3">
-          <Button variant="outline" className="gap-2" onClick={exportOrdersCSV}>
-            <FileDown className="h-4 w-4" /> Xuất CSV
+    <PageShell
+      title="Báo Cáo & Cài Đặt"
+      description="Xuất dữ liệu, quản lý cửa hàng, phân quyền, tích hợp và phản hồi."
+      action={
+        <div className="flex gap-2">
+          <Button variant="outline">
+            <FileDown className="mr-2 size-4" />
+            Excel
           </Button>
-          <Button className="gap-2" onClick={handlePrint}>
-            <Printer className="h-4 w-4" /> In / PDF
+          <Button className="bg-neutral-900 text-white hover:bg-neutral-800">
+            <FileText className="mr-2 size-4" />
+            PDF
           </Button>
         </div>
+      }
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <PeriodTabs value={period} onChange={setPeriod} />
+        {["Báo cáo", "Cài đặt cửa hàng", "Phân quyền", "Tích hợp & Thông báo", "Hỗ trợ"].map((item) => (
+          <Button
+            key={item}
+            variant={tab === item ? "default" : "outline"}
+            size="sm"
+            onClick={() => setTab(item)}
+          >
+            {item}
+          </Button>
+        ))}
       </div>
 
-      {/* KPI cards */}
-      <div className="grid md:grid-cols-2 gap-4 print:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Tổng đơn hàng (7 ngày)</CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-semibold">
-            {totalOrders}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Doanh thu (7 ngày)</CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-semibold text-green-700">
-            {totalRevenue.toLocaleString("vi-VN")} đ
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts */}
-      <Card className="border shadow-sm">
-        <CardHeader>
-          <CardTitle>Đơn hàng & Doanh thu theo ngày</CardTitle>
-        </CardHeader>
-        <CardContent className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={orderDaily} margin={{ top: 16, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis yAxisId="left" />
-              <YAxis yAxisId="right" orientation="right" />
-              <Tooltip
-                formatter={(value, name) =>
-                  name === "revenue" || name === "Doanh thu"
-                    ? `${Number(value ?? 0).toLocaleString("vi-VN")} đ`
-                    : value
-                }
-              />
-              <Line yAxisId="left" type="monotone" dataKey="orders" stroke="#0ea5e9" strokeWidth={2} dot={false} name="Đơn" />
-              <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#16a34a" strokeWidth={2} dot={false} name="Doanh thu" />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <div className="grid lg:grid-cols-2 gap-4">
-        {/* Top services */}
-        <Card className="border shadow-sm">
-          <CardHeader>
-            <CardTitle>Dịch vụ được dùng nhiều nhất</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table className="min-w-[400px]">
+      {tab === "Báo cáo" && (
+        <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
+          <SectionCard title="Dịch vụ phổ biến">
+            <div className="h-[320px] p-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={reportData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="orders" fill="#111827" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </SectionCard>
+          <SectionCard title="Top khách hàng">
+            <Table>
+              <TableCaption>Top khách hàng theo số đơn và chi tiêu.</TableCaption>
               <TableHeader>
-                <TableRow className="bg-muted/50 text-left">
-                  <TableHead>Dịch vụ</TableHead>
-                  <TableHead>Số lần</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {servicesUsage.map((s) => (
-                  <TableRow key={s.service} className="border-b">
-                    <TableCell>{s.service}</TableCell>
-                    <TableCell>{s.count}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-          <CardFooter className="print:hidden">
-            <Button variant="outline" size="sm" onClick={exportServicesCSV}>
-              <FileDown className="h-4 w-4" /> CSV Dịch vụ
-            </Button>
-          </CardFooter>
-        </Card>
-
-        {/* Frequent customers */}
-        <Card className="border shadow-sm">
-          <CardHeader>
-            <CardTitle>Khách hàng thường xuyên</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 max-h-64 overflow-y-auto">
-            <Table className="min-w-[400px]">
-              <TableHeader>
-                <TableRow className="bg-muted/50 text-left">
+                <TableRow className="bg-muted/30">
                   <TableHead>Khách hàng</TableHead>
                   <TableHead>Đơn</TableHead>
+                  <TableHead>Chi tiêu</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {frequentCustomers.map((c) => (
-                  <TableRow key={c.customer} className="border-b">
-                    <TableCell>{c.customer}</TableCell>
-                    <TableCell>{c.orders}</TableCell>
+                {topCustomers.map((row) => (
+                  <TableRow key={row[0]}>
+                    {row.map((cell) => <TableCell key={cell}>{cell}</TableCell>)}
                   </TableRow>
                 ))}
               </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={2}>Tổng chi tiêu nhóm top</TableCell>
+                  <TableCell className="text-right">30.800.000đ</TableCell>
+                </TableRow>
+              </TableFooter>
             </Table>
-          </CardContent>
-        </Card>
+          </SectionCard>
+        </div>
+      )}
+
+      {tab === "Cài đặt cửa hàng" && (
+        <SectionCard title="Thông tin cửa hàng">
+          <div className="grid gap-4 p-5 md:grid-cols-2">
+            {[
+              ["Tên cửa hàng", "Laundry Admin"],
+              ["Địa chỉ", "12 Trần Phú, Quận 1, TP.HCM"],
+              ["SĐT", "028 3812 3456"],
+              ["Email", "hello@laundry.vn"],
+              ["Múi giờ", "Asia/Bangkok"],
+              ["Tiền tệ", "VND"],
+            ].map(([label, value]) => (
+              <div key={label} className="space-y-2">
+                <Label>{label}</Label>
+                <Input defaultValue={value} />
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {tab === "Phân quyền" && (
+        <SectionCard
+          title="Vai trò và quyền truy cập"
+          description="Cấu hình quyền truy cập từng trang cho từng vai trò."
+        >
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead>Vai trò</TableHead>
+                <TableHead>Phạm vi</TableHead>
+                <TableHead>Trạng thái</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {roles.map((row) => (
+                <TableRow key={row[0]}>
+                  <TableCell className="font-medium">{row[0]}</TableCell>
+                  <TableCell>{row[1]}</TableCell>
+                  <TableCell>
+                    <StatusBadge tone="success">{row[2]}</StatusBadge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SectionCard>
+      )}
+
+      {tab === "Tích hợp & Thông báo" && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SectionCard title="Thanh toán">
+            <div className="space-y-3 p-5">
+              {["MoMo", "VNPay", "Tiền mặt", "Chuyển khoản ngân hàng"].map((item) => (
+                <div key={item} className="flex items-center justify-between rounded-lg border p-3">
+                  <span className="flex items-center gap-2">
+                    <Settings className="size-4" />
+                    {item}
+                  </span>
+                  <Switch defaultChecked />
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+          <SectionCard title="Thông báo SMS / Zalo OA">
+            <div className="space-y-3 p-5">
+              {[
+                "Xác nhận tiếp nhận đơn",
+                "Cập nhật trạng thái đang giặt",
+                "Nhắc lịch giao nhận",
+                "Đơn đã giao xong",
+                "Sinh nhật + mã giảm giá",
+              ].map((item) => (
+                <div key={item} className="flex items-center justify-between rounded-lg border p-3">
+                  <span className="flex items-center gap-2">
+                    <Send className="size-4" />
+                    {item}
+                  </span>
+                  <Switch defaultChecked={item !== "Sinh nhật + mã giảm giá"} />
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        </div>
+      )}
+
+      {tab === "Hỗ trợ" && (
+        <SectionCard title="Khiếu nại & phản hồi">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead>Loại</TableHead>
+                <TableHead>Khách</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead>Nội dung</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {complaints.map((row) => (
+                <TableRow key={`${row[0]}-${row[1]}`}>
+                  <TableCell>{row[0]}</TableCell>
+                  <TableCell>{row[1]}</TableCell>
+                  <TableCell>
+                    <StatusBadge tone={row[2] === "Đã giải quyết" ? "success" : "warning"}>
+                      {row[2]}
+                    </StatusBadge>
+                  </TableCell>
+                  <TableCell>{row[3]}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SectionCard>
+      )}
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <SectionCard title="Template tin nhắn">
+          <div className="space-y-3 p-4 text-sm">
+            {[
+              ["Tiếp nhận đơn", "Xin chào {{tên_khách}}, đơn {{mã_đơn}} đã được tiếp nhận."],
+              ["Sẵn sàng giao", "Đơn {{mã_đơn}} đã sẵn sàng giao trả lúc {{giờ_giao}}."],
+              ["Sinh nhật", "Chúc mừng sinh nhật {{tên_khách}}, tặng bạn mã {{mã_giảm_giá}}."],
+            ].map(([name, template]) => (
+              <div key={name} className="rounded-lg border p-3">
+                <p className="font-medium">{name}</p>
+                <p className="mt-1 text-muted-foreground">{template}</p>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Lịch xuất báo cáo">
+          <div className="space-y-3 p-4 text-sm">
+            {[
+              ["Doanh thu ngày", "22:00 mỗi ngày", "Email quản lý"],
+              ["Công nợ tuần", "Thứ 2 hàng tuần", "Excel"],
+              ["Tồn kho tháng", "Ngày 1 mỗi tháng", "PDF"],
+            ].map(([name, schedule, channel]) => (
+              <div key={name} className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="font-medium">{name}</p>
+                  <p className="text-muted-foreground">{schedule}</p>
+                </div>
+                <StatusBadge>{channel}</StatusBadge>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Audit cấu hình">
+          <div className="space-y-3 p-4 text-sm">
+            {[
+              ["Admin cập nhật giờ hoạt động", "16/05/2026 09:12"],
+              ["Quản lý bật VNPay", "15/05/2026 18:30"],
+              ["Thu ngân đổi template SMS", "14/05/2026 11:05"],
+            ].map(([event, time]) => (
+              <div key={event} className="rounded-lg border p-3">
+                <p className="font-medium">{event}</p>
+                <p className="text-muted-foreground">{time}</p>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
       </div>
-    </div>
+    </PageShell>
   );
 }

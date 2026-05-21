@@ -4,48 +4,43 @@ import { useMemo, useState } from "react";
 import {
   Bell,
   CalendarPlus,
+  Gift,
+  Headset,
   Menu,
   PackageSearch,
   SearchIcon,
-  Sparkles,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import NotificationsDialog from "./notifications-dialog";
 import { useNavbarStore } from "@/src/context/useNavbarStore";
 
-const dashboardCommands = [
-  { label: "Tạo đơn giặt mới", path: "/home/orders", meta: "Đơn hàng" },
-  { label: "Lịch giao nhận hôm nay", path: "/home/delivery", meta: "Giao nhận" },
-  { label: "Tìm khách hàng thân thiết", path: "/home/customers", meta: "Khách hàng" },
-  { label: "Cấu hình bảng giá", path: "/home/services", meta: "Dịch vụ" },
-  { label: "Mã giảm giá & loyalty", path: "/home/services", meta: "Ưu đãi" },
-  { label: "Kho vật tư sắp hết", path: "/home/staff", meta: "Vận hành" },
-  { label: "Phân quyền nhân viên", path: "/home/reports", meta: "Cài đặt" },
-  { label: "Template SMS/Zalo", path: "/home/reports", meta: "Thông báo" },
-];
-
-const landingLinks = [
-  { label: "Giới thiệu", path: "/" },
-  { label: "Dịch vụ", path: "/services" },
-  { label: "Quy trình", path: "/process" },
-  { label: "Ưu đãi", path: "/promotions" },
-  { label: "Liên hệ", path: "/contact" },
+const userCommands = [
+  { label: "Đặt lịch lấy đồ mới", path: "/user/bookings", meta: "Đặt lịch" },
+  { label: "Theo dõi đơn đang giặt", path: "/user/orders", meta: "Đơn hàng" },
+  { label: "Dùng mã giảm giá", path: "/user/loyalty", meta: "Ưu đãi" },
+  { label: "Gửi yêu cầu hỗ trợ", path: "/user/support", meta: "Hỗ trợ" },
 ];
 
 const pageTitles: Record<string, string> = {
-  "/home": "Tổng quan",
-  "/home/orders": "Quản lý Đơn Hàng",
-  "/home/delivery": "Quản lý Giao Nhận",
-  "/home/customers": "Khách Hàng",
-  "/home/services": "Dịch Vụ & Tài Chính",
-  "/home/staff": "Vận Hành Nội Bộ",
-  "/home/reports": "Báo Cáo & Cài Đặt",
+  "/user": "Tổng Quan Cá Nhân",
+  "/user/bookings": "Đặt Lịch",
+  "/user/orders": "Đơn Của Tôi",
+  "/user/loyalty": "Ưu Đãi",
+  "/user/support": "Hỗ Trợ",
 };
 
-export default function Search() {
+const userLinks = [
+  { label: "Tổng quan", path: "/user" },
+  { label: "Đặt lịch", path: "/user/bookings" },
+  { label: "Đơn của tôi", path: "/user/orders" },
+  { label: "Ưu đãi", path: "/user/loyalty" },
+  { label: "Hỗ trợ", path: "/user/support" },
+];
+
+export default function UserSearch() {
   const { toggle } = useNavbarStore();
   const router = useRouter();
   const pathname = usePathname();
@@ -54,13 +49,13 @@ export default function Search() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const results = useMemo(() => {
-    if (!query.trim()) return dashboardCommands.slice(0, 5);
-    return dashboardCommands.filter((item) =>
+    if (!query.trim()) return userCommands;
+    return userCommands.filter((item) =>
       `${item.label} ${item.meta}`.toLowerCase().includes(query.toLowerCase()),
     );
   }, [query]);
 
-  const title = pageTitles[pathname] ?? "Dashboard";
+  const title = pageTitles[pathname] ?? "Khu vực khách hàng";
 
   return (
     <>
@@ -75,13 +70,13 @@ export default function Search() {
           <Menu size={24} strokeWidth={1.7} />
         </button>
 
-        <div className="hidden min-w-[150px] shrink-0 md:block lg:min-w-[170px]">
+        <div className="hidden min-w-[150px] shrink-0 md:block lg:min-w-[180px]">
           <p className="text-sm font-semibold">{title}</p>
-          <p className="text-xs text-muted-foreground">Điều phối tiệm giặt</p>
+          <p className="text-xs text-muted-foreground">Tiệm giặt Panda</p>
         </div>
 
         <div className="hidden shrink-0 items-center gap-1 xl:flex">
-          {landingLinks.map((link) => (
+          {userLinks.map((link) => (
             <Button
               key={link.path}
               variant="ghost"
@@ -102,12 +97,12 @@ export default function Search() {
             onFocus={() => setFocused(true)}
             onBlur={() => window.setTimeout(() => setFocused(false), 140)}
             className="h-10 min-w-0 rounded-lg border-gray-200 bg-[#f7f7f7] pl-9 text-sm focus-visible:border-gray-300 focus-visible:ring-gray-300/40"
-            placeholder="Tìm đơn, khách, giao nhận..."
+            placeholder="Tìm lịch hẹn, đơn giặt, ưu đãi..."
           />
           {focused && (
             <div className="absolute left-0 right-0 top-12 z-[1100] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
               <div className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">
-                Gợi ý thao tác nhanh
+                Thao tác nhanh
               </div>
               <div className="max-h-72 overflow-y-auto p-1">
                 {results.length === 0 ? (
@@ -149,29 +144,38 @@ export default function Search() {
           onClick={() => setNotificationsOpen(true)}
         >
           <Bell className="size-4" />
-          <span>5</span>
+          <span>2</span>
         </Button>
         <Button
           variant="outline"
           size="sm"
           className="hidden shrink-0 gap-2 lg:flex"
-          onClick={() => router.push("/home/orders")}
+          onClick={() => router.push("/user/loyalty")}
         >
-          <CalendarPlus className="size-4" />
-          Đặt lịch
+          <Gift className="size-4" />
+          Ưu đãi
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="hidden shrink-0 gap-2 lg:flex"
+          onClick={() => router.push("/user/support")}
+        >
+          <Headset className="size-4" />
+          Hỗ trợ
         </Button>
         <Button
           size="sm"
           className="hidden shrink-0 gap-2 bg-neutral-900 text-white hover:bg-neutral-800 sm:flex"
-          onClick={() => router.push("/home/orders")}
+          onClick={() => router.push("/user/bookings")}
         >
-          <Sparkles className="size-4" />
-          Tạo đơn
+          <CalendarPlus className="size-4" />
+          Đặt lịch
         </Button>
       </div>
       </div>
       <NotificationsDialog
-        isUserArea={false}
+        isUserArea
         open={notificationsOpen}
         onOpenChange={setNotificationsOpen}
       />
