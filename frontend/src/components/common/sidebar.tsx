@@ -1,200 +1,258 @@
 "use client";
 
-
-import React, { useState, useEffect } from "react";
-import { Panda, Settings, LogOut, PanelLeft } from "lucide-react";
-import { useRouter, usePathname } from "next/navigation";
+import Image from "next/image";
+import React, { useState } from "react";
+import { Bell, LogOut, Panda, PanelLeft, Settings } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import Dropdown from "../ui/dropdown";
-import { menus } from "@/src/utils/routes";
+import LogoutDialog from "./logout-dialog";
+import NotificationsDialog from "./notifications-dialog";
+import ProfileDialog from "./profile-dialog";
+import SettingsDialog from "./settings-dialog";
 import { useNavbarStore } from "@/src/context/useNavbarStore";
+import { menus } from "@/src/utils/routes";
+import { userMenus } from "@/src/utils/user-routes";
+
+type SidebarItem = (typeof menus)[number] | (typeof userMenus)[number];
 
 export default function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const { open, toggle } = useNavbarStore();
+  const [activeX, setActiveX] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const isExpanded = open || activeX;
+  const isUserArea = pathname.startsWith("/user");
+
+  const activeMenus = isUserArea ? userMenus : menus;
+  const accountName = isUserArea ? "Nguyễn Thị Hương" : "Trịnh Như Nhất";
 
   const iconSize = 18;
   const stroke = 1.5;
 
-  const [activeX, setActiveX] = useState<boolean>(false);
-
-  const isActive = (item: (typeof menus)[0]) => {
+  const isActive = (item: SidebarItem) => {
     if (item.exact) return pathname === item.path;
     return pathname.startsWith(item.path);
   };
 
-
-  useEffect(() => {
-    if (open) {
-      setActiveX(true);
-    }
-  }, [open]);
-
   return (
-    <aside
-      className={`
-        ${!activeX ? "w-[57px]" : "w-[260px]"}
-        h-screen 
-        border-r 
-        border-gray-200 
-        bg-white 
-        fixed xl:relative
-        top-0 left-0
-        flex-col
-        z-50
-        transition-transform duration-300
-        translate-x-0
+    <>
+      <aside
+        className={`
+        ${!isExpanded ? "w-[57px]" : "w-[min(260px,80vw)]"}
+        fixed left-0 top-0 z-50 flex-col
+        h-screen max-w-[80vw]
+        border-r border-gray-200 bg-white/95 font-sans text-[14px] font-normal text-[#0d0d0d] backdrop-blur
+        will-change-[width]
+        transition-[width,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
         ${open ? "" : "hidden xl:flex"}
+        xl:relative
       `}
-    >
-      <nav className="flex flex-col justify-between h-full">
-        {/* Top */}
-        <div>
-          {/* Logo */}
-          <div
-            className={`h-[65px] flex items-center px-2 ${activeX && "justify-between"}`}
-          >
-            <div
-              className="w-10 h-10 bg-transparent flex justify-center items-center rounded-xl cursor-pointer group hover:bg-gray-200"
-              onClick={() => {
-                if (!open) {
-                  setActiveX(!activeX);
-                }
-              }}
-            >
-              <Panda
-                size={24}
-                strokeWidth={stroke}
-                className={`${!activeX ? "group-hover:hidden" : "block"}`}
-              />
-              <PanelLeft
-                size={24}
-                strokeWidth={stroke}
-                className={`${!activeX ? "hidden group-hover:block" : "hidden"}`}
-              />
-            </div>
-            {activeX && (
+      >
+        <nav className="flex h-full min-w-0 flex-col justify-between">
+          <div className="min-h-0">
+            <div className={`flex h-[65px] items-center px-2 ${isExpanded && "justify-between"}`}>
               <div
-                className="w-10 h-10 bg-transparent flex justify-center items-center rounded-xl cursor-pointer hover:bg-gray-200"
+                className={`flex h-10 items-center rounded-xl bg-transparent text-black transition-colors hover:text-black ${
+                  isExpanded
+                    ? "min-w-0 flex-1 cursor-default px-2 text-[17px] font-medium tracking-normal opacity-100"
+                    : "group relative w-10 cursor-pointer justify-center hover:bg-[#f3f3f3]"
+                }`}
                 onClick={() => {
-                  if (!open) {
-                    setActiveX(!activeX);
-                  } else toggle();
+                  if (!open && !isExpanded) setActiveX(true);
                 }}
               >
-                <PanelLeft size={24} strokeWidth={stroke} />
+                {isExpanded ? (
+                  <span className="truncate leading-none">BegauShop</span>
+                ) : (
+                  <>
+                    <Panda
+                      size={24}
+                      strokeWidth={stroke - 0.2}
+                      className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity duration-150 ease-out group-hover:opacity-0"
+                    />
+                    <PanelLeft
+                      size={20}
+                      strokeWidth={stroke - 0.2}
+                      className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-150 ease-out group-hover:opacity-100"
+                    />
+                  </>
+                )}
               </div>
-            )}
+
+              {isExpanded && (
+                <div
+                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-transparent text-black opacity-100 transition-[opacity,background-color,color] duration-200 ease-out hover:bg-[#f3f3f3] hover:text-black"
+                  onClick={() => {
+                    if (!open) setActiveX(false);
+                    else toggle();
+                  }}
+                >
+                  <PanelLeft size={20} strokeWidth={stroke - 0.2} />
+                </div>
+              )}
+            </div>
+
+            <div className="flex max-h-[calc(100dvh-140px)] flex-col gap-1 overflow-y-auto pt-3">
+              {activeMenus.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item);
+
+                return (
+                  <button
+                    key={item.path}
+                    onClick={() => {
+                      router.push(item.path);
+                      if (open) toggle();
+                    }}
+                    className={`mx-2 flex h-10 min-w-0 cursor-pointer items-center rounded-xl transition-colors ${
+                      active
+                        ? "bg-[#f3f3f3] text-black"
+                        : "text-[#0d0d0d] hover:bg-[#f3f3f3] hover:text-black"
+                    }`}
+                    title={!isExpanded ? item.label : undefined}
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
+                      <Icon size={iconSize} strokeWidth={stroke} />
+                    </div>
+                    <span
+                      className={`${isExpanded ? "block min-w-0 truncate opacity-100" : "hidden opacity-0"} pl-1 font-normal transition-opacity duration-200`}
+                    >
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Menu */}
-          <div className="flex flex-col gap-1">
-            {menus.map((item, index) => {
-              const Icon = item.icon;
-              const active = isActive(item);
-
-              const label = item.label;
-              return (
-                <button
-                  key={index}
-                  onClick={() => router.push(item.path)}
-                  className={`h-[40px] flex items-center mx-2 rounded-xl cursor-pointer ${active ? "bg-blue-100" : "hover:bg-gray-100 hover:text-black"}`}
-                >
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all
-                    ${
-                      active
-                        ? "bg-blue-100 text-blue-600"
-                        : "hover:bg-gray-100 hover:text-black"
-                    }`}
-                  >
-                    <Icon size={iconSize} strokeWidth={stroke} />
+          <div
+            className={`mx-2 my-3 rounded-xl p-0.5 transition-colors ${
+              isExpanded ? "hover:bg-[#f3f3f3]" : ""
+            }`}
+          >
+            <Dropdown
+              trigger={
+                <button className="flex h-10 min-w-0 cursor-pointer items-center rounded-[10px] text-[#0d0d0d]">
+                  <div className="flex h-10 w-10 items-center justify-center">
+                    <Image
+                      src="/default_avatar.jfif"
+                      alt="avatar"
+                      width={24}
+                      height={24}
+                      className="h-6 w-6 rounded-full object-cover transition-all hover:scale-105"
+                    />
                   </div>
-                  <span
-                    className={`${activeX ? "block" : "hidden"} ${
-                      active ? "bg-blue-100 text-blue-600" : "hover:text-black"
-                    } pl-1`}
-                  >
-                    {label}
+                  <span className={isExpanded ? "flex min-w-0 items-center truncate pl-1 font-normal" : "hidden"}>
+                    {accountName}
                   </span>
                 </button>
-              );
-            })}
+              }
+              position="top-start"
+              className="min-w-[208px]"
+            >
+              {({ close }) => (
+                <>
+                  <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-2.5">
+                    <Image
+                      src="/default_avatar.jfif"
+                      alt="avatar"
+                      width={28}
+                      height={28}
+                      className="h-7 w-7 rounded-full object-cover"
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium leading-5">
+                        {accountName}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {isUserArea ? "Tài khoản khách hàng" : "Tài khoản quản trị"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="px-2 py-1">
+                    <span className="block h-px bg-gray-100" />
+                  </div>
+                  <button
+                    className="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-[#0d0d0d] transition-colors hover:bg-[#f5f5f5]"
+                    onClick={() => {
+                      close();
+                      setProfileOpen(true);
+                    }}
+                  >
+                    <Image
+                      src="/default_avatar.jfif"
+                      alt="default-avatar"
+                      width={14}
+                      height={14}
+                      className="h-[14px] w-[14px] rounded-full object-cover"
+                    />
+                    <span>Hồ sơ</span>
+                  </button>
+                  <button
+                    className="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-[#0d0d0d] transition-colors hover:bg-[#f5f5f5]"
+                    onClick={() => {
+                      close();
+                      setSettingsOpen(true);
+                    }}
+                  >
+                    <Settings size={14} strokeWidth={1.8} />
+                    <span>Cài đặt</span>
+                  </button>
+                  <button
+                    className="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-[#0d0d0d] transition-colors hover:bg-[#f5f5f5]"
+                    onClick={() => {
+                      close();
+                      setNotificationsOpen(true);
+                    }}
+                  >
+                    <Bell size={14} strokeWidth={1.8} />
+                    <span>Thông báo</span>
+                  </button>
+                  <div className="px-2 py-1">
+                    <span className="block h-px bg-gray-100" />
+                  </div>
+                  <button
+                    className="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-red-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                    onClick={() => {
+                      close();
+                      setLogoutOpen(true);
+                    }}
+                  >
+                    <LogOut size={14} strokeWidth={1.8} />
+                    <span>Đăng xuất</span>
+                  </button>
+                </>
+              )}
+            </Dropdown>
           </div>
-        </div>
+        </nav>
+      </aside>
 
-        {/* Bottom avatar */}
-        <div
-          className={`h-[45px] flex items-center mx-2 my-2 rounded-xl ${activeX ? "hover:bg-gray-200" : ""}`}
-        >
-          <Dropdown
-            trigger={
-              <button className="flex cursor-pointer">
-                <div className={`w-10 h-10 flex justify-center items-center`}>
-                  <img
-                    src="/default_avatar.jfif"
-                    alt="avatar"
-                    className="w-6 h-6 rounded-full object-cover outline outline-2 outline-blue-500 outline-offset-2 hover:scale-105 transition-all"
-                  />
-                </div>
-                <span
-                  className={
-                    activeX ? "block flex items-center pl-1" : "hidden"
-                  }
-                >
-                  Trịnh Như Nhất
-                </span>
-              </button>
-            }
-            position="top-start"
-          >
-            {({ close }) => (
-              <>
-                <button
-                  className="w-full px-3 py-2 text-sm hover:bg-gray-100 rounded-lg flex items-center gap-2 cursor-pointer select-none"
-                  onClick={() => {
-                    router.push("/home/profile");
-                    close();
-                  }}
-                >
-                  <img
-                    src="/default_avatar.jfif"
-                    alt="default-avatar"
-                    className="w-[14px] h-[14px] rounded-full object-cover outline outline-2 outline-blue-500 outline-offset-2 transition-all"
-                  />
-                  <span>Hồ sơ</span>
-                </button>
-
-                <button
-                  className="w-full px-3 py-2 text-sm hover:bg-gray-100 rounded-lg flex items-center gap-2 cursor-pointer select-none"
-                  onClick={() => {
-                    router.push("/home/settings");
-                    close();
-                  }}
-                >
-                  <Settings size={14} strokeWidth={1.8} />
-                  <span>Cài đặt</span>
-                </button>
-
-                <div className="flex justify-center py-[1px]">
-                  <span className="w-[80%] h-[1px] bg-gray-200"></span>
-                </div>
-
-                <button
-                  className="w-full px-3 py-2 text-sm hover:bg-gray-100 rounded-lg flex items-center gap-2 cursor-pointer select-none text-red-500"
-                  onClick={() => {
-                    router.push("/logout");
-                    close();
-                  }}
-                >
-                  <LogOut size={14} strokeWidth={1.8} />
-                  <span>Đăng xuất</span>
-                </button>
-              </>
-            )}
-          </Dropdown>
-        </div>
-      </nav>
-    </aside>
+      <LogoutDialog
+        accountName={accountName}
+        open={logoutOpen}
+        onOpenChange={setLogoutOpen}
+      />
+      <ProfileDialog
+        accountName={accountName}
+        isUserArea={isUserArea}
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+      />
+      <SettingsDialog
+        isUserArea={isUserArea}
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+      />
+      <NotificationsDialog
+        isUserArea={isUserArea}
+        open={notificationsOpen}
+        onOpenChange={setNotificationsOpen}
+      />
+    </>
   );
 }

@@ -1,214 +1,280 @@
 "use client";
 
-import React, { useState } from "react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { BadgeCheck, Gift, Plus, Receipt, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Table,
-  TableHeader,
-  TableRow,
-  TableHead,
   TableBody,
   TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from "@/components/ui/select";
-import { Plus, X, Pencil } from "lucide-react";
+  PageShell,
+  Period,
+  PeriodTabs,
+  SectionCard,
+  StatCard,
+  StatusBadge,
+} from "../_components/dashboard-primitives";
 
-export type Unit = "kg" | "món";
-
-interface Service {
-  id: number;
-  name: string;
-  unit: Unit;
-  price: number; // giá trên đơn vị
-}
-
-const seedServices: Service[] = [
-  { id: 1, name: "Giặt thường", unit: "kg", price: 15000 },
-  { id: 2, name: "Giặt khô", unit: "kg", price: 30000 },
-  { id: 3, name: "Giặt hấp", unit: "món", price: 40000 },
-  { id: 4, name: "Giặt đồ da", unit: "món", price: 80000 },
+const services = [
+  ["Giặt thường", "Theo kg", "15.000đ/kg", "Đang hoạt động", "Áo quần hằng ngày"],
+  ["Giặt khô", "Theo món", "80.000đ/món", "Đang hoạt động", "Vest, áo khoác"],
+  ["Giặt hấp", "Theo món", "45.000đ/món", "Đang hoạt động", "Đồ nhạy cảm"],
+  ["Giặt đồ da", "Theo món", "180.000đ/món", "Tạm ngừng", "Cần xác nhận trước"],
+  ["Giặt chăn màn", "Theo kg", "35.000đ/kg", "Đang hoạt động", "Chăn, ga, rèm"],
 ];
 
-export default function ServiceManagement() {
-  const [services, setServices] = useState<Service[]>(seedServices);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Service | null>(null);
+const receivables = [
+  ["Công ty ABC", "DH-1038", "2.500.000đ", "Thanh toán một phần"],
+  ["Shop Linen", "DH-1044", "1.800.000đ", "Chưa thanh toán"],
+  ["Trần Minh", "DH-1052", "240.000đ", "Chưa thanh toán"],
+];
 
-  // form fields
-  const [name, setName] = useState("Giặt thường");
-  const [unit, setUnit] = useState<Unit>("kg");
-  const [price, setPrice] = useState<string>("15000");
+const expenses = [
+  ["Lương", "12.000.000đ", "15/05/2026"],
+  ["Hóa chất", "3.200.000đ", "12/05/2026"],
+  ["Điện nước", "2.850.000đ", "10/05/2026"],
+  ["Thuê mặt bằng", "18.000.000đ", "01/05/2026"],
+];
 
-  const resetForm = () => {
-    setName("");
-    setUnit("kg");
-    setPrice("");
-    setEditing(null);
-  };
+const promotions = [
+  ["WELCOME10", "Giảm 10%", "31/05/2026", "120 lượt"],
+  ["BIRTHDAY15", "Sinh nhật giảm 15%", "Không giới hạn", "Tự động"],
+  ["COMBO-GIAT-SAY", "Combo giặt + sấy", "30/06/2026", "80 lượt"],
+];
 
-  const openNewForm = () => {
-    resetForm();
-    setShowForm(true);
-  };
-
-  const openEditForm = (srv: Service) => {
-    setEditing(srv);
-    setName(srv.name);
-    setUnit(srv.unit);
-    setPrice(String(srv.price));
-    setShowForm(true);
-  };
-
-  const saveService = () => {
-    if (!name.trim() || !price) return;
-    const numericPrice = parseInt(price, 10);
-    if (isNaN(numericPrice)) return;
-
-    if (editing) {
-      setServices((prev) =>
-        prev.map((s) =>
-          s.id === editing.id ? { ...editing, name, unit, price: numericPrice } : s
-        )
-      );
-    } else {
-      const newService: Service = {
-        id: Date.now(),
-        name,
-        unit,
-        price: numericPrice,
-      };
-      setServices((prev) => [...prev, newService]);
-    }
-    setShowForm(false);
-    resetForm();
-  };
+export default function ServicesFinancePage() {
+  const [tab, setTab] = useState("Dịch vụ & Bảng giá");
+  const [period, setPeriod] = useState<Period>("Tháng");
+  const [openForm, setOpenForm] = useState(false);
 
   return (
-    <div className="flex flex-col gap-8 p-6 w-full">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Dịch vụ & Bảng giá</h2>
-          <p className="text-muted-foreground text-sm">
-            Quản lý các loại dịch vụ và giá theo kg hoặc theo món
-          </p>
-        </div>
-        <Button className="gap-2" onClick={openNewForm}>
-          <Plus className="h-4 w-4" /> Thêm dịch vụ
+    <PageShell
+      title="Dịch Vụ & Tài Chính"
+      description="Quản lý bảng giá, doanh thu, công nợ, thu chi và khuyến mãi."
+      action={
+        <Button className="bg-neutral-900 text-white hover:bg-neutral-800" onClick={() => setOpenForm(true)}>
+          <Plus className="mr-2 size-4" />
+          Thêm cấu hình
         </Button>
+      }
+    >
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard label="Doanh thu tháng" value="186tr" hint="+14% so với tháng trước" icon={Wallet} tone="success" />
+        <StatCard label="Công nợ" value="4,54tr" hint="3 đơn chưa thu đủ" icon={Receipt} tone="warning" />
+        <StatCard label="Chi phí" value="36,05tr" hint="Lương, hóa chất, điện nước" icon={BadgeCheck} />
+        <StatCard label="Mã đang chạy" value="3" hint="1 mã tự động sinh nhật" icon={Gift} />
       </div>
 
-      <Card className="shadow-sm border max-w-full overflow-x-auto">
-        <CardContent className="p-0">
-          <Table className="min-w-[600px]">
-            <colgroup>
-              <col className="w-56" />
-              <col className="w-24" />
-              <col className="w-32" />
-              <col className="w-24" />
-            </colgroup>
+      <div className="flex flex-wrap items-center gap-2">
+        <PeriodTabs value={period} onChange={setPeriod} />
+        {[
+          "Dịch vụ & Bảng giá",
+          "Doanh thu & Công nợ",
+          "Thu Chi & Lợi nhuận",
+          "Khuyến mãi & Loyalty",
+        ].map((item) => (
+          <Button
+            key={item}
+            variant={tab === item ? "default" : "outline"}
+            size="sm"
+            onClick={() => setTab(item)}
+          >
+            {item}
+          </Button>
+        ))}
+      </div>
+
+      {tab === "Dịch vụ & Bảng giá" && (
+        <SectionCard title="Danh mục dịch vụ">
+          <Table className="min-w-[780px]">
             <TableHeader>
-              <TableRow className="bg-muted/50 text-left">
-                <TableHead>Tên dịch vụ</TableHead>
-                <TableHead>Đơn vị</TableHead>
-                <TableHead>Giá (đ)</TableHead>
-                <TableHead className="text-right">Thao tác</TableHead>
+              <TableRow className="bg-muted/30">
+                <TableHead>Dịch vụ</TableHead>
+                <TableHead>Cách tính</TableHead>
+                <TableHead>Giá</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead>Ghi chú</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {services.map((srv) => (
-                <TableRow key={srv.id} className="border-b hover:bg-muted/50">
-                  <TableCell className="whitespace-nowrap font-medium">
-                    {srv.name}
+              {services.map((row) => (
+                <TableRow key={row[0]}>
+                  <TableCell className="font-medium">{row[0]}</TableCell>
+                  <TableCell>{row[1]}</TableCell>
+                  <TableCell>{row[2]}</TableCell>
+                  <TableCell>
+                    <StatusBadge tone={row[3] === "Đang hoạt động" ? "success" : "warning"}>
+                      {row[3]}
+                    </StatusBadge>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap uppercase">{srv.unit}</TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {srv.price.toLocaleString("vi-VN")}
-                  </TableCell>
-                  <TableCell className="flex justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Sửa"
-                      onClick={() => openEditForm(srv)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+                  <TableCell>{row[4]}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </SectionCard>
+      )}
 
-      {/* Modal Form */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4" role="dialog">
-          <Card className="w-full max-w-md">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-medium">
-                {editing ? "Cập nhật dịch vụ" : "Thêm dịch vụ"}
-              </CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setShowForm(false)}>
-                <X className="h-4 w-4" />
+      {tab === "Doanh thu & Công nợ" && (
+        <SectionCard title="Danh sách công nợ khách hàng">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead>Khách hàng</TableHead>
+                <TableHead>Đơn</TableHead>
+                <TableHead>Số tiền</TableHead>
+                <TableHead>Trạng thái</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {receivables.map((row) => (
+                <TableRow key={row[1]}>
+                  <TableCell>{row[0]}</TableCell>
+                  <TableCell>{row[1]}</TableCell>
+                  <TableCell>{row[2]}</TableCell>
+                  <TableCell><StatusBadge tone="warning">{row[3]}</StatusBadge></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SectionCard>
+      )}
+
+      {tab === "Thu Chi & Lợi nhuận" && (
+        <SectionCard title="Chi phí vận hành">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead>Hạng mục</TableHead>
+                <TableHead>Số tiền</TableHead>
+                <TableHead>Ngày ghi nhận</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {expenses.map((row) => (
+                <TableRow key={row[0]}>
+                  <TableCell>{row[0]}</TableCell>
+                  <TableCell>{row[1]}</TableCell>
+                  <TableCell>{row[2]}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SectionCard>
+      )}
+
+      {tab === "Khuyến mãi & Loyalty" && (
+        <SectionCard title="Mã giảm giá và tích điểm">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead>Mã / chương trình</TableHead>
+                <TableHead>Ưu đãi</TableHead>
+                <TableHead>Thời hạn</TableHead>
+                <TableHead>Giới hạn</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {promotions.map((row) => (
+                <TableRow key={row[0]}>
+                  <TableCell className="font-medium">{row[0]}</TableCell>
+                  <TableCell>{row[1]}</TableCell>
+                  <TableCell>{row[2]}</TableCell>
+                  <TableCell>{row[3]}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SectionCard>
+      )}
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <SectionCard title="Kênh thanh toán">
+          <div className="space-y-3 p-4 text-sm">
+            {[
+              ["Tiền mặt", "42%", "Đối soát cuối ca"],
+              ["MoMo", "28%", "Tự động ghi nhận"],
+              ["VNPay", "18%", "Tự động ghi nhận"],
+              ["Chuyển khoản", "12%", "Cần xác nhận"],
+            ].map(([name, share, note]) => (
+              <div key={name} className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="font-medium">{name}</p>
+                  <p className="text-muted-foreground">{note}</p>
+                </div>
+                <span className="font-semibold">{share}</span>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Cấu hình tích điểm">
+          <div className="space-y-3 p-4 text-sm">
+            <div className="rounded-lg border p-3">
+              <p className="font-medium">10.000đ = 1 điểm</p>
+              <p className="text-muted-foreground">Áp dụng cho đơn đã thanh toán đủ.</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="font-medium">100 điểm = 10.000đ</p>
+              <p className="text-muted-foreground">Cho phép đổi trực tiếp khi tạo đơn.</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="font-medium">Ưu đãi sinh nhật</p>
+              <p className="text-muted-foreground">Tự động cấp mã BIRTHDAY15.</p>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Điều kiện hạng thành viên">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead>Hạng</TableHead>
+                <TableHead>Điều kiện</TableHead>
+                <TableHead>Quyền lợi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[
+                ["Bạc", "1.000 điểm", "Giảm 3%"],
+                ["Vàng", "2.000 điểm", "Giảm 5%"],
+                ["Kim cương", "4.000 điểm", "Giảm 8% + giao miễn phí"],
+              ].map((row) => (
+                <TableRow key={row[0]}>
+                  {row.map((cell) => <TableCell key={cell}>{cell}</TableCell>)}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SectionCard>
+      </div>
+
+      {openForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-xl border bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Thêm cấu hình dịch vụ / tài chính</h2>
+              <Button variant="ghost" size="sm" onClick={() => setOpenForm(false)}>Đóng</Button>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input placeholder="Tên dịch vụ / mã giảm giá / hạng mục" />
+              <Input placeholder="Giá trị / số tiền" />
+              <Input placeholder="Đơn vị: kg, món, %, VNĐ" />
+              <Input type="date" />
+              <Input className="md:col-span-2" placeholder="Mô tả điều kiện áp dụng" />
+              <Button className="md:col-span-2 bg-neutral-900 text-white hover:bg-neutral-800">
+                Lưu cấu hình
               </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Tên dịch vụ</Label>
-                <Input
-                  id="name"
-                  placeholder="Giặt khô..."
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Đơn vị</Label>
-                <Select value={unit} onValueChange={(v) => setUnit(v as Unit)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn đơn vị" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="kg">kg</SelectItem>
-                    <SelectItem value="món">món</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="price">Giá (đ)</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  placeholder="30000"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full" onClick={saveService}>
-                {editing ? "Lưu thay đổi" : "Thêm"}
-              </Button>
-            </CardFooter>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }
