@@ -18,7 +18,6 @@ import {
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableFooter,
   TableHead,
@@ -112,7 +111,6 @@ export default function ReportsSettingsPage() {
           </SectionCard>
           <SectionCard title="Top khách hàng">
             <Table>
-              <TableCaption>Top khách hàng theo số đơn và chi tiêu.</TableCaption>
               <TableHeader>
                 <TableRow className="bg-muted/30">
                   <TableHead>Khách hàng</TableHead>
@@ -134,6 +132,9 @@ export default function ReportsSettingsPage() {
                 </TableRow>
               </TableFooter>
             </Table>
+            <div className="my-4 text-center text-sm text-muted-foreground">
+              Top khách hàng theo số đơn và chi tiêu.
+            </div>
           </SectionCard>
         </div>
       )}

@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { GradientText } from "@/src/components/ui/gradient-text";
+import { validateEmail } from "@/src/lib/validators/auth";
+import { toast } from "sonner";
 
 const images = [
   "/download (1).jfif",
@@ -11,10 +14,14 @@ const images = [
 ];
 
 export default function Page() {
+  const router = useRouter();
   const [currentImage, setCurrentImage] = useState(0);
   const [prevImage, setPrevImage] = useState<number | null>(null);
-  const [account, setAccount] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [usernameError, setUsernameError] = useState("");
+  const [emailError, setEmailError] = useState("");
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -23,6 +30,52 @@ export default function Page() {
     }, 10000);
     return () => clearInterval(timer);
   }, [currentImage]);
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUsernameError("");
+    setEmailError("");
+
+    if (!username.trim()) {
+      setUsernameError("Tên đăng nhập không được để trống.");
+      return;
+    }
+
+    const err = validateEmail(email);
+    if (err) {
+      setEmailError(err);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch("http://localhost:8000/api/auth/forgot-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: username.trim(),
+          email: email.trim(),
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success("Mã xác thực đổi mật khẩu đã được tạo!");
+        setTimeout(() => {
+          router.push(`/reset-password?token=${data.reset_token}`);
+        }, 1500);
+      } else {
+        toast.error(data.message || "Email không tồn tại trong hệ thống.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể kết nối đến máy chủ.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div
@@ -91,7 +144,7 @@ export default function Page() {
         </div>
 
         {/* ── PHẢI: Form quên mật khẩu ── */}
-        <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 py-10 bg-stone-50">
+        <form onSubmit={handleForgot} className="flex-1 flex flex-col justify-center px-8 sm:px-12 py-10 bg-stone-50">
           {/* Tiêu đề */}
           <div className="mb-8">
             <h2 className="text-2xl font-bold tracking-tight">
@@ -100,44 +153,62 @@ export default function Page() {
               </GradientText>
             </h2>
             <p className="text-sm text-stone-500 mt-1">
-              Nhập tài khoản và mã kích hoạt để xác minh
+              Nhập email đăng ký tài khoản của bạn để khôi phục mật khẩu
             </p>
           </div>
 
           {/* Fields */}
           <div className="space-y-4 mb-6">
-            {/* Tài khoản */}
+            {/* Tên đăng nhập */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-stone-600 tracking-wide">
-                Tài khoản
+                Tên đăng nhập
               </label>
               <input
                 type="text"
-                placeholder="ichigomazone"
-                value={account}
-                onChange={(e) => setAccount(e.target.value)}
+                placeholder="Nhập tên đăng nhập của bạn"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setUsernameError("");
+                }}
                 className="w-full h-10 px-3 rounded-md border border-stone-200 bg-white text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 transition-all"
               />
+              {usernameError && (
+                <p className="text-xs text-orange-600">{usernameError}</p>
+              )}
             </div>
 
             {/* Email */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-stone-600 tracking-wide">
-                Email
+                Email đăng ký
               </label>
               <input
                 type="email"
                 placeholder="example@gmail.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setEmailError("");
+                }}
                 className="w-full h-10 px-3 rounded-md border border-stone-200 bg-white text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 transition-all"
               />
+              {emailError && (
+                <p className="text-xs text-orange-600">{emailError}</p>
+              )}
             </div>
           </div>
 
           {/* Nút xác nhận */}
-          <button className="w-full h-10 rounded-md bg-orange-700 hover:bg-orange-800 active:scale-[0.98] text-white text-sm font-semibold tracking-wide transition-all mb-4">
-            Xác nhận
+          <button
+            type="submit"
+            disabled={isLoading || !email || !username}
+            className={`w-full h-10 rounded-md bg-orange-700 hover:bg-orange-800 ${
+              isLoading || !email || !username ? "opacity-70 cursor-not-allowed" : "active:scale-[0.98] cursor-pointer"
+            } text-white text-sm font-semibold tracking-wide transition-all mb-4`}
+          >
+            {isLoading ? "Đang xử lý..." : "Xác nhận gửi yêu cầu"}
           </button>
 
           {/* Divider */}
@@ -165,7 +236,7 @@ export default function Page() {
               Tạo tài khoản
             </Link>
           </p>
-        </div>
+        </form>
       </div>
     </div>
   );

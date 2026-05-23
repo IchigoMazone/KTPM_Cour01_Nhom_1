@@ -2,33 +2,41 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { GradientText } from "@/src/components/ui/gradient-text";
-import { validateEmail, validatePassword } from "@/src/lib/validators/auth";
+import { validateUsername, validatePassword } from "@/src/lib/validators/auth";
+import { toast } from "sonner";
 
 const images = ["/summer (1).jfif", "/summer (2).jfif", "/summer (3).jfif"];
+const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+const hasGoogleClientId =
+  Boolean(googleClientId) &&
+  googleClientId.endsWith(".apps.googleusercontent.com") &&
+  !googleClientId.includes("mockclientid") &&
+  !googleClientId.includes("REPLACE_WITH");
+
+const isRealGoogleClientId = (clientId: string) =>
+  Boolean(clientId) &&
+  clientId.endsWith(".apps.googleusercontent.com") &&
+  !clientId.includes("mockclientid") &&
+  !clientId.includes("REPLACE_WITH");
 
 export default function Page() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [currentImage, setCurrentImage] = useState(0);
   const [prevImage, setPrevImage] = useState<number | null>(null);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({
-    email: "",
+    username: "",
     password: "",
   });
 
-  const isFormValid = email && password && !errors.email && !errors.password;
-
-  /*
-    Call API Login tai day
-  */
-
-  const handleLogin = () => {
-    console.log("Call API LOGIN");
-  };
+  const isFormValid = username && password && !errors.username && !errors.password;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -37,6 +45,105 @@ export default function Page() {
     }, 10000);
     return () => clearInterval(timer);
   }, [currentImage]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    setErrors({ username: "", password: "" });
+
+    const usernameError = validateUsername(username);
+    const passwordError = validatePassword(password);
+
+    if (usernameError || passwordError) {
+      setErrors({
+        username: usernameError,
+        password: passwordError,
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch("http://localhost:8000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: username.trim(),
+          password,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success(data.message || "Đăng nhập thành công!");
+        localStorage.setItem("token", data.access_token);
+        localStorage.setItem("role", data.role || "customer");
+        setTimeout(() => {
+          if (data.role === "admin") {
+            router.push("/home");
+          } else {
+            router.push("/user");
+          }
+        }, 1500);
+      } else {
+        toast.error(data.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản và mật khẩu.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể kết nối đến máy chủ.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const redirectToGoogle = (clientId: string) => {
+    const redirectUri = `${window.location.origin}/login/google/callback`;
+    const state = crypto.randomUUID();
+    const nonce = crypto.randomUUID();
+
+    sessionStorage.setItem("google_oauth_state", state);
+    sessionStorage.setItem("google_oauth_client_id", clientId);
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: "id_token",
+      scope: "openid email profile",
+      prompt: "select_account consent",
+      max_age: "0",
+      state,
+      nonce,
+    });
+
+    window.location.assign(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+  };
+
+  const handleGoogleRedirect = () => {
+    const savedClientId = localStorage.getItem("google_oauth_client_id") || "";
+    const clientId = hasGoogleClientId ? googleClientId : savedClientId;
+
+    if (isRealGoogleClientId(clientId)) {
+      redirectToGoogle(clientId);
+      return;
+    }
+
+    const enteredClientId = window.prompt(
+      "Nhập Google OAuth Client ID thật để mở trang Google:",
+      ""
+    )?.trim();
+
+    if (!enteredClientId) return;
+
+    if (!isRealGoogleClientId(enteredClientId)) {
+      toast.error("Google OAuth Client ID không hợp lệ.");
+      return;
+    }
+
+    localStorage.setItem("google_oauth_client_id", enteredClientId);
+    redirectToGoogle(enteredClientId);
+  };
 
   return (
     <div
@@ -92,6 +199,7 @@ export default function Page() {
               {images.map((_, i) => (
                 <button
                   key={i}
+                  type="button"
                   onClick={() => {
                     setPrevImage(currentImage);
                     setCurrentImage(i);
@@ -106,7 +214,7 @@ export default function Page() {
         </div>
 
         {/* ── PHẢI: Form đăng nhập ── */}
-        <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 py-10 bg-white">
+        <form onSubmit={handleLogin} className="flex-1 flex flex-col justify-center px-8 sm:px-12 py-10 bg-white">
           {/* Tiêu đề */}
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
@@ -121,29 +229,28 @@ export default function Page() {
 
           {/* Fields */}
           <div className="space-y-4 mb-4">
-            {/* Email */}
+            {/* Tên đăng nhập */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-700 tracking-wide">
-                Email
+                Tên đăng nhập
               </label>
               <input
-                type="email"
-                placeholder="example@gmail.com"
-                value={email}
+                type="text"
+                placeholder="Tên đăng nhập của bạn"
+                value={username}
                 onChange={(e) => {
                   const value = e.target.value;
-                  setEmail(value);
-
+                  setUsername(value);
                   setErrors((prev) => ({
                     ...prev,
-                    email: validateEmail(value),
+                    username: validateUsername(value),
                     password: "",
                   }));
                 }}
                 className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 transition-all"
               />
-              {errors.email && (
-                <p className="text-xs text-[#f59e0b]">{errors.email}</p>
+              {errors.username && (
+                <p className="text-xs text-[#f59e0b]">{errors.username}</p>
               )}
             </div>
 
@@ -160,11 +267,10 @@ export default function Page() {
                   onChange={(e) => {
                     const value = e.target.value;
                     setPassword(value);
-
-                    setErrors((prev) => ({
-                      email: "",
+                    setErrors({
+                      username: "",
                       password: validatePassword(value),
-                    }));
+                    });
                   }}
                   className="w-full h-10 px-3 pr-10 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 transition-all"
                 />
@@ -188,8 +294,9 @@ export default function Page() {
 
           {/* Ghi nhớ & Quên mật khẩu */}
           <div className="flex items-center justify-between mb-5">
-            <label className="flex items-center gap-2 cursor-pointer select-none group">
-              <div
+            <div className="flex items-center gap-2 cursor-pointer select-none group">
+              <button
+                type="button"
                 onClick={() => setRememberMe(!rememberMe)}
                 className={`w-4 h-4 rounded flex items-center justify-center border transition-all duration-200 ${
                   rememberMe
@@ -208,9 +315,9 @@ export default function Page() {
                     />
                   </svg>
                 )}
-              </div>
+              </button>
               <span className="text-xs text-gray-600">Ghi nhớ tài khoản</span>
-            </label>
+            </div>
 
             <Link
               href="/forgot-password"
@@ -222,11 +329,11 @@ export default function Page() {
 
           {/* Nút đăng nhập */}
           <button
-            disabled={!isFormValid}
-            className={`w-full h-10 rounded-md bg-amber-500 hover:bg-amber-600 ${isFormValid ? "active:scale-[0.98] cursor-pointer" : "cursor-not-allowed"} text-white text-sm font-semibold tracking-wide transition-all mb-4`}
-            onClick={handleLogin}
+            type="submit"
+            disabled={!isFormValid || isLoading}
+            className={`w-full h-10 rounded-md bg-amber-500 hover:bg-amber-600 ${isFormValid && !isLoading ? "active:scale-[0.98] cursor-pointer" : "cursor-not-allowed opacity-75"} text-white text-sm font-semibold tracking-wide transition-all mb-4`}
           >
-            Đăng nhập
+            {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
 
           {/* Divider */}
@@ -237,10 +344,16 @@ export default function Page() {
           </div>
 
           {/* Nút Google */}
-          <button className="w-full h-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.98] text-sm font-medium text-gray-700 flex items-center justify-center gap-2.5 transition-all mb-6">
-            <img src="/google.png" alt="Google" className="w-[18px] h-[18px]" />
-            Tiếp tục với Google
-          </button>
+          <div className="mb-6 w-full overflow-hidden rounded-md">
+            <button
+              type="button"
+              onClick={handleGoogleRedirect}
+              className="flex h-10 w-full items-center justify-center gap-2.5 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-700 transition-all hover:bg-gray-50 active:scale-[0.98]"
+            >
+              <img src="/google.png" alt="Google" className="h-[18px] w-[18px]" />
+              Tiếp tục với Google
+            </button>
+          </div>
 
           {/* Đăng ký */}
           <p className="text-center text-sm text-gray-500">
@@ -252,7 +365,7 @@ export default function Page() {
               Tạo tài khoản
             </Link>
           </p>
-        </div>
+        </form>
       </div>
     </div>
   );

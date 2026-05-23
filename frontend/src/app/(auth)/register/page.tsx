@@ -2,8 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { GradientText } from "@/src/components/ui/gradient-text";
+import { validateEmail, validatePassword, validateUsername } from "@/src/lib/validators/auth";
+import { toast } from "sonner";
 
 const images = [
   "/tải xuống (15).jfif",
@@ -12,6 +15,7 @@ const images = [
 ];
 
 export default function Page() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [currentImage, setCurrentImage] = useState(0);
@@ -23,6 +27,12 @@ export default function Page() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [agreed, setAgreed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState({
+    username: "",
+    password: "",
+    email: "",
+  });
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -31,6 +41,89 @@ export default function Page() {
     }, 10000);
     return () => clearInterval(timer);
   }, [currentImage]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Reset errors
+    setErrors({ username: "", password: "", email: "" });
+
+    // Validate inputs locally
+    const usernameError = validateUsername(username);
+    const passwordError = validatePassword(password);
+    const emailError = validateEmail(email);
+
+    if (usernameError || passwordError || emailError) {
+      setErrors({
+        username: usernameError,
+        password: passwordError,
+        email: emailError,
+      });
+      return;
+    }
+
+    if (!firstName.trim() || !lastName.trim()) {
+      toast.error("Vui lòng nhập đầy đủ Họ và Tên.");
+      return;
+    }
+
+    if (password !== confirm) {
+      toast.error("Mật khẩu xác nhận không khớp.");
+      return;
+    }
+
+    if (!agreed) {
+      toast.error("Bạn phải đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch("http://localhost:8000/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: username.trim(),
+          password,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email.trim(),
+          phone: "",
+          address: "",
+        }),
+      });
+
+      const responseText = await response.text();
+      let data: { success?: boolean; message?: string } = {};
+
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        data = {};
+      }
+
+      if (!response.ok) {
+        toast.error(data.message || "Máy chủ đang lỗi. Vui lòng thử lại.");
+        return;
+      }
+
+      if (data.success) {
+        toast.success(data.message || "Đăng ký thành công!");
+        setTimeout(() => {
+          router.push("/login");
+        }, 1500);
+      } else {
+        toast.error(data.message || "Đăng ký thất bại.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể kết nối đến máy chủ.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div
@@ -86,6 +179,7 @@ export default function Page() {
               {images.map((_, i) => (
                 <button
                   key={i}
+                  type="button"
                   onClick={() => {
                     setPrevImage(currentImage);
                     setCurrentImage(i);
@@ -100,7 +194,7 @@ export default function Page() {
         </div>
 
         {/* ── PHẢI: Form đăng ký ── */}
-        <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 py-4 bg-white overflow-y-auto">
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-center px-8 sm:px-12 py-4 bg-white overflow-y-auto">
           {/* Fields */}
           <div className="space-y-3 mb-4">
             {/* Họ & Tên */}
@@ -143,6 +237,9 @@ export default function Page() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
               />
+              {errors.email && (
+                <p className="text-xs text-pink-500">{errors.email}</p>
+              )}
             </div>
 
             {/* Tên đăng nhập */}
@@ -152,11 +249,14 @@ export default function Page() {
               </label>
               <input
                 type="text"
-                placeholder="ichigomazone"
+                placeholder="ichigomazone1"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
               />
+              {errors.username && (
+                <p className="text-xs text-pink-500">{errors.username}</p>
+              )}
             </div>
 
             {/* Mật khẩu */}
@@ -184,6 +284,9 @@ export default function Page() {
                   )}
                 </button>
               </div>
+              {errors.password && (
+                <p className="text-xs text-pink-500">{errors.password}</p>
+              )}
             </div>
 
             {/* Xác nhận mật khẩu */}
@@ -215,8 +318,9 @@ export default function Page() {
           </div>
 
           {/* Điều khoản */}
-          <label className="flex items-start gap-2 cursor-pointer select-none group mb-5">
-            <div
+          <div className="flex items-start gap-2 cursor-pointer select-none group mb-5">
+            <button
+              type="button"
               onClick={() => setAgreed(!agreed)}
               className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center border transition-all duration-200 shrink-0 ${
                 agreed
@@ -235,7 +339,7 @@ export default function Page() {
                   />
                 </svg>
               )}
-            </div>
+            </button>
             <span className="text-xs text-gray-600 leading-relaxed">
               Tôi đồng ý với{" "}
               <Link
@@ -252,11 +356,17 @@ export default function Page() {
                 Chính sách bảo mật
               </Link>
             </span>
-          </label>
+          </div>
 
           {/* Nút đăng ký */}
-          <button className="w-full h-10 rounded-md bg-gradient-to-r from-pink-400 to-orange-400 hover:from-pink-500 hover:to-orange-500 active:scale-[0.98] text-white text-sm font-semibold tracking-wide transition-all mb-4">
-            Đăng ký ngay
+          <button
+            type="submit"
+            disabled={isLoading}
+            className={`w-full h-10 rounded-md bg-gradient-to-r from-pink-400 to-orange-400 hover:from-pink-500 hover:to-orange-500 text-white text-sm font-semibold tracking-wide transition-all mb-4 ${
+              isLoading ? "opacity-70 cursor-not-allowed" : "active:scale-[0.98]"
+            }`}
+          >
+            {isLoading ? "Đang xử lý..." : "Đăng ký ngay"}
           </button>
 
           {/* Divider */}
@@ -267,7 +377,7 @@ export default function Page() {
           </div>
 
           {/* Nút Google */}
-          <button className="w-full h-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.98] text-sm font-medium text-gray-700 flex items-center justify-center gap-2.5 transition-all mb-6">
+          <button type="button" className="w-full h-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.98] text-sm font-medium text-gray-700 flex items-center justify-center gap-2.5 transition-all mb-6">
             <img src="/google.png" alt="Google" className="w-[18px] h-[18px]" />
             Tiếp tục với Google
           </button>
@@ -282,7 +392,7 @@ export default function Page() {
               Đăng nhập
             </Link>
           </p>
-        </div>
+        </form>
       </div>
     </div>
   );

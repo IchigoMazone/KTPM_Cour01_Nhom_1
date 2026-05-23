@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CalendarDays, MapPin, Plus, Route, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSettingsStore } from "@/src/context/useSettingsStore";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableFooter,
   TableHead,
@@ -46,6 +47,35 @@ const slots = [
 export default function DeliveryPage() {
   const [period, setPeriod] = useState<Period>("Ngày");
   const [page, setPage] = useState(1);
+  const { deliveryEnabled } = useSettingsStore();
+  const [mounted, setMounted] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (mounted && !deliveryEnabled) {
+    return (
+      <PageShell
+        title="Quản lý Giao Nhận"
+        description="Điều phối lấy đồ, trả đồ, tài xế và tuyến đường trong ngày."
+      >
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="flex size-16 items-center justify-center rounded-full bg-neutral-100 mb-4">
+            <Truck className="size-8 text-neutral-400" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Tính năng Quản lý giao nhận đã tắt</h2>
+          <p className="text-muted-foreground max-w-md mb-6 text-sm">
+            Tính năng điều phối giao nhận hiện đang bị tắt trong phần Cài đặt. Vui lòng bật lại để truy cập trang này.
+          </p>
+          <Button onClick={() => router.push("/home")} className="bg-neutral-900 text-white hover:bg-neutral-800">
+            Quay về trang tổng quan
+          </Button>
+        </div>
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell
@@ -93,7 +123,6 @@ export default function DeliveryPage() {
 
         <SectionCard title="Danh sách chuyến trong ngày">
           <Table className="min-w-[920px]">
-            <TableCaption>Danh sách chuyến lấy/trả đồ cần điều phối hôm nay.</TableCaption>
             <TableHeader>
               <TableRow className="bg-muted/30">
                 <TableHead>Giờ</TableHead>
@@ -131,6 +160,9 @@ export default function DeliveryPage() {
               </TableRow>
             </TableFooter>
           </Table>
+          <div className="my-4 text-center text-sm text-muted-foreground">
+            Danh sách chuyến lấy/trả đồ cần điều phối hôm nay.
+          </div>
           <PaginationFooter
             page={page}
             pageCount={2}
