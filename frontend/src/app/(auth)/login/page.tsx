@@ -8,6 +8,7 @@ import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 import { GradientText } from "@/src/components/ui/gradient-text";
 import { validateUsername, validatePassword } from "@/src/lib/validators/auth";
 import { toast } from "sonner";
+import { API_BASE_URL } from "@/src/lib/config";
 
 const images = ["/summer (1).jfif", "/summer (2).jfif", "/summer (3).jfif"];
 
@@ -53,7 +54,7 @@ export default function Page() {
 
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/api/auth/login", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

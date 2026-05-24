@@ -1,5 +1,7 @@
 "use client";
 
+import { API_BASE_URL } from "@/src/lib/config";
+
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
@@ -119,7 +121,7 @@ export default function ProfileDialog({
 
       setIsLoading(true);
       try {
-        const response = await fetch("http://localhost:8000/api/auth/me", {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -167,7 +169,7 @@ export default function ProfileDialog({
 
     setIsSaving(true);
     try {
-      const response = await fetch("http://localhost:8000/api/auth/me", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

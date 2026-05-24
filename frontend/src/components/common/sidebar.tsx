@@ -1,5 +1,7 @@
 "use client";
 
+import { API_BASE_URL } from "@/src/lib/config";
+
 import Image from "next/image";
 import React, { useState } from "react";
 import { Bell, LogOut, Panda, PanelLeft, Settings } from "lucide-react";
@@ -58,7 +60,7 @@ export default function Sidebar() {
       customer: "Tài khoản khách hàng",
     };
 
-    fetch("http://localhost:8000/api/auth/me", {
+    fetch(`${API_BASE_URL}/api/auth/me`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
