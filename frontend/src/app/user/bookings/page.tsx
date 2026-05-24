@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { API_BASE_URL } from "@/src/lib/config";
 import { CalendarDays, Clock, Home, MapPin, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,7 @@ export default function UserBookingsPage() {
 
   // Fetch active services
   useEffect(() => {
-    fetch("http://localhost:8000/api/bookings/services")
+    fetch(`${API_BASE_URL}/api/bookings/services`)
       .then((res) => {
         if (!res.ok) throw new Error();
         return res.json() as Promise<Service[]>;
@@ -88,7 +89,7 @@ export default function UserBookingsPage() {
   const fetchBookings = () => {
     const token = localStorage.getItem("token");
     if (!token) return;
-    fetch("http://localhost:8000/api/bookings", {
+    fetch(`${API_BASE_URL}/api/bookings`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -108,7 +109,7 @@ export default function UserBookingsPage() {
     if (!token) return;
     
     // Auto-fill user profile info
-    fetch("http://localhost:8000/api/auth/me", {
+    fetch(`${API_BASE_URL}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -141,7 +142,7 @@ export default function UserBookingsPage() {
 
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/api/bookings", {
+      const response = await fetch(`${API_BASE_URL}/api/bookings`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

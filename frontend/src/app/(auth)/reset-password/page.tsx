@@ -8,6 +8,7 @@ import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 import { GradientText } from "@/src/components/ui/gradient-text";
 import { validatePassword } from "@/src/lib/validators/auth";
 import { toast } from "sonner";
+import { API_BASE_URL } from "@/src/lib/config";
 
 const images = [
   "/download (5).jfif",
@@ -70,7 +71,7 @@ function ResetPasswordContent() {
 
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/api/auth/reset-password", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

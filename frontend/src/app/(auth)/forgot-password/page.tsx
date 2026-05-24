@@ -7,6 +7,7 @@ import { GradientText } from "@/src/components/ui/gradient-text";
 import { validateEmail } from "@/src/lib/validators/auth";
 import { toast } from "sonner";
 import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
+import { API_BASE_URL } from "@/src/lib/config";
 
 const images = [
   "/download (1).jfif",
@@ -50,7 +51,7 @@ export default function Page() {
 
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/api/auth/forgot-password", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

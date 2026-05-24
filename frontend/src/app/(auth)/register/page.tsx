@@ -8,6 +8,7 @@ import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 import { GradientText } from "@/src/components/ui/gradient-text";
 import { validateEmail, validatePassword, validateUsername } from "@/src/lib/validators/auth";
 import { toast } from "sonner";
+import { API_BASE_URL } from "@/src/lib/config";
 
 const images = [
   "/tải xuống (15).jfif",
@@ -80,7 +81,7 @@ export default function Page() {
 
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/api/auth/register", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

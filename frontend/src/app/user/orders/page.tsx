@@ -39,6 +39,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { API_BASE_URL } from "@/src/lib/config";
 import {
   PageShell,
   PaginationFooter,
@@ -347,7 +348,7 @@ export default function UserOrdersPage() {
     const token = localStorage.getItem("token");
     if (!token) return;
     setIsLoading(true);
-    fetch("http://localhost:8000/api/orders", {
+    fetch(`${API_BASE_URL}/api/orders`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -379,7 +380,7 @@ export default function UserOrdersPage() {
     if (!token) return;
 
     setIsDetailLoading(true);
-    fetch(`http://localhost:8000/api/orders/${selectedTimelineOrder.code}`, {
+    fetch(`${API_BASE_URL}/api/orders/${selectedTimelineOrder.code}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -934,7 +935,7 @@ export default function UserOrdersPage() {
                 }
 
                 try {
-                  const response = await fetch(`http://localhost:8000/api/orders/${deleteOrderCode}/cancel`, {
+                  const response = await fetch(`${API_BASE_URL}/api/orders/${deleteOrderCode}/cancel`, {
                     method: "POST",
                     headers: {
                       Authorization: `Bearer ${token}`,
