@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
+import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 import { GradientText } from "@/src/components/ui/gradient-text";
 import { validateUsername, validatePassword } from "@/src/lib/validators/auth";
 import { toast } from "sonner";
@@ -278,7 +279,11 @@ export default function Page() {
             disabled={!isFormValid || isLoading}
             className={`w-full h-10 rounded-md bg-amber-500 hover:bg-amber-600 ${isFormValid && !isLoading ? "active:scale-[0.98] cursor-pointer" : "cursor-not-allowed opacity-75"} text-white text-sm font-semibold tracking-wide transition-all mb-6`}
           >
-            {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
+            {isLoading ? (
+              <SpokeSpinner />
+            ) : (
+              "Đăng nhập"
+            )}
           </button>          {/* Divider */}
           <div className="flex items-center gap-3 mb-4">
             <div className="flex-1 h-px bg-gray-200" />

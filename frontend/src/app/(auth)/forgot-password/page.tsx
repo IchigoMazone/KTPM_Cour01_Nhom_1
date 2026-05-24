@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { GradientText } from "@/src/components/ui/gradient-text";
 import { validateEmail } from "@/src/lib/validators/auth";
 import { toast } from "sonner";
+import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 
 const images = [
   "/download (1).jfif",
@@ -208,7 +209,11 @@ export default function Page() {
               isLoading || !email || !username ? "opacity-70 cursor-not-allowed" : "active:scale-[0.98] cursor-pointer"
             } text-white text-sm font-semibold tracking-wide transition-all mb-4`}
           >
-            {isLoading ? "Đang xử lý..." : "Xác nhận gửi yêu cầu"}
+            {isLoading ? (
+              <SpokeSpinner />
+            ) : (
+              "Xác nhận gửi yêu cầu"
+            )}
           </button>
 
           {/* Divider */}

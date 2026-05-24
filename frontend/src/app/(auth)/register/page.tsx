@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
+import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 import { GradientText } from "@/src/components/ui/gradient-text";
 import { validateEmail, validatePassword, validateUsername } from "@/src/lib/validators/auth";
 import { toast } from "sonner";
@@ -370,7 +371,11 @@ export default function Page() {
               isLoading ? "opacity-70 cursor-not-allowed" : "active:scale-[0.98]"
             }`}
           >
-            {isLoading ? "Đang xử lý..." : "Đăng ký ngay"}
+            {isLoading ? (
+              <SpokeSpinner />
+            ) : (
+              "Đăng ký ngay"
+            )}
           </button>
 
           {/* Divider */}

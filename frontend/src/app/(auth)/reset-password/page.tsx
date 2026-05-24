@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
+import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 import { GradientText } from "@/src/components/ui/gradient-text";
 import { validatePassword } from "@/src/lib/validators/auth";
 import { toast } from "sonner";
@@ -265,7 +266,11 @@ function ResetPasswordContent() {
             disabled={isLoading || passwordMismatch || !newPassword || !confirmPassword}
             className="w-full h-10 rounded-md bg-cyan-700 hover:bg-cyan-800 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] text-white text-sm font-semibold tracking-wide transition-all mb-4"
           >
-            {isLoading ? "Đang xử lý..." : "Xác nhận đổi mật khẩu"}
+            {isLoading ? (
+              <SpokeSpinner />
+            ) : (
+              "Xác nhận đổi mật khẩu"
+            )}
           </button>
 
           {/* Divider */}
