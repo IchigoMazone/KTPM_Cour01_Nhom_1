@@ -230,13 +230,13 @@ export default function Header() {
           <div className="flex items-center justify-end gap-2">
             <Button
               variant="secondary"
-              className="hidden bg-blue-50 text-blue-700 hover:bg-blue-100 sm:inline-flex"
+              className="bg-blue-50 px-3 text-sm text-blue-700 hover:bg-blue-100 sm:px-4"
               onClick={() => router.push("/login")}
             >
               Đăng nhập
             </Button>
             <Button
-              className="bg-blue-600 text-white hover:bg-blue-700"
+              className="bg-blue-600 px-3 text-sm text-white hover:bg-blue-700 sm:px-4"
               onClick={() => router.push("/register")}
             >
               Đăng kí

@@ -32,9 +32,6 @@ function ResetPasswordContent() {
     password: "",
   });
 
-  const passwordMismatch =
-    confirmPassword.length > 0 && newPassword !== confirmPassword;
-
   useEffect(() => {
     // Tự động đồng bộ token từ url nếu có thay đổi
     if (tokenFromUrl) {
@@ -100,12 +97,14 @@ function ResetPasswordContent() {
     }
   };
 
+  const passwordMismatch = newPassword && confirmPassword && newPassword !== confirmPassword;
+
   return (
     <div
       className="min-h-screen flex items-center justify-center bg-cover bg-center p-4"
       style={{ backgroundImage: "url('/download (8).jfif')" }}
     >
-      <div className="w-full min-w-[330px] h-[540px] sm:w-[480px] sm:h-[620px] lg:w-[1000px] lg:h-[640px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
+      <div className="w-full min-w-[330px] h-[540px] sm:w-[480px] sm:h-[620px] lg:w-[1000px] lg:h-[670px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
         {/* ── TRÁI: Slider ── */}
         <div className="hidden lg:block lg:w-[52%] relative overflow-hidden rounded-l-2xl">
           {images.map((img, index) => {
@@ -244,11 +243,7 @@ function ResetPasswordContent() {
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`w-full h-10 px-3 pr-10 rounded-md border bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
-                    passwordMismatch
-                      ? "border-red-300 focus:ring-red-300/50 focus:border-red-400"
-                      : "border-slate-200 focus:ring-cyan-400/50 focus:border-cyan-400"
-                  }`}
+                  className="w-full h-10 px-3 pr-10 rounded-md border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400 transition-all"
                 />
                 <button
                   type="button"

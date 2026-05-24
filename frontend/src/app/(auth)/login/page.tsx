@@ -9,18 +9,6 @@ import { validateUsername, validatePassword } from "@/src/lib/validators/auth";
 import { toast } from "sonner";
 
 const images = ["/summer (1).jfif", "/summer (2).jfif", "/summer (3).jfif"];
-const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
-const hasGoogleClientId =
-  Boolean(googleClientId) &&
-  googleClientId.endsWith(".apps.googleusercontent.com") &&
-  !googleClientId.includes("mockclientid") &&
-  !googleClientId.includes("REPLACE_WITH");
-
-const isRealGoogleClientId = (clientId: string) =>
-  Boolean(clientId) &&
-  clientId.endsWith(".apps.googleusercontent.com") &&
-  !clientId.includes("mockclientid") &&
-  !clientId.includes("REPLACE_WITH");
 
 export default function Page() {
   const router = useRouter();
@@ -98,51 +86,8 @@ export default function Page() {
     }
   };
 
-  const redirectToGoogle = (clientId: string) => {
-    const redirectUri = `${window.location.origin}/login/google/callback`;
-    const state = crypto.randomUUID();
-    const nonce = crypto.randomUUID();
-
-    sessionStorage.setItem("google_oauth_state", state);
-    sessionStorage.setItem("google_oauth_client_id", clientId);
-
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: "id_token",
-      scope: "openid email profile",
-      prompt: "select_account consent",
-      max_age: "0",
-      state,
-      nonce,
-    });
-
-    window.location.assign(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
-  };
-
-  const handleGoogleRedirect = () => {
-    const savedClientId = localStorage.getItem("google_oauth_client_id") || "";
-    const clientId = hasGoogleClientId ? googleClientId : savedClientId;
-
-    if (isRealGoogleClientId(clientId)) {
-      redirectToGoogle(clientId);
-      return;
-    }
-
-    const enteredClientId = window.prompt(
-      "Nhập Google OAuth Client ID thật để mở trang Google:",
-      ""
-    )?.trim();
-
-    if (!enteredClientId) return;
-
-    if (!isRealGoogleClientId(enteredClientId)) {
-      toast.error("Google OAuth Client ID không hợp lệ.");
-      return;
-    }
-
-    localStorage.setItem("google_oauth_client_id", enteredClientId);
-    redirectToGoogle(enteredClientId);
+  const handleGoogleUnavailable = () => {
+    toast.error("Tính năng đăng nhập bằng Google hiện không khả dụng.");
   };
 
   return (
@@ -331,12 +276,10 @@ export default function Page() {
           <button
             type="submit"
             disabled={!isFormValid || isLoading}
-            className={`w-full h-10 rounded-md bg-amber-500 hover:bg-amber-600 ${isFormValid && !isLoading ? "active:scale-[0.98] cursor-pointer" : "cursor-not-allowed opacity-75"} text-white text-sm font-semibold tracking-wide transition-all mb-4`}
+            className={`w-full h-10 rounded-md bg-amber-500 hover:bg-amber-600 ${isFormValid && !isLoading ? "active:scale-[0.98] cursor-pointer" : "cursor-not-allowed opacity-75"} text-white text-sm font-semibold tracking-wide transition-all mb-6`}
           >
             {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
-          </button>
-
-          {/* Divider */}
+          </button>          {/* Divider */}
           <div className="flex items-center gap-3 mb-4">
             <div className="flex-1 h-px bg-gray-200" />
             <span className="text-xs text-gray-400">hoặc</span>
@@ -347,8 +290,8 @@ export default function Page() {
           <div className="mb-6 w-full overflow-hidden rounded-md">
             <button
               type="button"
-              onClick={handleGoogleRedirect}
-              className="flex h-10 w-full items-center justify-center gap-2.5 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-700 transition-all hover:bg-gray-50 active:scale-[0.98]"
+              onClick={handleGoogleUnavailable}
+              className="flex h-10 w-full items-center justify-center gap-2.5 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-700 transition-all hover:bg-gray-50 active:scale-[0.98] cursor-pointer"
             >
               <img src="/google.png" alt="Google" className="h-[18px] w-[18px]" />
               Tiếp tục với Google

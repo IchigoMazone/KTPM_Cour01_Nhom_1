@@ -125,6 +125,10 @@ export default function Page() {
     }
   };
 
+  const handleGoogleUnavailable = () => {
+    toast.error("Tính năng đăng nhập bằng Google hiện không khả dụng.");
+  };
+
   return (
     <div
       className="min-h-screen flex items-center justify-center bg-cover bg-center p-4"
@@ -362,7 +366,7 @@ export default function Page() {
           <button
             type="submit"
             disabled={isLoading}
-            className={`w-full h-10 rounded-md bg-gradient-to-r from-pink-400 to-orange-400 hover:from-pink-500 hover:to-orange-500 text-white text-sm font-semibold tracking-wide transition-all mb-4 ${
+            className={`w-full h-10 rounded-md bg-gradient-to-r from-pink-400 to-orange-400 hover:from-pink-500 hover:to-orange-500 text-white text-sm font-semibold tracking-wide transition-all mb-6 ${
               isLoading ? "opacity-70 cursor-not-allowed" : "active:scale-[0.98]"
             }`}
           >
@@ -377,7 +381,11 @@ export default function Page() {
           </div>
 
           {/* Nút Google */}
-          <button type="button" className="w-full h-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.98] text-sm font-medium text-gray-700 flex items-center justify-center gap-2.5 transition-all mb-6">
+          <button
+            type="button"
+            onClick={handleGoogleUnavailable}
+            className="w-full h-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.98] text-sm font-medium text-gray-700 flex items-center justify-center gap-2.5 transition-all mb-6 cursor-pointer"
+          >
             <img src="/google.png" alt="Google" className="w-[18px] h-[18px]" />
             Tiếp tục với Google
           </button>

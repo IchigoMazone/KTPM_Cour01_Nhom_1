@@ -62,22 +62,6 @@ class AccountRepository:
         )
         return self.cursor.fetchone()
 
-    def get_account_by_email(self, email):
-        self.cursor.execute(
-            """
-            SELECT a.user_id, a.username, a.role 
-            FROM accounts a 
-            JOIN user_profiles p ON a.user_id = p.user_id 
-            WHERE p.email = %s
-            UNION ALL
-            SELECT a.user_id, a.username, a.role 
-            FROM accounts a 
-            JOIN admin_profiles p ON a.user_id = p.user_id 
-            WHERE p.email = %s
-            """,
-            (email, email)
-        )
-        return self.cursor.fetchone()
 
     def update_password(self, user_id, password_hash):
         self.cursor.execute(

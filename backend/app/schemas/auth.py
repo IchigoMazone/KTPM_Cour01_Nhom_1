@@ -129,6 +129,3 @@ class ResetPasswordRequest(BaseModel):
         return password
 
 
-class GoogleLoginRequest(BaseModel):
-    id_token: str
-    client_id: str | None = None

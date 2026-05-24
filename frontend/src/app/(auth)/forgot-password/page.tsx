@@ -82,7 +82,7 @@ export default function Page() {
       className="min-h-screen flex items-center justify-center bg-cover bg-center p-4"
       style={{ backgroundImage: "url('/download.jfif')" }}
     >
-      <div className="w-full min-w-[330px] h-[540px] sm:w-[480px] sm:h-[620px] lg:w-[1000px] lg:h-[640px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
+      <div className="w-full min-w-[330px] h-[540px] sm:w-[480px] sm:h-[620px] lg:w-[1000px] lg:h-[670px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
         {/* ── TRÁI: Slider ── */}
         <div className="hidden lg:block lg:w-[52%] relative overflow-hidden rounded-l-2xl">
           {images.map((img, index) => {
