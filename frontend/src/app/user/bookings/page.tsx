@@ -336,12 +336,12 @@ export default function UserBookingsPage() {
                 cancelled: "Đã hủy",
               };
               
-              const statusColors: Record<string, "warning" | "success" | "neutral"> = {
+              const statusColors: Record<string, "warning" | "success" | "default"> = {
                 pending: "warning",
                 confirmed: "success",
                 assigned: "success",
                 picked_up: "success",
-                cancelled: "neutral",
+                cancelled: "default",
               };
 
               return (
@@ -359,7 +359,7 @@ export default function UserBookingsPage() {
                     <span className="truncate">{booking.address}</span>
                   </div>
                   <div className="flex sm:justify-end">
-                    <StatusBadge tone={statusColors[booking.status] || "neutral"}>
+                    <StatusBadge tone={statusColors[booking.status] || "default"}>
                       {bookingStatusLabels[booking.status] || booking.status}
                     </StatusBadge>
                   </div>
