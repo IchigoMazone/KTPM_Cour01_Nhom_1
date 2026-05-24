@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   Bell,
+  Calendar,
   Clock3,
   KeyRound,
   Languages,
@@ -24,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useSettingsStore } from "@/src/context/useSettingsStore";
 
 type SettingsDialogProps = {
   isUserArea: boolean;
@@ -36,6 +39,7 @@ const adminToggles = [
   { icon: Mail, label: "Gửi báo cáo cuối ngày qua email", enabled: true },
   { icon: ShieldCheck, label: "Yêu cầu OTP khi xuất dữ liệu", enabled: true },
   { icon: Clock3, label: "Nhắc ca làm trước 15 phút", enabled: false },
+  { icon: Calendar, label: "Quản lý giao hàng", enabled: true },
 ];
 
 const userToggles = [
@@ -50,6 +54,13 @@ export default function SettingsDialog({
   open,
   onOpenChange,
 }: SettingsDialogProps) {
+  const { deliveryEnabled, setDeliveryEnabled } = useSettingsStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const toggles = isUserArea ? userToggles : adminToggles;
 
   return (
@@ -67,18 +78,32 @@ export default function SettingsDialog({
         <div className="grid gap-4 px-5 py-4 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="space-y-3">
             <p className="text-sm font-medium">Tùy chọn nhanh</p>
-            {toggles.map((item) => (
-              <div
-                key={item.label}
-                className="flex items-center justify-between gap-3 rounded-lg border border-black/[0.06] px-3 py-3"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <item.icon className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="text-sm">{item.label}</span>
+            {toggles.map((item) => {
+              const isDeliveryToggle = item.label === "Quản lý giao hàng";
+              const isChecked = isDeliveryToggle
+                ? (mounted ? deliveryEnabled : true)
+                : item.enabled;
+
+              return (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-black/[0.06] px-3 py-3"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <item.icon className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="text-sm">{item.label}</span>
+                  </div>
+                  <Switch
+                    checked={isChecked}
+                    onCheckedChange={(checked) => {
+                      if (isDeliveryToggle) {
+                        setDeliveryEnabled(checked);
+                      }
+                    }}
+                  />
                 </div>
-                <Switch defaultChecked={item.enabled} />
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="space-y-3">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bell,
   CalendarPlus,
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import NotificationsDialog from "./notifications-dialog";
 import { useNavbarStore } from "@/src/context/useNavbarStore";
+import { useSettingsStore } from "@/src/context/useSettingsStore";
 
 const dashboardCommands = [
   { label: "Tạo đơn giặt mới", path: "/home/orders", meta: "Đơn hàng" },
@@ -49,16 +50,29 @@ export default function Search() {
   const { toggle } = useNavbarStore();
   const router = useRouter();
   const pathname = usePathname();
+  const { deliveryEnabled } = useSettingsStore();
+  const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const results = useMemo(() => {
-    if (!query.trim()) return dashboardCommands.slice(0, 5);
-    return dashboardCommands.filter((item) =>
-      `${item.label} ${item.meta}`.toLowerCase().includes(query.toLowerCase()),
+    const commands = dashboardCommands.filter((item) => {
+      if (item.path === "/home/delivery" && mounted && !deliveryEnabled) {
+        return false;
+      }
+      return true;
+    });
+
+    if (!query.trim()) return commands.slice(0, 5);
+    return commands.filter((item) =>
+      `${item.label} ${item.meta}`.toLowerCase().includes(query.toLowerCase())
     );
-  }, [query]);
+  }, [query, deliveryEnabled, mounted]);
 
   const title = pageTitles[pathname] ?? "Dashboard";
 

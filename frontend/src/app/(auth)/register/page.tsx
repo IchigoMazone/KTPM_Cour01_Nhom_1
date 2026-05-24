@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import {
-  RegisterField,
-  validateRegisterForm,
-} from "@/src/lib/validators/auth";
+import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
+import { GradientText } from "@/src/components/ui/gradient-text";
+import { validateEmail, validatePassword, validateUsername } from "@/src/lib/validators/auth";
+import { toast } from "sonner";
 
 const images = [
   "/tải xuống (15).jfif",
@@ -14,38 +15,8 @@ const images = [
   "/tải xuống (17).jfif",
 ];
 
-const emptyTouched = {
-  firstName: false,
-  lastName: false,
-  email: false,
-  username: false,
-  password: false,
-  confirm: false,
-};
-
-const fieldOrder: RegisterField[] = [
-  "firstName",
-  "lastName",
-  "email",
-  "username",
-  "password",
-  "confirm",
-];
-
-function ValidationMessage({ message }: { message: string }) {
-  return (
-    <div
-      className={`overflow-hidden transition-all duration-300 ease-out ${
-        message ? "mt-0.5 max-h-5 opacity-100" : "mt-0 max-h-0 opacity-0"
-      }`}
-      aria-live="polite"
-    >
-      <p className="text-[11px] leading-4 text-pink-500">{message}</p>
-    </div>
-  );
-}
-
 export default function Page() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [currentImage, setCurrentImage] = useState(0);
@@ -57,67 +28,12 @@ export default function Page() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [agreed, setAgreed] = useState(false);
-  const [touched, setTouched] = useState(emptyTouched);
-  const [activeErrorField, setActiveErrorField] =
-    useState<RegisterField | null>(null);
-
-  const formValues = {
-    firstName,
-    lastName,
-    email,
-    username,
-    password,
-    confirm,
-    agreed,
-  };
-  const formErrors = validateRegisterForm(formValues);
-  const isFormValid = fieldOrder.every((field) => !formErrors[field]);
-  const activeError =
-    activeErrorField &&
-    activeErrorField !== "agreed" &&
-    touched[activeErrorField]
-      ? formErrors[activeErrorField]
-      : "";
-
-  const updateField = (field: RegisterField, value: string | boolean) => {
-    if (field === "firstName") setFirstName(String(value));
-    if (field === "lastName") setLastName(String(value));
-    if (field === "email") setEmail(String(value));
-    if (field === "username") setUsername(String(value));
-    if (field === "password") setPassword(String(value));
-    if (field === "confirm") setConfirm(String(value));
-    if (field === "agreed") setAgreed(Boolean(value));
-
-    if (field !== "agreed") {
-      setActiveErrorField(field);
-    }
-  };
-
-  const markFieldTouched = (field: RegisterField) => {
-    setTouched((currentTouched) => ({
-      ...currentTouched,
-      [field]: true,
-    }));
-    setActiveErrorField(formErrors[field] ? field : null);
-  };
-
-  const handleRegister = () => {
-    setTouched({
-      firstName: true,
-      lastName: true,
-      email: true,
-      username: true,
-      password: true,
-      confirm: true,
-    });
-    setActiveErrorField(
-      fieldOrder.find((field) => formErrors[field]) ?? null,
-    );
-
-    if (!isFormValid) return;
-
-    console.log("Call API REGISTER");
-  };
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState({
+    username: "",
+    password: "",
+    email: "",
+  });
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -127,12 +43,99 @@ export default function Page() {
     return () => clearInterval(timer);
   }, [currentImage]);
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Reset errors
+    setErrors({ username: "", password: "", email: "" });
+
+    // Validate inputs locally
+    const usernameError = validateUsername(username);
+    const passwordError = validatePassword(password);
+    const emailError = validateEmail(email);
+
+    if (usernameError || passwordError || emailError) {
+      setErrors({
+        username: usernameError,
+        password: passwordError,
+        email: emailError,
+      });
+      return;
+    }
+
+    if (!firstName.trim() || !lastName.trim()) {
+      toast.error("Vui lòng nhập đầy đủ Họ và Tên.");
+      return;
+    }
+
+    if (password !== confirm) {
+      toast.error("Mật khẩu xác nhận không khớp.");
+      return;
+    }
+
+    if (!agreed) {
+      toast.error("Bạn phải đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch("http://localhost:8000/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: username.trim(),
+          password,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email.trim(),
+          phone: "",
+          address: "",
+        }),
+      });
+
+      const responseText = await response.text();
+      let data: { success?: boolean; message?: string } = {};
+
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        data = {};
+      }
+
+      if (!response.ok) {
+        toast.error(data.message || "Máy chủ đang lỗi. Vui lòng thử lại.");
+        return;
+      }
+
+      if (data.success) {
+        toast.success(data.message || "Đăng ký thành công!");
+        setTimeout(() => {
+          router.push("/login");
+        }, 1500);
+      } else {
+        toast.error(data.message || "Đăng ký thất bại.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể kết nối đến máy chủ.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleUnavailable = () => {
+    toast.error("Tính năng đăng nhập bằng Google hiện không khả dụng.");
+  };
+
   return (
     <div
       className="min-h-screen flex items-center justify-center bg-cover bg-center p-4"
       style={{ backgroundImage: "url('/tải xuống (14).jfif')" }}
     >
-      <div className="w-full min-w-[330px] h-[700px] sm:w-[480px] sm:h-[620px] md:h-[700px] lg:w-[1000px] lg:h-[670px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
+      <div className="w-full min-w-[330px] h-[650px] sm:w-[480px] sm:h-[620px] lg:w-[1000px] lg:h-[640px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
         {/* ── TRÁI: Slider ── */}
         <div className="hidden lg:block lg:w-[52%] relative overflow-hidden rounded-l-2xl">
           {images.map((img, index) => {
@@ -181,6 +184,7 @@ export default function Page() {
               {images.map((_, i) => (
                 <button
                   key={i}
+                  type="button"
                   onClick={() => {
                     setPrevImage(currentImage);
                     setCurrentImage(i);
@@ -195,7 +199,7 @@ export default function Page() {
         </div>
 
         {/* ── PHẢI: Form đăng ký ── */}
-        <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 py-4 bg-white overflow-y-auto">
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-center px-8 sm:px-12 py-4 bg-white overflow-y-auto">
           {/* Fields */}
           <div className="space-y-3 mb-4">
             {/* Họ & Tên */}
@@ -208,22 +212,9 @@ export default function Page() {
                   type="text"
                   placeholder="Nguyễn"
                   value={firstName}
-                  aria-invalid={
-                    activeErrorField === "firstName" && Boolean(activeError)
-                  }
-                  aria-describedby="first-name-error"
-                  onChange={(e) => updateField("firstName", e.target.value)}
-                  onFocus={() => setActiveErrorField("firstName")}
-                  onBlur={() => markFieldTouched("firstName")}
+                  onChange={(e) => setFirstName(e.target.value)}
                   className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
                 />
-                <div id="first-name-error">
-                  <ValidationMessage
-                    message={
-                      activeErrorField === "firstName" ? activeError : ""
-                    }
-                  />
-                </div>
               </div>
               <div className="flex-1 space-y-1.5">
                 <label className="text-xs font-medium text-gray-700 tracking-wide">
@@ -233,20 +224,9 @@ export default function Page() {
                   type="text"
                   placeholder="Văn A"
                   value={lastName}
-                  aria-invalid={
-                    activeErrorField === "lastName" && Boolean(activeError)
-                  }
-                  aria-describedby="last-name-error"
-                  onChange={(e) => updateField("lastName", e.target.value)}
-                  onFocus={() => setActiveErrorField("lastName")}
-                  onBlur={() => markFieldTouched("lastName")}
+                  onChange={(e) => setLastName(e.target.value)}
                   className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
                 />
-                <div id="last-name-error">
-                  <ValidationMessage
-                    message={activeErrorField === "lastName" ? activeError : ""}
-                  />
-                </div>
               </div>
             </div>
 
@@ -259,20 +239,12 @@ export default function Page() {
                 type="email"
                 placeholder="example@gmail.com"
                 value={email}
-                aria-invalid={
-                  activeErrorField === "email" && Boolean(activeError)
-                }
-                aria-describedby="email-error"
-                onChange={(e) => updateField("email", e.target.value)}
-                onFocus={() => setActiveErrorField("email")}
-                onBlur={() => markFieldTouched("email")}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
               />
-              <div id="email-error">
-                <ValidationMessage
-                  message={activeErrorField === "email" ? activeError : ""}
-                />
-              </div>
+              {errors.email && (
+                <p className="text-xs text-pink-500">{errors.email}</p>
+              )}
             </div>
 
             {/* Tên đăng nhập */}
@@ -282,22 +254,14 @@ export default function Page() {
               </label>
               <input
                 type="text"
-                placeholder="ichigomazone"
+                placeholder="ichigomazone1"
                 value={username}
-                aria-invalid={
-                  activeErrorField === "username" && Boolean(activeError)
-                }
-                aria-describedby="username-error"
-                onChange={(e) => updateField("username", e.target.value)}
-                onFocus={() => setActiveErrorField("username")}
-                onBlur={() => markFieldTouched("username")}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
               />
-              <div id="username-error">
-                <ValidationMessage
-                  message={activeErrorField === "username" ? activeError : ""}
-                />
-              </div>
+              {errors.username && (
+                <p className="text-xs text-pink-500">{errors.username}</p>
+              )}
             </div>
 
             {/* Mật khẩu */}
@@ -310,13 +274,7 @@ export default function Page() {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
-                  aria-invalid={
-                    activeErrorField === "password" && Boolean(activeError)
-                  }
-                  aria-describedby="password-error"
-                  onChange={(e) => updateField("password", e.target.value)}
-                  onFocus={() => setActiveErrorField("password")}
-                  onBlur={() => markFieldTouched("password")}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full h-10 px-3 pr-10 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
                 />
                 <button
@@ -331,11 +289,9 @@ export default function Page() {
                   )}
                 </button>
               </div>
-              <div id="password-error">
-                <ValidationMessage
-                  message={activeErrorField === "password" ? activeError : ""}
-                />
-              </div>
+              {errors.password && (
+                <p className="text-xs text-pink-500">{errors.password}</p>
+              )}
             </div>
 
             {/* Xác nhận mật khẩu */}
@@ -348,13 +304,7 @@ export default function Page() {
                   type={showConfirm ? "text" : "password"}
                   placeholder="••••••••"
                   value={confirm}
-                  aria-invalid={
-                    activeErrorField === "confirm" && Boolean(activeError)
-                  }
-                  aria-describedby="confirm-error"
-                  onChange={(e) => updateField("confirm", e.target.value)}
-                  onFocus={() => setActiveErrorField("confirm")}
-                  onBlur={() => markFieldTouched("confirm")}
+                  onChange={(e) => setConfirm(e.target.value)}
                   className="w-full h-10 px-3 pr-10 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
                 />
                 <button
@@ -369,20 +319,14 @@ export default function Page() {
                   )}
                 </button>
               </div>
-              <div id="confirm-error">
-                <ValidationMessage
-                  message={activeErrorField === "confirm" ? activeError : ""}
-                />
-              </div>
             </div>
           </div>
 
           {/* Điều khoản */}
-          <label className="flex items-start gap-2 cursor-pointer select-none group mb-5">
-            <div
-              onClick={() => {
-                updateField("agreed", !agreed);
-              }}
+          <div className="flex items-start gap-2 cursor-pointer select-none group mb-5">
+            <button
+              type="button"
+              onClick={() => setAgreed(!agreed)}
               className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center border transition-all duration-200 shrink-0 ${
                 agreed
                   ? "bg-pink-400 border-pink-400"
@@ -400,7 +344,7 @@ export default function Page() {
                   />
                 </svg>
               )}
-            </div>
+            </button>
             <span className="text-xs text-gray-600 leading-relaxed">
               Tôi đồng ý với{" "}
               <Link
@@ -417,15 +361,21 @@ export default function Page() {
                 Chính sách bảo mật
               </Link>
             </span>
-          </label>
+          </div>
 
           {/* Nút đăng ký */}
           <button
-            disabled={!isFormValid}
-            onClick={handleRegister}
-            className="w-full h-10 rounded-md bg-gradient-to-r from-pink-400 to-orange-400 hover:from-pink-500 hover:to-orange-500 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] text-white text-sm font-semibold tracking-wide transition-all mb-4"
+            type="submit"
+            disabled={isLoading}
+            className={`w-full h-10 rounded-md bg-gradient-to-r from-pink-400 to-orange-400 hover:from-pink-500 hover:to-orange-500 text-white text-sm font-semibold tracking-wide transition-all mb-6 ${
+              isLoading ? "opacity-70 cursor-not-allowed" : "active:scale-[0.98]"
+            }`}
           >
-            Đăng ký ngay
+            {isLoading ? (
+              <SpokeSpinner />
+            ) : (
+              "Đăng ký ngay"
+            )}
           </button>
 
           {/* Divider */}
@@ -436,7 +386,11 @@ export default function Page() {
           </div>
 
           {/* Nút Google */}
-          <button className="w-full h-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.98] text-sm font-medium text-gray-700 flex items-center justify-center gap-2.5 transition-all mb-6">
+          <button
+            type="button"
+            onClick={handleGoogleUnavailable}
+            className="w-full h-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.98] text-sm font-medium text-gray-700 flex items-center justify-center gap-2.5 transition-all mb-6 cursor-pointer"
+          >
             <img src="/google.png" alt="Google" className="w-[18px] h-[18px]" />
             Tiếp tục với Google
           </button>
@@ -451,7 +405,7 @@ export default function Page() {
               Đăng nhập
             </Link>
           </p>
-        </div>
+        </form>
       </div>
     </div>
   );

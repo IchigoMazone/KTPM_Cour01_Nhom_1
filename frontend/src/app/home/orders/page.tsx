@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { FileText, Plus, Search, X } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import type { DateRange } from "react-day-picker";
+import { CalendarDays, ChevronLeft, ChevronRight, FileText, Plus, Search, X } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,8 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
+  TableCaption,
   TableFooter,
   TableHead,
   TableHeader,
@@ -76,6 +79,13 @@ export default function OrdersPage() {
   const [period, setPeriod] = useState<Period>("Ngày");
   const [page, setPage] = useState(1);
   const [openForm, setOpenForm] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [selectedWeek, setSelectedWeek] = useState<{ from: Date; to: Date } | undefined>(undefined);
+  const [selectedMonth, setSelectedMonth] = useState<{ month: number; year: number } | undefined>(undefined);
+  const [monthPickerYear, setMonthPickerYear] = useState(new Date().getFullYear());
+  const [weekPickerMonth, setWeekPickerMonth] = useState(new Date().getMonth());
+  const [weekPickerYear, setWeekPickerYear] = useState(new Date().getFullYear());
   const [form, setForm] = useState({
     customer: "",
     phone: "",
@@ -88,14 +98,76 @@ export default function OrdersPage() {
     note: "",
   });
 
+  const monthNames = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
+
+  const getWeekRange = (date: Date) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diffToMon = day === 0 ? -6 : 1 - day;
+    const monday = new Date(d);
+    monday.setDate(d.getDate() + diffToMon);
+    monday.setHours(0, 0, 0, 0);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+    return { from: monday, to: sunday };
+  };
+
+  const getWeeksInMonth = (year: number, month: number) => {
+    const weeks: { from: Date; to: Date }[] = [];
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    const start = new Date(firstDay);
+    const day = start.getDay();
+    const diffToMon = day === 0 ? -6 : 1 - day;
+    start.setDate(start.getDate() + diffToMon);
+    start.setHours(0, 0, 0, 0);
+
+    let current = new Date(start);
+    while (current <= lastDay) {
+      const from = new Date(current);
+      const to = new Date(current);
+      to.setDate(to.getDate() + 6);
+      to.setHours(23, 59, 59, 999);
+      weeks.push({ from, to });
+      current.setDate(current.getDate() + 7);
+    }
+    return weeks;
+  };
+
+  const handlePeriodChange = useCallback((newPeriod: Period) => {
+    setPeriod(newPeriod);
+    setDateRange(undefined);
+    setSelectedWeek(undefined);
+    setSelectedMonth(undefined);
+    setCalendarOpen(false);
+    setPage(1);
+  }, []);
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const source = `${order.id} ${order.customer} ${order.phone} ${order.service} ${order.driver}`;
       const matchQuery = source.toLowerCase().includes(query.toLowerCase());
       const matchStatus = selectedStatus === "Tất cả" || order.status === selectedStatus;
-      return matchQuery && matchStatus;
+
+      let matchDate = true;
+      if (dateRange?.from) {
+        const orderDate = new Date(order.createdAt);
+        orderDate.setHours(0, 0, 0, 0);
+        const from = new Date(dateRange.from);
+        from.setHours(0, 0, 0, 0);
+        if (orderDate < from) matchDate = false;
+        if (dateRange.to) {
+          const to = new Date(dateRange.to);
+          to.setHours(23, 59, 59, 999);
+          if (orderDate > to) matchDate = false;
+        }
+      }
+
+      return matchQuery && matchStatus && matchDate;
     });
-  }, [orders, query, selectedStatus]);
+  }, [orders, query, selectedStatus, dateRange]);
 
   const pageCount = Math.ceil(filteredOrders.length / pageSize);
   const paginatedOrders = filteredOrders.slice((page - 1) * pageSize, page * pageSize);
@@ -158,7 +230,247 @@ export default function OrdersPage() {
               }}
             />
           </div>
-          <PeriodTabs value={period} onChange={setPeriod} />
+          {period === "Ngày" && (
+            <div className="relative w-fit">
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={`w-[220px] justify-start text-left font-normal ${dateRange?.from ? "pr-9" : ""}`}
+                  >
+                    <CalendarDays className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                    <span className="overflow-x-auto whitespace-nowrap scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
+                      {dateRange?.from ? (
+                        dateRange.to && dateRange.to.getTime() !== dateRange.from.getTime() ? (
+                          <>
+                            {dateRange.from.toLocaleDateString("vi-VN")} –{" "}
+                            {dateRange.to.toLocaleDateString("vi-VN")}
+                          </>
+                        ) : (
+                          dateRange.from.toLocaleDateString("vi-VN")
+                        )
+                      ) : (
+                        "Chọn ngày"
+                      )}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={(range) => {
+                      setDateRange(range);
+                      setPage(1);
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+              {dateRange?.from && (
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-sm bg-background p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDateRange(undefined);
+                    setPage(1);
+                  }}
+                  title="Xóa bộ lọc ngày"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {period === "Tuần" && (
+            <div className="relative w-fit">
+              <Popover
+                open={calendarOpen}
+                onOpenChange={(open) => {
+                  setCalendarOpen(open);
+                  if (open) {
+                    const refDate = selectedWeek?.from || new Date();
+                    setWeekPickerMonth(refDate.getMonth());
+                    setWeekPickerYear(refDate.getFullYear());
+                  }
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={`w-[220px] justify-start text-left font-normal ${selectedWeek ? "pr-9" : ""}`}
+                  >
+                    <CalendarDays className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                    <span className="overflow-x-auto whitespace-nowrap scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
+                      {selectedWeek ? (
+                        <>
+                          {selectedWeek.from.toLocaleDateString("vi-VN")} –{" "}
+                          {selectedWeek.to.toLocaleDateString("vi-VN")}
+                        </>
+                      ) : (
+                        "Chọn tuần"
+                      )}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[280px] p-3" align="start">
+                  <div className="flex items-center justify-between mb-3">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => {
+                        if (weekPickerMonth === 0) {
+                          setWeekPickerMonth(11);
+                          setWeekPickerYear((y) => y - 1);
+                        } else {
+                          setWeekPickerMonth((m) => m - 1);
+                        }
+                      }}
+                    >
+                      <ChevronLeft className="size-4" />
+                    </Button>
+                    <span className="text-sm font-medium">
+                      Tháng {weekPickerMonth + 1} / {weekPickerYear}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => {
+                        if (weekPickerMonth === 11) {
+                          setWeekPickerMonth(0);
+                          setWeekPickerYear((y) => y + 1);
+                        } else {
+                          setWeekPickerMonth((m) => m + 1);
+                        }
+                      }}
+                    >
+                      <ChevronRight className="size-4" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {getWeeksInMonth(weekPickerYear, weekPickerMonth).slice(0, 4).map((week, idx) => {
+                      const isSelected = selectedWeek &&
+                        selectedWeek.from.getTime() === week.from.getTime() &&
+                        selectedWeek.to.getTime() === week.to.getTime();
+                      return (
+                        <Button
+                          key={idx}
+                          variant={isSelected ? "default" : "outline"}
+                          className="w-full justify-between text-xs font-normal h-9 px-3"
+                          onClick={() => {
+                            setSelectedWeek(week);
+                            setDateRange({ from: week.from, to: week.to });
+                            setPage(1);
+                            setCalendarOpen(false);
+                          }}
+                        >
+                          <span className="font-medium">Tuần {idx + 1}</span>
+                          <span className={isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}>
+                            {week.from.toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' })} - {week.to.toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' })}
+                          </span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              {selectedWeek && (
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-sm bg-background p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedWeek(undefined);
+                    setDateRange(undefined);
+                    setPage(1);
+                  }}
+                  title="Xóa bộ lọc tuần"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {period === "Tháng" && (
+            <div className="relative w-fit">
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={`w-[220px] justify-start text-left font-normal ${selectedMonth ? "pr-9" : ""}`}
+                  >
+                    <CalendarDays className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                    {selectedMonth ? (
+                      `${monthNames[selectedMonth.month]} / ${selectedMonth.year}`
+                    ) : (
+                      "Chọn tháng"
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[260px] p-3" align="start">
+                  <div className="flex items-center justify-between mb-3">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => setMonthPickerYear((y) => y - 1)}
+                    >
+                      <ChevronLeft className="size-4" />
+                    </Button>
+                    <span className="text-sm font-medium">{monthPickerYear}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => setMonthPickerYear((y) => y + 1)}
+                    >
+                      <ChevronRight className="size-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {monthNames.map((name, idx) => (
+                      <Button
+                        key={name}
+                        variant={selectedMonth?.month === idx && selectedMonth?.year === monthPickerYear ? "default" : "ghost"}
+                        size="sm"
+                        className="h-9 text-xs"
+                        onClick={() => {
+                          setSelectedMonth({ month: idx, year: monthPickerYear });
+                          const from = new Date(monthPickerYear, idx, 1);
+                          const to = new Date(monthPickerYear, idx + 1, 0, 23, 59, 59, 999);
+                          setDateRange({ from, to });
+                          setPage(1);
+                          setCalendarOpen(false);
+                        }}
+                      >
+                        {name}
+                      </Button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              {selectedMonth && (
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-sm bg-background p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedMonth(undefined);
+                    setDateRange(undefined);
+                    setPage(1);
+                  }}
+                  title="Xóa bộ lọc tháng"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+          <PeriodTabs value={period} onChange={handlePeriodChange} />
           <div className="flex flex-wrap gap-2">
             {["Tất cả", ...statuses].map((status) => (
               <Button
@@ -178,7 +490,6 @@ export default function OrdersPage() {
 
         <SectionCard title="Danh sách đơn hàng" description={`Đang xem theo ${period.toLowerCase()}.`}>
           <Table className="min-w-[1080px]">
-            <TableCaption>Danh sách đơn đang vận hành và lịch sử gần nhất.</TableCaption>
             <TableHeader>
               <TableRow className="bg-muted/30">
                 <TableHead>Mã đơn</TableHead>
@@ -228,6 +539,9 @@ export default function OrdersPage() {
               </TableRow>
             </TableFooter>
           </Table>
+          <div className="my-4 text-center text-sm text-muted-foreground ">
+            Danh sách đơn đang vận hành và lịch sử gần nhất.
+          </div>
           <PaginationFooter
             page={page}
             pageCount={pageCount}
@@ -321,11 +635,11 @@ export default function OrdersPage() {
       </div>
 
       {openForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <Card className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto">
-            <CardHeader className="flex flex-row items-center justify-between">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 p-4">
+          <Card className="relative max-h-[90dvh] w-full max-w-2xl overflow-y-auto">
+            <CardHeader className="pr-12">
               <CardTitle className="text-lg">Tạo đơn giặt mới</CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setOpenForm(false)}>
+              <Button variant="ghost" size="icon" className="absolute right-4 top-4" onClick={() => setOpenForm(false)}>
                 <X className="size-4" />
               </Button>
             </CardHeader>
