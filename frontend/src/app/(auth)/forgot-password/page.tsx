@@ -3,6 +3,10 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { GradientText } from "@/src/components/ui/gradient-text";
+import {
+  ForgotPasswordField,
+  validateForgotPasswordForm,
+} from "@/src/lib/validators/auth";
 
 const images = [
   "/download (1).jfif",
@@ -10,11 +14,70 @@ const images = [
   "/download (3).jfif",
 ];
 
+const emptyTouched = {
+  account: false,
+  email: false,
+};
+
+function ValidationMessage({ message }: { message: string }) {
+  return (
+    <div
+      className={`overflow-hidden transition-all duration-300 ease-out ${
+        message ? "mt-0.5 max-h-5 opacity-100" : "mt-0 max-h-0 opacity-0"
+      }`}
+      aria-live="polite"
+    >
+      <p className="text-[11px] leading-4 text-orange-600">{message}</p>
+    </div>
+  );
+}
+
 export default function Page() {
   const [currentImage, setCurrentImage] = useState(0);
   const [prevImage, setPrevImage] = useState<number | null>(null);
   const [account, setAccount] = useState("");
   const [email, setEmail] = useState("");
+  const [touched, setTouched] = useState(emptyTouched);
+  const [activeErrorField, setActiveErrorField] =
+    useState<ForgotPasswordField | null>(null);
+
+  const formErrors = validateForgotPasswordForm({ account, email });
+  const isFormValid = !formErrors.account && !formErrors.email;
+  const activeError =
+    activeErrorField && touched[activeErrorField]
+      ? formErrors[activeErrorField]
+      : "";
+
+  const updateField = (field: ForgotPasswordField, value: string) => {
+    if (field === "account") {
+      setAccount(value);
+    } else {
+      setEmail(value);
+    }
+    setActiveErrorField(field);
+  };
+
+  const markFieldTouched = (field: ForgotPasswordField) => {
+    setTouched((currentTouched) => ({
+      ...currentTouched,
+      [field]: true,
+    }));
+    setActiveErrorField(formErrors[field] ? field : null);
+  };
+
+  const handleSubmit = () => {
+    setTouched({
+      account: true,
+      email: true,
+    });
+    setActiveErrorField(
+      formErrors.account ? "account" : formErrors.email ? "email" : null,
+    );
+
+    if (!isFormValid) return;
+
+    console.log("Call API FORGOT PASSWORD");
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -29,7 +92,7 @@ export default function Page() {
       className="min-h-screen flex items-center justify-center bg-cover bg-center p-4"
       style={{ backgroundImage: "url('/download.jfif')" }}
     >
-      <div className="w-full min-w-[330px] h-[540px] sm:w-[480px] sm:h-[620px] lg:w-[1000px] lg:h-[640px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
+      <div className="w-full min-w-[330px] h-[540px] sm:w-[480px] sm:h-[620px] lg:w-[1000px] lg:h-[670px] bg-white rounded-2xl shadow-2xl flex overflow-hidden">
         {/* ── TRÁI: Slider ── */}
         <div className="hidden lg:block lg:w-[52%] relative overflow-hidden rounded-l-2xl">
           {images.map((img, index) => {
@@ -115,9 +178,20 @@ export default function Page() {
                 type="text"
                 placeholder="ichigomazone"
                 value={account}
-                onChange={(e) => setAccount(e.target.value)}
+                aria-invalid={
+                  activeErrorField === "account" && Boolean(activeError)
+                }
+                aria-describedby="account-error"
+                onChange={(e) => updateField("account", e.target.value)}
+                onFocus={() => setActiveErrorField("account")}
+                onBlur={() => markFieldTouched("account")}
                 className="w-full h-10 px-3 rounded-md border border-stone-200 bg-white text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 transition-all"
               />
+              <div id="account-error">
+                <ValidationMessage
+                  message={activeErrorField === "account" ? activeError : ""}
+                />
+              </div>
             </div>
 
             {/* Email */}
@@ -129,14 +203,29 @@ export default function Page() {
                 type="email"
                 placeholder="example@gmail.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                aria-invalid={
+                  activeErrorField === "email" && Boolean(activeError)
+                }
+                aria-describedby="email-error"
+                onChange={(e) => updateField("email", e.target.value)}
+                onFocus={() => setActiveErrorField("email")}
+                onBlur={() => markFieldTouched("email")}
                 className="w-full h-10 px-3 rounded-md border border-stone-200 bg-white text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 transition-all"
               />
+              <div id="email-error">
+                <ValidationMessage
+                  message={activeErrorField === "email" ? activeError : ""}
+                />
+              </div>
             </div>
           </div>
 
           {/* Nút xác nhận */}
-          <button className="w-full h-10 rounded-md bg-orange-700 hover:bg-orange-800 active:scale-[0.98] text-white text-sm font-semibold tracking-wide transition-all mb-4">
+          <button
+            disabled={!isFormValid}
+            onClick={handleSubmit}
+            className="w-full h-10 rounded-md bg-orange-700 hover:bg-orange-800 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] text-white text-sm font-semibold tracking-wide transition-all mb-4"
+          >
             Xác nhận
           </button>
 
