@@ -1,0 +1,18 @@
+2026-05-22 22:26:32.099 +07 [7723] LOG:  starting PostgreSQL 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit
+2026-05-22 22:26:32.099 +07 [7723] LOG:  listening on IPv4 address "127.0.0.1", port 5435
+2026-05-22 22:26:32.101 +07 [7723] FATAL:  could not create lock file "/var/run/postgresql/.s.PGSQL.5435.lock": Permission denied
+2026-05-22 22:26:32.102 +07 [7723] LOG:  database system is shut down
+2026-05-22 22:26:39.766 +07 [7749] LOG:  starting PostgreSQL 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit
+2026-05-22 22:26:39.767 +07 [7749] LOG:  listening on IPv4 address "127.0.0.1", port 5435
+2026-05-22 22:26:39.769 +07 [7749] LOG:  listening on Unix socket "/tmp/.s.PGSQL.5435"
+2026-05-22 22:26:39.774 +07 [7753] LOG:  database system was shut down at 2026-05-22 22:26:26 +07
+2026-05-22 22:26:39.779 +07 [7749] LOG:  database system is ready to accept connections
+2026-05-22 22:26:43.879 +07 [7777] FATAL:  database "nguyentuanhuy" does not exist
+2026-05-22 22:31:39.873 +07 [7751] LOG:  checkpoint starting: time
+2026-05-22 22:33:19.509 +07 [7751] LOG:  checkpoint complete: wrote 986 buffers (6.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=99.502 s, sync=0.127 s, total=99.637 s; sync files=351, longest=0.003 s, average=0.001 s; distance=4754 kB, estimate=4754 kB; lsn=0/1A00450, redo lsn=0/1998148
+2026-05-22 22:36:39.610 +07 [7751] LOG:  checkpoint starting: time
+2026-05-22 22:36:48.576 +07 [7751] LOG:  checkpoint complete: wrote 90 buffers (0.5%); 0 WAL file(s) added, 0 removed, 0 recycled; write=8.942 s, sync=0.015 s, total=8.966 s; sync files=47, longest=0.002 s, average=0.001 s; distance=423 kB, estimate=4321 kB; lsn=0/1A020E0, redo lsn=0/1A020A8
+2026-05-22 22:46:39.776 +07 [7751] LOG:  checkpoint starting: time
+2026-05-22 22:46:40.693 +07 [7751] LOG:  checkpoint complete: wrote 10 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.905 s, sync=0.005 s, total=0.917 s; sync files=10, longest=0.002 s, average=0.001 s; distance=3 kB, estimate=3889 kB; lsn=0/1A02F80, redo lsn=0/1A02F48
+2026-05-22 23:06:39.102 +07 [7751] LOG:  checkpoint starting: time
+2026-05-22 23:06:40.054 +07 [7751] LOG:  checkpoint complete: wrote 10 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.927 s, sync=0.005 s, total=0.953 s; sync files=10, longest=0.002 s, average=0.001 s; distance=3 kB, estimate=3501 kB; lsn=0/1A03ED0, redo lsn=0/1A03E98

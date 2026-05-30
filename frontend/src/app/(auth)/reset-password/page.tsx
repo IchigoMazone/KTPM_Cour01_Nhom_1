@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
+import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 import { GradientText } from "@/src/components/ui/gradient-text";
-import {
-  ResetPasswordField,
-  validateResetPasswordForm,
-} from "@/src/lib/validators/auth";
+import { validatePassword } from "@/src/lib/validators/auth";
+import { toast } from "sonner";
+import { API_BASE_URL } from "@/src/lib/config";
 
 const images = [
   "/download (5).jfif",
@@ -15,77 +16,30 @@ const images = [
   "/download (7).jfif",
 ];
 
-const emptyTouched = {
-  newPassword: false,
-  confirmPassword: false,
-};
+function ResetPasswordContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tokenFromUrl = searchParams.get("token") || "";
 
-function ValidationMessage({ message }: { message: string }) {
-  return (
-    <div
-      className={`overflow-hidden transition-all duration-300 ease-out ${
-        message ? "mt-0.5 max-h-5 opacity-100" : "mt-0 max-h-0 opacity-0"
-      }`}
-      aria-live="polite"
-    >
-      <p className="text-[11px] leading-4 text-red-400">{message}</p>
-    </div>
-  );
-}
-
-export default function Page() {
   const [currentImage, setCurrentImage] = useState(0);
   const [prevImage, setPrevImage] = useState<number | null>(null);
+  const [token, setToken] = useState(tokenFromUrl);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [touched, setTouched] = useState(emptyTouched);
-  const [activeErrorField, setActiveErrorField] =
-    useState<ResetPasswordField | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState({
+    token: "",
+    password: "",
+  });
 
-  const formValues = { newPassword, confirmPassword };
-  const formErrors = validateResetPasswordForm(formValues);
-  const isFormValid = !formErrors.newPassword && !formErrors.confirmPassword;
-  const activeError =
-    activeErrorField && touched[activeErrorField]
-      ? formErrors[activeErrorField]
-      : "";
-
-  const updateField = (field: ResetPasswordField, value: string) => {
-    if (field === "newPassword") {
-      setNewPassword(value);
-    } else {
-      setConfirmPassword(value);
+  useEffect(() => {
+    // Tự động đồng bộ token từ url nếu có thay đổi
+    if (tokenFromUrl) {
+      setToken(tokenFromUrl);
     }
-    setActiveErrorField(field);
-  };
-
-  const markFieldTouched = (field: ResetPasswordField) => {
-    setTouched((currentTouched) => ({
-      ...currentTouched,
-      [field]: true,
-    }));
-    setActiveErrorField(formErrors[field] ? field : null);
-  };
-
-  const handleResetPassword = () => {
-    setTouched({
-      newPassword: true,
-      confirmPassword: true,
-    });
-    setActiveErrorField(
-      formErrors.newPassword
-        ? "newPassword"
-        : formErrors.confirmPassword
-          ? "confirmPassword"
-          : null,
-    );
-
-    if (!isFormValid) return;
-
-    console.log("Call API RESET PASSWORD");
-  };
+  }, [tokenFromUrl]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -94,6 +48,58 @@ export default function Page() {
     }, 10000);
     return () => clearInterval(timer);
   }, [currentImage]);
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({ token: "", password: "" });
+
+    if (!token.trim()) {
+      setErrors((prev) => ({ ...prev, token: "Vui lòng nhập token xác thực." }));
+      return;
+    }
+
+    const passError = validatePassword(newPassword);
+    if (passError) {
+      setErrors((prev) => ({ ...prev, password: passError }));
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("Mật khẩu xác nhận không khớp.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          token: token.trim(),
+          password: newPassword,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success(data.message || "Đặt lại mật khẩu thành công!");
+        setTimeout(() => {
+          router.push("/login");
+        }, 1500);
+      } else {
+        toast.error(data.message || "Đổi mật khẩu thất bại. Mã xác thực không hợp lệ hoặc đã hết hạn.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể kết nối đến máy chủ.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const passwordMismatch = newPassword && confirmPassword && newPassword !== confirmPassword;
 
   return (
     <div
@@ -140,8 +146,7 @@ export default function Page() {
               lòng vẫn ấm áp
             </h1>
             <p className="text-sm text-cyan-100/70 leading-relaxed mb-8 max-w-xs">
-              Dù trời có lạnh đến đâu, một khởi đầu mới luôn mang theo hơi ấm
-              của hy vọng.
+              Dù trời có lạnh đến đâu, một khởi đầu mới luôn mang theo hơi ấm của hy vọng.
             </p>
 
             {/* Chấm chỉ báo */}
@@ -154,9 +159,7 @@ export default function Page() {
                     setCurrentImage(i);
                   }}
                   className={`h-1.5 rounded-full transition-all duration-500 ${
-                    i === currentImage
-                      ? "w-8 bg-cyan-300"
-                      : "w-1.5 bg-white/40"
+                    i === currentImage ? "w-8 bg-cyan-300" : "w-1.5 bg-white/40"
                   }`}
                 />
               ))}
@@ -165,9 +168,9 @@ export default function Page() {
         </div>
 
         {/* ── PHẢI: Form reset mật khẩu ── */}
-        <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 py-10 bg-slate-50">
+        <form onSubmit={handleReset} className="flex-1 flex flex-col justify-center px-8 sm:px-12 py-6 bg-slate-50 overflow-y-auto">
           {/* Tiêu đề */}
-          <div className="mb-8">
+          <div className="mb-6">
             <h2 className="text-2xl font-bold tracking-tight">
               <GradientText from="#0e7490" to="#1d4ed8">
                 Đặt lại mật khẩu
@@ -179,7 +182,29 @@ export default function Page() {
           </div>
 
           {/* Fields */}
-          <div className="space-y-4 mb-6">
+          <div className="space-y-3 mb-5">
+            {/* Token xác thực (chỉ hiện nếu không có trong URL) */}
+            {!tokenFromUrl && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-600 tracking-wide">
+                  Mã token xác thực
+                </label>
+                <input
+                  type="text"
+                  placeholder="Dán mã reset token của bạn vào đây"
+                  value={token}
+                  onChange={(e) => {
+                    setToken(e.target.value);
+                    setErrors((prev) => ({ ...prev, token: "" }));
+                  }}
+                  className="w-full h-10 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400 transition-all"
+                />
+                {errors.token && (
+                  <p className="text-xs text-red-500">{errors.token}</p>
+                )}
+              </div>
+            )}
+
             {/* Mật khẩu mới */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-slate-600 tracking-wide">
@@ -190,13 +215,10 @@ export default function Page() {
                   type={showNew ? "text" : "password"}
                   placeholder="••••••••"
                   value={newPassword}
-                  aria-invalid={
-                    activeErrorField === "newPassword" && Boolean(activeError)
-                  }
-                  aria-describedby="new-password-error"
-                  onChange={(e) => updateField("newPassword", e.target.value)}
-                  onFocus={() => setActiveErrorField("newPassword")}
-                  onBlur={() => markFieldTouched("newPassword")}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    setErrors((prev) => ({ ...prev, password: "" }));
+                  }}
                   className="w-full h-10 px-3 pr-10 rounded-md border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400 transition-all"
                 />
                 <button
@@ -204,20 +226,12 @@ export default function Page() {
                   onClick={() => setShowNew(!showNew)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                 >
-                  {showNew ? (
-                    <EyeOff size={16} strokeWidth={1.8} />
-                  ) : (
-                    <Eye size={16} strokeWidth={1.8} />
-                  )}
+                  {showNew ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
                 </button>
               </div>
-              <div id="new-password-error">
-                <ValidationMessage
-                  message={
-                    activeErrorField === "newPassword" ? activeError : ""
-                  }
-                />
-              </div>
+              {errors.password && (
+                <p className="text-xs text-red-500">{errors.password}</p>
+              )}
             </div>
 
             {/* Xác nhận mật khẩu */}
@@ -230,51 +244,34 @@ export default function Page() {
                   type={showConfirm ? "text" : "password"}
                   placeholder="••••••••"
                   value={confirmPassword}
-                  aria-invalid={
-                    activeErrorField === "confirmPassword" &&
-                    Boolean(activeError)
-                  }
-                  aria-describedby="confirm-password-error"
-                  onChange={(e) =>
-                    updateField("confirmPassword", e.target.value)
-                  }
-                  onFocus={() => setActiveErrorField("confirmPassword")}
-                  onBlur={() => markFieldTouched("confirmPassword")}
-                  className={`w-full h-10 px-3 pr-10 rounded-md border bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
-                    activeErrorField === "confirmPassword" && activeError
-                      ? "border-red-300 focus:ring-red-300/50 focus:border-red-400"
-                      : "border-slate-200 focus:ring-cyan-400/50 focus:border-cyan-400"
-                  }`}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full h-10 px-3 pr-10 rounded-md border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400 transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirm(!showConfirm)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                 >
-                  {showConfirm ? (
-                    <EyeOff size={16} strokeWidth={1.8} />
-                  ) : (
-                    <Eye size={16} strokeWidth={1.8} />
-                  )}
+                  {showConfirm ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
                 </button>
               </div>
-              <div id="confirm-password-error">
-                <ValidationMessage
-                  message={
-                    activeErrorField === "confirmPassword" ? activeError : ""
-                  }
-                />
-              </div>
+              {passwordMismatch && (
+                <p className="text-xs text-red-400">Mật khẩu xác nhận không khớp.</p>
+              )}
             </div>
           </div>
 
           {/* Nút xác nhận */}
           <button
-            disabled={!isFormValid}
-            onClick={handleResetPassword}
+            type="submit"
+            disabled={isLoading || passwordMismatch || !newPassword || !confirmPassword}
             className="w-full h-10 rounded-md bg-cyan-700 hover:bg-cyan-800 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] text-white text-sm font-semibold tracking-wide transition-all mb-4"
           >
-            Xác nhận đổi mật khẩu
+            {isLoading ? (
+              <SpokeSpinner />
+            ) : (
+              "Xác nhận đổi mật khẩu"
+            )}
           </button>
 
           {/* Divider */}
@@ -301,8 +298,23 @@ export default function Page() {
               Tạo tài khoản
             </Link>
           </p>
-        </div>
+        </form>
       </div>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+        <div className="flex flex-col items-center gap-3">
+          <div className="size-8 rounded-full border-4 border-slate-300 border-t-cyan-700 animate-spin" />
+          <p className="text-sm text-slate-500 font-medium">Đang tải...</p>
+        </div>
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

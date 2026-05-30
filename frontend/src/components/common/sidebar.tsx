@@ -1,5 +1,7 @@
 "use client";
 
+import { API_BASE_URL } from "@/src/lib/config";
+
 import Image from "next/image";
 import React, { useState } from "react";
 import { Bell, LogOut, Panda, PanelLeft, Settings } from "lucide-react";
@@ -10,15 +12,25 @@ import NotificationsDialog from "./notifications-dialog";
 import ProfileDialog from "./profile-dialog";
 import SettingsDialog from "./settings-dialog";
 import { useNavbarStore } from "@/src/context/useNavbarStore";
+import { useSettingsStore } from "@/src/context/useSettingsStore";
 import { menus } from "@/src/utils/routes";
 import { userMenus } from "@/src/utils/user-routes";
 
 type SidebarItem = (typeof menus)[number] | (typeof userMenus)[number];
 
+type CurrentUser = {
+  username: string;
+  role: string;
+  profile?: {
+    full_name?: string | null;
+  } | null;
+};
+
 export default function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const { open, toggle } = useNavbarStore();
+  const { deliveryEnabled } = useSettingsStore();
   const [activeX, setActiveX] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -26,9 +38,61 @@ export default function Sidebar() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const isExpanded = open || activeX;
   const isUserArea = pathname.startsWith("/user");
+  const fallbackAccountName = isUserArea ? "Khách hàng" : "Quản trị viên";
+  const fallbackRoleLabel = isUserArea ? "Tài khoản khách hàng" : "Tài khoản nội bộ";
+  const [accountName, setAccountName] = useState("");
+  const [accountRoleLabel, setAccountRoleLabel] = useState("");
 
-  const activeMenus = isUserArea ? userMenus : menus;
-  const accountName = isUserArea ? "Nguyễn Thị Hương" : "Trịnh Như Nhất";
+  React.useEffect(() => {
+    let ignore = false;
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      return;
+    }
+
+    const roleLabels: Record<string, string> = {
+      admin: "Tài khoản quản trị",
+      manager: "Tài khoản quản lý",
+      staff: "Tài khoản nhân viên",
+      driver: "Tài khoản giao nhận",
+      cashier: "Tài khoản thu ngân",
+      customer: "Tài khoản khách hàng",
+    };
+
+    fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return response.json() as Promise<CurrentUser>;
+      })
+      .then((user) => {
+        if (ignore || !user) return;
+        setAccountName(user.profile?.full_name || user.username);
+        setAccountRoleLabel(roleLabels[user.role] || "Tài khoản");
+      })
+      .catch(() => {
+        if (ignore) return;
+        setAccountName("");
+        setAccountRoleLabel("");
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [isUserArea]);
+
+  const activeMenus = (isUserArea ? userMenus : menus).filter((item) => {
+    if (item.path === "/home/delivery" && !deliveryEnabled) {
+      return false;
+    }
+    return true;
+  });
+  const displayAccountName = accountName || fallbackAccountName;
+  const displayRoleLabel = accountRoleLabel || fallbackRoleLabel;
 
   const iconSize = 18;
   const stroke = 1.5;
@@ -147,7 +211,7 @@ export default function Sidebar() {
                     />
                   </div>
                   <span className={isExpanded ? "flex min-w-0 items-center truncate pl-1 font-normal" : "hidden"}>
-                    {accountName}
+                    {displayAccountName}
                   </span>
                 </button>
               }
@@ -166,10 +230,10 @@ export default function Sidebar() {
                     />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium leading-5">
-                        {accountName}
+                        {displayAccountName}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {isUserArea ? "Tài khoản khách hàng" : "Tài khoản quản trị"}
+                        {displayRoleLabel}
                       </p>
                     </div>
                   </div>
@@ -233,15 +297,16 @@ export default function Sidebar() {
       </aside>
 
       <LogoutDialog
-        accountName={accountName}
+        accountName={displayAccountName}
         open={logoutOpen}
         onOpenChange={setLogoutOpen}
       />
       <ProfileDialog
-        accountName={accountName}
+        accountName={displayAccountName}
         isUserArea={isUserArea}
         open={profileOpen}
         onOpenChange={setProfileOpen}
+        onProfileUpdated={setAccountName}
       />
       <SettingsDialog
         isUserArea={isUserArea}

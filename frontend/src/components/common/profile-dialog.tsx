@@ -1,17 +1,21 @@
 "use client";
 
+import { API_BASE_URL } from "@/src/lib/config";
+
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   Building2,
-  CalendarDays,
   Camera,
+  CircleCheck,
   Mail,
-  MessageCircle,
   MapPin,
   Phone,
   ShieldCheck,
+  Sparkles,
   UserRound,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +34,51 @@ type ProfileDialogProps = {
   isUserArea: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onProfileUpdated?: (accountName: string) => void;
+};
+
+type UserProfile = {
+  profile_id: number;
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  loyalty_points: number;
+  member_tier: string;
+  special_notes?: string | null;
+};
+
+type CurrentUser = {
+  user_id: number;
+  username: string;
+  role: string;
+  is_active: boolean;
+  profile?: UserProfile | null;
+};
+
+type ProfileForm = {
+  full_name: string;
+  email: string;
+  phone: string;
+  address: string;
+  special_notes: string;
+};
+
+const emptyForm: ProfileForm = {
+  full_name: "",
+  email: "",
+  phone: "",
+  address: "",
+  special_notes: "",
+};
+
+const roleLabel: Record<string, string> = {
+  admin: "Quản trị viên",
+  manager: "Quản lý cửa hàng",
+  staff: "Nhân viên vận hành",
+  driver: "Nhân viên giao nhận",
+  cashier: "Thu ngân",
+  customer: "Khách hàng",
 };
 
 export default function ProfileDialog({
@@ -37,15 +86,127 @@ export default function ProfileDialog({
   isUserArea,
   open,
   onOpenChange,
+  onProfileUpdated,
 }: ProfileDialogProps) {
-  const accountType = isUserArea ? "Tài khoản khách hàng" : "Tài khoản quản trị";
-  const email = isUserArea ? "huong.nguyen@email.com" : "nhat.trinh@begausshop.vn";
-  const phone = isUserArea ? "0901 234 567" : "0902 888 168";
-  const zalo = isUserArea ? "0901 234 567" : "0902 888 168";
-  const birthday = isUserArea ? "12/08/1998" : "18/03/1997";
-  const location = isUserArea ? "12 Nguyễn Trãi, Quận 1" : "Panda Laundry Quận 1";
-  const role = isUserArea ? "Khách hàng thân thiết" : "Quản lý cửa hàng";
-  const code = isUserArea ? "KH-1048" : "NV-001";
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [form, setForm] = useState<ProfileForm>(emptyForm);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const accountType = isUserArea ? "Tài khoản khách hàng" : "Tài khoản nội bộ";
+  const displayName = form.full_name || accountName;
+  const displayRole = currentUser ? roleLabel[currentUser.role] || currentUser.role : accountType;
+  const accountCode = currentUser
+    ? `${isUserArea ? "KH" : "TK"}-${String(currentUser.user_id).padStart(4, "0")}`
+    : "Đang tải";
+
+  const statusItems = useMemo(() => {
+    const active = currentUser?.is_active ? "Đang hoạt động" : "Đã khóa";
+    const member = currentUser?.profile?.member_tier
+      ? `Hạng ${currentUser.profile.member_tier}`
+      : "Hồ sơ tiêu chuẩn";
+
+    return ["Đã xác minh", active, member];
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const fetchProfile = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Phiên đăng nhập đã hết hạn.");
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          toast.error(data.detail || "Không thể tải hồ sơ.");
+          return;
+        }
+
+        setCurrentUser(data);
+        setForm({
+          full_name: data.profile?.full_name || data.username || accountName,
+          email: data.profile?.email || "",
+          phone: data.profile?.phone || "",
+          address: data.profile?.address || "",
+          special_notes: data.profile?.special_notes || "",
+        });
+        onProfileUpdated?.(data.profile?.full_name || data.username || accountName);
+      } catch (error) {
+        console.error(error);
+        toast.error("Không thể kết nối đến máy chủ.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [accountName, onProfileUpdated, open]);
+
+  const updateField = (field: keyof ProfileForm, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSave = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast.error("Phiên đăng nhập đã hết hạn.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          full_name: form.full_name.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+          address: form.address.trim(),
+          special_notes: form.special_notes.trim(),
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        toast.error(data.detail || "Không thể lưu hồ sơ.");
+        return;
+      }
+
+      setCurrentUser(data);
+      setForm({
+        full_name: data.profile?.full_name || data.username || accountName,
+        email: data.profile?.email || "",
+        phone: data.profile?.phone || "",
+        address: data.profile?.address || "",
+        special_notes: data.profile?.special_notes || "",
+      });
+      onProfileUpdated?.(data.profile?.full_name || data.username || accountName);
+      toast.success("Đã lưu hồ sơ.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể kết nối đến máy chủ.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -70,12 +231,12 @@ export default function ProfileDialog({
             </div>
             <div className="min-w-0">
               <DialogTitle className="truncate text-base font-semibold leading-6">
-                {accountName}
+                {isLoading ? "Đang tải hồ sơ..." : displayName}
               </DialogTitle>
               <DialogDescription className="text-sm text-muted-foreground">
-                {accountType} · {code}
+                {accountType} · {accountCode}
               </DialogDescription>
-              <p className="mt-1 text-xs text-muted-foreground">{role}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{displayRole}</p>
             </div>
           </div>
         </DialogHeader>
@@ -86,47 +247,75 @@ export default function ProfileDialog({
               <Label className="text-xs text-muted-foreground">Họ tên</Label>
               <div className="relative">
                 <UserRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input defaultValue={accountName} className="h-10 rounded-lg pl-9" />
+                <Input
+                  value={form.full_name}
+                  onChange={(e) => updateField("full_name", e.target.value)}
+                  disabled={isLoading}
+                  className="h-10 rounded-lg pl-9"
+                />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Vai trò</Label>
+              <Label className="text-xs text-muted-foreground">Tên đăng nhập</Label>
               <div className="relative">
                 <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input defaultValue={role} className="h-10 rounded-lg pl-9" />
+                <Input
+                  value={currentUser?.username || ""}
+                  disabled
+                  className="h-10 rounded-lg bg-muted/40 pl-9"
+                />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Email</Label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input defaultValue={email} className="h-10 rounded-lg pl-9" />
+                <Input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => updateField("email", e.target.value)}
+                  disabled={isLoading}
+                  className="h-10 rounded-lg pl-9"
+                />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Số điện thoại</Label>
               <div className="relative">
                 <Phone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input defaultValue={phone} className="h-10 rounded-lg pl-9" />
+                <Input
+                  value={form.phone}
+                  onChange={(e) => updateField("phone", e.target.value)}
+                  disabled={isLoading}
+                  className="h-10 rounded-lg pl-9"
+                />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Zalo</Label>
+              <Label className="text-xs text-muted-foreground">Vai trò</Label>
               <div className="relative">
-                <MessageCircle className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input defaultValue={zalo} className="h-10 rounded-lg pl-9" />
+                <CircleCheck className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={displayRole} disabled className="h-10 rounded-lg bg-muted/40 pl-9" />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Ngày sinh</Label>
+              <Label className="text-xs text-muted-foreground">Điểm / hạng</Label>
               <div className="relative">
-                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input defaultValue={birthday} className="h-10 rounded-lg pl-9" />
+                <Sparkles className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={
+                    currentUser?.profile
+                      ? `${currentUser.profile.loyalty_points} điểm · ${currentUser.profile.member_tier}`
+                      : "Chưa có dữ liệu"
+                  }
+                  disabled
+                  className="h-10 rounded-lg bg-muted/40 pl-9"
+                />
               </div>
             </div>
             <div className="space-y-1.5 md:col-span-2">
               <Label className="text-xs text-muted-foreground">
-                {isUserArea ? "Địa chỉ mặc định" : "Chi nhánh làm việc"}
+                {isUserArea ? "Địa chỉ mặc định" : "Chi nhánh / địa chỉ"}
               </Label>
               <div className="relative">
                 {isUserArea ? (
@@ -134,15 +323,30 @@ export default function ProfileDialog({
                 ) : (
                   <Building2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 )}
-                <Input defaultValue={location} className="h-10 rounded-lg pl-9" />
+                <Input
+                  value={form.address}
+                  onChange={(e) => updateField("address", e.target.value)}
+                  disabled={isLoading}
+                  className="h-10 rounded-lg pl-9"
+                />
               </div>
+            </div>
+            <div className="space-y-1.5 md:col-span-2">
+              <Label className="text-xs text-muted-foreground">Ghi chú</Label>
+              <Input
+                value={form.special_notes}
+                onChange={(e) => updateField("special_notes", e.target.value)}
+                disabled={isLoading}
+                placeholder="Ví dụ: dị ứng hóa chất, yêu cầu riêng..."
+                className="h-10 rounded-lg"
+              />
             </div>
           </div>
 
           <div className="mt-4 rounded-lg border border-black/[0.06] bg-[#fafafa] p-3">
             <p className="text-sm font-medium">Trạng thái tài khoản</p>
             <div className="mt-3 grid gap-2 md:grid-cols-3">
-              {["Đã xác minh", "Đang hoạt động", "Bảo mật tốt"].map((item) => (
+              {statusItems.map((item) => (
                 <div
                   key={item}
                   className="rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-xs font-medium"
@@ -160,8 +364,13 @@ export default function ProfileDialog({
               Đóng
             </Button>
           </DialogClose>
-          <Button className="h-8 rounded-lg bg-[#1f1f1f] px-3 text-sm text-white shadow-sm hover:bg-black sm:w-auto">
-            Lưu thay đổi
+          <Button
+            type="button"
+            disabled={isLoading || isSaving}
+            onClick={handleSave}
+            className="h-8 rounded-lg bg-[#1f1f1f] px-3 text-sm text-white shadow-sm hover:bg-black disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+          >
+            {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
           </Button>
         </DialogFooter>
       </DialogContent>
