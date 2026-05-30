@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import React from "react";
 import Sidebar from "@/src/components/common/sidebar";
 import Search from "@/src/components/common/search";
 
@@ -13,25 +12,6 @@ export default function HomeLayout({
   children: React.ReactNode;
 }) {
   const { open, toggle } = useNavbarStore();
-  const router = useRouter();
-  const [authorized, setAuthorized] = useState(false);
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const role = localStorage.getItem("role");
-
-    if (!token) {
-      router.push("/login");
-    } else if (role !== "admin") {
-      router.push("/user");
-    } else {
-      setAuthorized(true);
-    }
-  }, [router]);
-
-  if (!authorized) {
-    return null;
-  }
 
   return (
     <div className="flex h-dvh min-w-0 overflow-hidden">
