@@ -1,278 +1,333 @@
 "use client";
 
-import React, { useState } from "react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { Clock, Package, Plus, TrendingUp, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
+import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 import {
   Table,
-  TableHeader,
-  TableRow,
-  TableHead,
   TableBody,
   TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Plus, X, ClipboardEdit, Clock, TrendingUp } from "lucide-react";
+  PageShell,
+  PaginationFooter,
+  SectionCard,
+  StatCard,
+  StatusBadge,
+} from "../_components/dashboard-primitives";
 
-interface Employee {
-  id: number;
-  name: string;
-  role: string;
-  shift: string; // "Sáng" | "Chiều" | "Tối" | "-"
-  productivity: number; // đơn hoàn thành / ngày
-}
-
-const SHIFT_OPTS = ["Sáng", "Chiều", "Tối"];
-
-const seedEmployees: Employee[] = [
-  { id: 1, name: "Nguyễn Văn A", role: "Thợ giặt", shift: "Sáng", productivity: 30 },
-  { id: 2, name: "Trần Thị B", role: "Gấp đồ", shift: "Chiều", productivity: 25 },
-  { id: 3, name: "Lê Hoàng C", role: "Giao nhận", shift: "Tối", productivity: 18 },
-  { id: 4, name: "Phạm Duy D", role: "Thu ngân", shift: "-", productivity: 0 },
+const employees = [
+  ["Nguyễn Văn A", "Giặt", "Sáng", "32 đơn", "4.8/5", "Hoạt động"],
+  ["Trần Thị B", "Gấp/Là", "Chiều", "25 đơn", "4.7/5", "Hoạt động"],
+  ["Lê Hoàng C", "Giao nhận", "Tối", "18 chuyến", "4.6/5", "Hoạt động"],
+  ["Phạm Duy D", "Thu ngân", "Sáng", "42 giao dịch", "-", "Nghỉ phép"],
 ];
 
-export default function EmployeeManagement() {
-  const [employees, setEmployees] = useState<Employee[]>(seedEmployees);
+const shifts = [
+  ["Thứ 2", "A, D", "B", "C"],
+  ["Thứ 3", "A", "B, D", "C"],
+  ["Thứ 4", "A, B", "D", "C"],
+  ["Thứ 5", "D", "A, B", "C"],
+];
 
-  // add / edit modal
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Employee | null>(null);
-  const [empName, setEmpName] = useState("");
-  const [empRole, setEmpRole] = useState("");
+const supplies = [
+  ["Hóa chất giặt", "25 kg", "10 kg", "Ổn định"],
+  ["Nước xả", "6 lít", "8 lít", "Sắp hết"],
+  ["Túi đựng", "120 cái", "50 cái", "Ổn định"],
+  ["Móc áo", "75 cái", "100 cái", "Sắp hết"],
+];
 
-  // shift modal
-  const [showShift, setShowShift] = useState(false);
-  const [shiftEmp, setShiftEmp] = useState<Employee | null>(null);
-  const [newShift, setNewShift] = useState<string>(SHIFT_OPTS[0]);
+const stockHistory = [
+  ["16/05/2026", "Nước xả", "+12 lít", "Nhà cung cấp CleanPro", "720.000đ"],
+  ["15/05/2026", "Túi đựng", "+200 cái", "Kho tổng", "460.000đ"],
+  ["12/05/2026", "Hóa chất giặt", "+30 kg", "Nhà cung cấp EcoWash", "1.800.000đ"],
+];
 
-  // productivity modal
-  const [showProd, setShowProd] = useState(false);
-  const [prodEmp, setProdEmp] = useState<Employee | null>(null);
-  const [prodNumber, setProdNumber] = useState("0");
+const purchaseStats = [
+  ["Hóa chất giặt", "EcoWash", "90 kg", "3 lần", "5.400.000đ"],
+  ["Nước xả", "CleanPro", "42 lít", "4 lần", "2.520.000đ"],
+  ["Túi đựng", "Kho tổng", "600 cái", "3 lần", "1.380.000đ"],
+  ["Móc áo", "Nhựa Minh An", "500 cái", "2 lần", "1.250.000đ"],
+];
 
-  const openNew = () => {
-    setEditing(null);
-    setEmpName("");
-    setEmpRole("");
-    setShowForm(true);
-  };
+const purchaseSummary = [
+  ["Tổng chi vật tư", "10.550.000đ"],
+  ["Nhà cung cấp", "4"],
+  ["Lượt nhập", "12"],
+  ["Vật tư sắp cần mua", "2"],
+];
 
-  const openEdit = (e: Employee) => {
-    setEditing(e);
-    setEmpName(e.name);
-    setEmpRole(e.role);
-    setShowForm(true);
-  };
-
-  const saveEmp = () => {
-    if (!empName.trim() || !empRole.trim()) return;
-    const emp: Employee = {
-      id: editing ? editing.id : Date.now(),
-      name: empName,
-      role: empRole,
-      shift: editing ? editing.shift : "-",
-      productivity: editing ? editing.productivity : 0,
-    };
-    setEmployees((prev) =>
-      editing ? prev.map((x) => (x.id === emp.id ? emp : x)) : [...prev, emp]
-    );
-    setShowForm(false);
-  };
-
-  const openShiftModal = (e: Employee) => {
-    setShiftEmp(e);
-    setNewShift(e.shift === "-" ? SHIFT_OPTS[0] : e.shift);
-    setShowShift(true);
-  };
-
-  const assignShift = () => {
-    if (!shiftEmp) return;
-    setEmployees((prev) =>
-      prev.map((x) => (x.id === shiftEmp.id ? { ...x, shift: newShift } : x))
-    );
-    setShowShift(false);
-  };
-
-  const openProdModal = (e: Employee) => {
-    setProdEmp(e);
-    setProdNumber(String(e.productivity));
-    setShowProd(true);
-  };
-
-  const saveProd = () => {
-    if (!prodEmp) return;
-    const num = parseInt(prodNumber, 10);
-    if (isNaN(num) || num < 0) return;
-    setEmployees((prev) =>
-      prev.map((x) => (x.id === prodEmp.id ? { ...x, productivity: num } : x))
-    );
-    setShowProd(false);
-  };
+export default function StaffOperationsPage() {
+  const [tab, setTab] = useState("Nhân viên");
+  const [page, setPage] = useState(1);
+  const [openForm, setOpenForm] = useState(false);
+  const range = useDashboardTimeRangeStore((state) => state.range);
+  const rangeLabel = formatRange(normalizeRange(range));
 
   return (
-    <div className="flex flex-col gap-8 p-6 w-full">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold">Nhân viên</h2>
-          <p className="text-muted-foreground text-sm">Danh sách, phân ca & năng suất</p>
-        </div>
-        <Button className="gap-2" onClick={openNew}>
-          <Plus className="h-4 w-4" /> Thêm nhân viên
+    <PageShell
+      title="Vận Hành Nội Bộ"
+      description="Quản lý nhân sự, ca làm, năng suất và kho vật tư."
+      action={
+        <Button className="bg-neutral-900 text-white hover:bg-neutral-800" onClick={() => setOpenForm(true)}>
+          <Plus className="mr-2 size-4" />
+          Thêm mới
         </Button>
+      }
+    >
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard label="Nhân viên" value="12" hint="3 vai trò vận hành" icon={Users} />
+        <StatCard label="Ca hôm nay" value="3" hint="Sáng · Chiều · Tối" icon={Clock} />
+        <StatCard label="Năng suất" value="128 đơn" hint={`Theo ${rangeLabel}`} icon={TrendingUp} tone="success" />
+        <StatCard label="Vật tư sắp hết" value="2" hint="Nước xả, móc áo" icon={Package} tone="danger" />
       </div>
 
-      {/* Table */}
-      <Card className="shadow-sm border overflow-x-auto">
-        <CardContent className="p-0">
-          <Table className="min-w-[800px]">
-            <colgroup>
-              <col className="w-56" />
-              <col className="w-40" />
-              <col className="w-28" />
-              <col className="w-28" />
-              <col className="w-28" />
-            </colgroup>
+      <div className="flex flex-wrap items-center gap-2">
+        {["Nhân viên", "Ca làm việc", "Năng suất", "Kho & Vật tư"].map((item) => (
+          <Button
+            key={item}
+            variant={tab === item ? "default" : "outline"}
+            size="sm"
+            onClick={() => setTab(item)}
+          >
+            {item}
+          </Button>
+        ))}
+      </div>
+
+      {(tab === "Nhân viên" || tab === "Năng suất") && (
+        <SectionCard title={tab === "Nhân viên" ? "Danh sách nhân viên" : "Năng suất nhân viên"}>
+          <Table className="min-w-[820px]">
             <TableHeader>
-              <TableRow className="bg-muted/50 text-left">
-                <TableHead>Họ tên</TableHead>
-                <TableHead>Chức vụ</TableHead>
-                <TableHead>Ca hiện tại</TableHead>
+              <TableRow className="bg-muted/30">
+                <TableHead>Tên</TableHead>
+                <TableHead>Vai trò</TableHead>
+                <TableHead>Ca</TableHead>
                 <TableHead>Năng suất</TableHead>
-                <TableHead className="text-right">Thao tác</TableHead>
+                <TableHead>Đánh giá</TableHead>
+                <TableHead>Trạng thái</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {employees.map((e) => (
-                <TableRow key={e.id} className="border-b hover:bg-muted/50">
-                  <TableCell className="font-medium cursor-pointer" onClick={() => openEdit(e)}>
-                    {e.name}
-                  </TableCell>
-                  <TableCell>{e.role}</TableCell>
-                  <TableCell>
-                    {e.shift === "-" ? (
-                      <Badge variant="outline">Chưa phân</Badge>
-                    ) : (
-                      <Badge variant="secondary">{e.shift}</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>{e.productivity}</TableCell>
-                  <TableCell className="flex gap-2 justify-end">
-                    <Button variant="outline" size="icon" title="Phân ca" onClick={() => openShiftModal(e)}>
-                      <Clock className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="icon" title="Năng suất" onClick={() => openProdModal(e)}>
-                      <TrendingUp className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+              {employees.map((row) => (
+                <TableRow key={row[0]}>
+                  {row.map((cell, index) => (
+                    <TableCell key={`${row[0]}-${index}`}>
+                      {index === 5 ? (
+                        <StatusBadge tone={cell === "Hoạt động" ? "success" : "warning"}>
+                          {cell}
+                        </StatusBadge>
+                      ) : (
+                        cell
+                      )}
+                    </TableCell>
+                  ))}
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
-
-      {/* Add/Edit modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-medium">
-                {editing ? "Cập nhật nhân viên" : "Thêm nhân viên"}
-              </CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setShowForm(false)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Họ tên</Label>
-                <Input value={empName} onChange={(e) => setEmpName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Chức vụ</Label>
-                <Input value={empRole} onChange={(e) => setEmpRole(e.target.value)} />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full" onClick={saveEmp}>
-                {editing ? "Lưu" : "Thêm"}
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
+          <PaginationFooter
+            page={page}
+            pageCount={3}
+            total={12}
+            onPrev={() => setPage((current) => Math.max(current - 1, 1))}
+            onNext={() => setPage((current) => Math.min(current + 1, 3))}
+          />
+        </SectionCard>
       )}
 
-      {/* Shift modal */}
-      {showShift && shiftEmp && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
-          <Card className="w-full max-w-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-medium">Phân ca cho {shiftEmp.name}</CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setShowShift(false)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Select value={newShift} onValueChange={setNewShift}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Chọn ca" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SHIFT_OPTS.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
+      {tab === "Ca làm việc" && (
+        <SectionCard title="Lịch ca theo tuần">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead>Ngày</TableHead>
+                <TableHead>Ca sáng</TableHead>
+                <TableHead>Ca chiều</TableHead>
+                <TableHead>Ca tối</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {shifts.map((row) => (
+                <TableRow key={row[0]}>
+                  {row.map((cell) => <TableCell key={cell}>{cell}</TableCell>)}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </SectionCard>
+      )}
+
+      {tab === "Kho & Vật tư" && (
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-4">
+            {purchaseSummary.map(([label, value]) => (
+              <div key={label} className="rounded-xl border bg-card p-4">
+                <p className="text-sm text-muted-foreground">{label}</p>
+                <p className="mt-2 text-xl font-semibold">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
+            <SectionCard title="Tồn kho hiện tại">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/30">
+                    <TableHead>Vật tư</TableHead>
+                    <TableHead>Tồn kho</TableHead>
+                    <TableHead>Ngưỡng</TableHead>
+                    <TableHead>Cảnh báo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {supplies.map((row) => (
+                    <TableRow key={row[0]}>
+                      <TableCell>{row[0]}</TableCell>
+                      <TableCell>{row[1]}</TableCell>
+                      <TableCell>{row[2]}</TableCell>
+                      <TableCell>
+                        <StatusBadge tone={row[3] === "Sắp hết" ? "danger" : "success"}>
+                          {row[3]}
+                        </StatusBadge>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full" onClick={assignShift}>
-                Lưu
-              </Button>
-            </CardFooter>
-          </Card>
+                </TableBody>
+              </Table>
+            </SectionCard>
+
+            <SectionCard title="Lịch sử nhập kho">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/30">
+                    <TableHead>Ngày</TableHead>
+                    <TableHead>Vật tư</TableHead>
+                    <TableHead>Số lượng</TableHead>
+                    <TableHead>Giá</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stockHistory.map((row) => (
+                    <TableRow key={`${row[0]}-${row[1]}`}>
+                      <TableCell>{row[0]}</TableCell>
+                      <TableCell>{row[1]}</TableCell>
+                      <TableCell>{row[2]}</TableCell>
+                      <TableCell>{row[4]}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </SectionCard>
+          </div>
+
+          <SectionCard
+            title="Thống kê vật tư đã mua"
+            description={`Tổng hợp theo ${rangeLabel} để đối soát chi phí vật tư.`}
+          >
+            <Table className="min-w-[780px]">
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead>Vật tư</TableHead>
+                  <TableHead>Nhà cung cấp</TableHead>
+                  <TableHead>Tổng đã mua</TableHead>
+                  <TableHead>Số lần nhập</TableHead>
+                  <TableHead>Chi phí</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {purchaseStats.map((row) => (
+                  <TableRow key={row[0]}>
+                    {row.map((cell) => (
+                      <TableCell key={cell}>{cell}</TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </SectionCard>
         </div>
       )}
 
-      {/* Productivity modal */}
-      {showProd && prodEmp && (
-        <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
-          <Card className="w-full max-w-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-medium">Năng suất {prodEmp.name}</CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setShowProd(false)}>
-                <X className="h-4 w-4" />
+      <div className="grid gap-4 xl:grid-cols-3">
+        <SectionCard title="Chấm công hôm nay">
+          <div className="space-y-3 p-4 text-sm">
+            {[
+              ["Nguyễn Văn A", "07:55", "Đúng giờ"],
+              ["Trần Thị B", "13:05", "Trễ 5 phút"],
+              ["Lê Hoàng C", "17:50", "Đúng giờ"],
+            ].map(([name, time, status]) => (
+              <div key={name} className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="font-medium">{name}</p>
+                  <p className="text-muted-foreground">Check-in {time}</p>
+                </div>
+                <StatusBadge tone={status.includes("Trễ") ? "warning" : "success"}>{status}</StatusBadge>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Phân việc theo ca">
+          <div className="space-y-3 p-4 text-sm">
+            {[
+              ["Ca sáng", "Tiếp nhận 36 đơn · Giặt 210kg"],
+              ["Ca chiều", "Sấy/Gấp 48 đơn · Giao 12 chuyến"],
+              ["Ca tối", "Chốt đơn · Kiểm kho · Dọn máy"],
+            ].map(([shift, work]) => (
+              <div key={shift} className="rounded-lg border p-3">
+                <p className="font-medium">{shift}</p>
+                <p className="text-muted-foreground">{work}</p>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Yêu cầu mua vật tư">
+          <div className="space-y-3 p-4 text-sm">
+            {[
+              ["Nước xả", "Đề xuất mua 20 lít", "Cao"],
+              ["Móc áo", "Đề xuất mua 200 cái", "Trung bình"],
+              ["Bao bì", "Đủ dùng 5 ngày", "Thấp"],
+            ].map(([item, desc, level]) => (
+              <div key={item} className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="font-medium">{item}</p>
+                  <p className="text-muted-foreground">{desc}</p>
+                </div>
+                <StatusBadge tone={level === "Cao" ? "danger" : level === "Trung bình" ? "warning" : "default"}>{level}</StatusBadge>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      </div>
+
+      {openForm && (
+        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-xl border bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Thêm nhân sự / vật tư</h2>
+              <Button variant="ghost" size="sm" onClick={() => setOpenForm(false)}>Đóng</Button>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input placeholder="Tên nhân viên / vật tư" />
+              <Input placeholder="Vai trò / đơn vị tính" />
+              <Input placeholder="Ca làm / tồn kho" />
+              <Input placeholder="SĐT / ngưỡng cảnh báo" />
+              <Input className="md:col-span-2" placeholder="Ghi chú vận hành" />
+              <Button className="md:col-span-2 bg-neutral-900 text-white hover:bg-neutral-800">
+                Lưu thông tin
               </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Label>Số đơn hoàn thành hôm nay</Label>
-              <Input type="number" value={prodNumber} onChange={(e) => setProdNumber(e.target.value)} />
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full" onClick={saveProd}>
-                Lưu
-              </Button>
-            </CardFooter>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

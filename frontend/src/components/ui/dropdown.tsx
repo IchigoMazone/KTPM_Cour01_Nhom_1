@@ -40,7 +40,7 @@ export default function Dropdown({
 
   const style: React.CSSProperties = {
     position: "absolute",
-    zIndex: 50,
+    zIndex: 1300,
   };
 
   if (side === "top") style.bottom = `calc(100% + ${gap}px)`;
@@ -67,15 +67,18 @@ export default function Dropdown({
   }
 
   return (
-    <div ref={wrapRef} className="relative inline-flex">
-      <div onClick={() => setOpen((v) => !v)} className="cursor-pointer">
+    <div ref={wrapRef} className="relative inline-flex min-w-0">
+      <div
+        onClick={() => setOpen((v) => !v)}
+        className="min-w-0 cursor-pointer"
+      >
         {trigger}
       </div>
 
       {open && (
         <div
           style={style}
-          className={`min-w-[160px] bg-white border border-gray-200 rounded-lg shadow-lg p-1 ${className}`}
+          className={`min-w-[204px] overflow-hidden rounded-xl border border-black/[0.06] bg-white p-1 text-[#0d0d0d] shadow-[0_8px_20px_rgba(0,0,0,0.08)] animate-in fade-in-0 zoom-in-95 duration-100 ${className}`}
         >
           {children({ close })}
         </div>
