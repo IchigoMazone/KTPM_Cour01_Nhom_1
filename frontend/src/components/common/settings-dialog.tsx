@@ -8,6 +8,7 @@ import {
   Mail,
   MessageCircle,
   Moon,
+  Route,
   ShieldCheck,
   Smartphone,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useDashboardSettingsStore } from "@/src/context/useDashboardSettingsStore";
 
 type SettingsDialogProps = {
   isUserArea: boolean;
@@ -51,6 +53,7 @@ export default function SettingsDialog({
   onOpenChange,
 }: SettingsDialogProps) {
   const toggles = isUserArea ? userToggles : adminToggles;
+  const { deliveryEnabled, setDeliveryEnabled } = useDashboardSettingsStore();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -79,6 +82,23 @@ export default function SettingsDialog({
                 <Switch defaultChecked={item.enabled} />
               </div>
             ))}
+            {!isUserArea && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-black/[0.06] px-3 py-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <Route className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0">
+                    <span className="block text-sm">Hiển thị mục Giao nhận</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      Tắt để ẩn lịch giao nhận khỏi dashboard
+                    </span>
+                  </span>
+                </div>
+                <Switch
+                  checked={deliveryEnabled}
+                  onCheckedChange={setDeliveryEnabled}
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">

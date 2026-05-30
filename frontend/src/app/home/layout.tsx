@@ -24,7 +24,7 @@ export default function HomeLayout({
           ></div>
         )}
         <Search />
-        <main className="min-w-0 flex-1 overflow-y-auto bg-background">
+        <main className="min-w-0 flex-1 overflow-hidden bg-background flex flex-col">
           {children}
         </main>
       </div>

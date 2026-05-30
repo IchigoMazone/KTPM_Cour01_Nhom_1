@@ -45,7 +45,7 @@ export default function Sidebar() {
         ${!isExpanded ? "w-[57px]" : "w-[min(260px,80vw)]"}
         fixed left-0 top-0 z-50 flex-col
         h-screen max-w-[80vw]
-        border-r border-gray-200 bg-white/95 font-sans text-[14px] font-normal text-[#0d0d0d] backdrop-blur
+        border-r border-slate-200 bg-white/95 font-sans text-[14px] font-normal text-[#0d0d0d] backdrop-blur
         will-change-[width]
         transition-[width,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
         ${open ? "" : "hidden xl:flex"}
@@ -96,7 +96,7 @@ export default function Sidebar() {
               )}
             </div>
 
-            <div className="flex max-h-[calc(100dvh-140px)] flex-col gap-1 overflow-y-auto pt-3">
+            <div className="flex max-h-[calc(100dvh-140px)] flex-col gap-1 overflow-y-auto pt-8">
               {activeMenus.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item);
@@ -108,18 +108,18 @@ export default function Sidebar() {
                       router.push(item.path);
                       if (open) toggle();
                     }}
-                    className={`mx-2 flex h-10 min-w-0 cursor-pointer items-center rounded-xl transition-colors ${
+                    className={`mx-2 flex h-10 min-w-0 cursor-pointer items-center rounded-lg transition-all ${
                       active
-                        ? "bg-[#f3f3f3] text-black"
-                        : "text-[#0d0d0d] hover:bg-[#f3f3f3] hover:text-black"
+                        ? "bg-slate-100 text-slate-900 font-semibold"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                     }`}
                     title={!isExpanded ? item.label : undefined}
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
-                      <Icon size={iconSize} strokeWidth={stroke} />
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
+                      <Icon size={iconSize} strokeWidth={stroke} className={active ? "text-slate-900" : "text-slate-500"} />
                     </div>
                     <span
-                      className={`${isExpanded ? "block min-w-0 truncate opacity-100" : "hidden opacity-0"} pl-1 font-normal transition-opacity duration-200`}
+                      className={`${isExpanded ? "block min-w-0 truncate opacity-100" : "hidden opacity-0"} pl-1 font-medium transition-opacity duration-200`}
                     >
                       {item.label}
                     </span>
@@ -130,13 +130,13 @@ export default function Sidebar() {
           </div>
 
           <div
-            className={`mx-2 my-3 rounded-xl p-0.5 transition-colors ${
-              isExpanded ? "hover:bg-[#f3f3f3]" : ""
+            className={`mx-2 my-3 rounded-lg p-0.5 transition-colors ${
+              isExpanded ? "hover:bg-slate-50" : ""
             }`}
           >
             <Dropdown
               trigger={
-                <button className="flex h-10 min-w-0 cursor-pointer items-center rounded-[10px] text-[#0d0d0d]">
+                <button className="flex h-10 min-w-0 cursor-pointer items-center rounded-lg text-slate-600">
                   <div className="flex h-10 w-10 items-center justify-center">
                     <Image
                       src="/default_avatar.jfif"
@@ -177,7 +177,7 @@ export default function Sidebar() {
                     <span className="block h-px bg-gray-100" />
                   </div>
                   <button
-                    className="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-[#0d0d0d] transition-colors hover:bg-[#f5f5f5]"
+                    className="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
                     onClick={() => {
                       close();
                       setProfileOpen(true);
@@ -193,7 +193,7 @@ export default function Sidebar() {
                     <span>Hồ sơ</span>
                   </button>
                   <button
-                    className="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-[#0d0d0d] transition-colors hover:bg-[#f5f5f5]"
+                    className="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
                     onClick={() => {
                       close();
                       setSettingsOpen(true);
@@ -203,7 +203,7 @@ export default function Sidebar() {
                     <span>Cài đặt</span>
                   </button>
                   <button
-                    className="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-[#0d0d0d] transition-colors hover:bg-[#f5f5f5]"
+                    className="flex w-full cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
                     onClick={() => {
                       close();
                       setNotificationsOpen(true);

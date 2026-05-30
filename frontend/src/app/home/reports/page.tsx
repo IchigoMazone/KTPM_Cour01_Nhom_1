@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
+import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 import {
   Bar,
   BarChart,
@@ -27,8 +29,6 @@ import {
 } from "@/components/ui/table";
 import {
   PageShell,
-  Period,
-  PeriodTabs,
   SectionCard,
   StatusBadge,
 } from "../_components/dashboard-primitives";
@@ -62,7 +62,8 @@ const complaints = [
 
 export default function ReportsSettingsPage() {
   const [tab, setTab] = useState("Báo cáo");
-  const [period, setPeriod] = useState<Period>("Tháng");
+  const range = useDashboardTimeRangeStore((state) => state.range);
+  const rangeLabel = formatRange(normalizeRange(range));
 
   return (
     <PageShell
@@ -81,8 +82,11 @@ export default function ReportsSettingsPage() {
         </div>
       }
     >
+      <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+        Đang áp dụng thời gian chung: {rangeLabel}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
-        <PeriodTabs value={period} onChange={setPeriod} />
         {["Báo cáo", "Cài đặt cửa hàng", "Phân quyền", "Tích hợp & Thông báo", "Hỗ trợ"].map((item) => (
           <Button
             key={item}
@@ -97,7 +101,7 @@ export default function ReportsSettingsPage() {
 
       {tab === "Báo cáo" && (
         <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-          <SectionCard title="Dịch vụ phổ biến">
+          <SectionCard title="Dịch vụ phổ biến" description={rangeLabel}>
             <div className="h-[320px] p-4">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={reportData}>

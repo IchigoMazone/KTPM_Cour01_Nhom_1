@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarDays, MapPin, Plus, Route, Truck } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarDays, MapPin, Plus, Route, Truck } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { useDashboardSettingsStore } from "@/src/context/useDashboardSettingsStore";
+import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
+import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 import {
   Table,
   TableBody,
@@ -16,8 +20,6 @@ import {
 import {
   PageShell,
   PaginationFooter,
-  Period,
-  PeriodTabs,
   SectionCard,
   StatCard,
   StatusBadge,
@@ -44,55 +46,99 @@ const slots = [
 ];
 
 export default function DeliveryPage() {
-  const [period, setPeriod] = useState<Period>("Ngày");
+  const router = useRouter();
   const [page, setPage] = useState(1);
+  const deliveryEnabled = useDashboardSettingsStore((state) => state.deliveryEnabled);
+  const range = useDashboardTimeRangeStore((state) => state.range);
+  const rangeLabel = formatRange(normalizeRange(range));
 
   return (
     <PageShell
       title="Quản lý Giao Nhận"
       description="Điều phối lấy đồ, trả đồ, tài xế và tuyến đường trong ngày."
       action={
-        <Button className="bg-neutral-900 text-white hover:bg-neutral-800">
-          <Plus className="mr-2 size-4" />
-          Thêm chuyến
-        </Button>
+        deliveryEnabled ? (
+          <Button className="bg-neutral-900 text-white hover:bg-neutral-800">
+            <Plus className="mr-2 size-4" />
+            Thêm chuyến
+          </Button>
+        ) : null
       }
     >
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Chuyến hôm nay" value="18" hint="9 lấy · 9 trả" icon={Truck} />
-        <StatCard label="Đúng hẹn" value="92%" hint="2 chuyến có nguy cơ trễ" icon={CalendarDays} tone="success" />
-        <StatCard label="Tài xế hoạt động" value="3/4" hint="1 tài xế dự phòng" icon={Route} />
-      </div>
-
-      <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 md:flex-row md:items-center md:justify-between">
-        <PeriodTabs value={period} onChange={setPeriod} />
-        <div className="text-sm text-muted-foreground">
-          Đang xem lịch giao nhận theo {period.toLowerCase()} · có {trips.length} chuyến nổi bật
-        </div>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
-        <SectionCard title="Lịch giao nhận" description="Xem nhanh theo ngày.">
-          <div className="space-y-3 p-4">
-            {slots.map(([time, type, order, className]) => (
-              <button
-                key={`${time}-${order}`}
-                className="flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors hover:border-neutral-300"
-              >
-                <div>
-                  <p className="font-medium">{time}</p>
-                  <p className="text-sm text-muted-foreground">{order}</p>
-                </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-medium ${className}`}>
-                  {type}
-                </span>
-              </button>
-            ))}
+      {!deliveryEnabled && (
+        <div className="grid min-h-[calc(100dvh-220px)] place-items-center rounded-lg border border-dashed border-neutral-300 bg-white p-6">
+          <div className="mx-auto max-w-xl text-center">
+            <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+              <AlertTriangle className="size-6" />
+            </div>
+            <h2 className="mt-4 text-lg font-semibold">
+              Mục Giao nhận đã được tắt
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Thông tin giao nhận đang được ẩn theo cài đặt hiện tại. Chọn một trang khác để rời khỏi đây, sau đó mục Giao nhận sẽ biến mất khỏi dashboard.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              {[
+                ["Tổng quan", "/home"],
+                ["Đơn hàng", "/home/orders"],
+                ["Khách hàng", "/home/customers"],
+              ].map(([label, path]) => (
+                <Button
+                  key={path}
+                  variant={path === "/home" ? "default" : "outline"}
+                  size="sm"
+                  className={
+                    path === "/home"
+                      ? "gap-2 bg-neutral-900 text-white hover:bg-neutral-800"
+                      : "gap-2"
+                  }
+                  onClick={() => router.push(path)}
+                >
+                  {label}
+                  <ArrowRight className="size-4" />
+                </Button>
+              ))}
+            </div>
           </div>
-        </SectionCard>
+        </div>
+      )}
 
-        <SectionCard title="Danh sách chuyến trong ngày">
-          <Table className="min-w-[920px]">
+      {deliveryEnabled && (
+        <>
+          <div className="grid gap-4 md:grid-cols-3">
+            <StatCard label="Chuyến hôm nay" value="18" hint="9 lấy · 9 trả" icon={Truck} />
+            <StatCard label="Đúng hẹn" value="92%" hint="2 chuyến có nguy cơ trễ" icon={CalendarDays} tone="success" />
+            <StatCard label="Tài xế hoạt động" value="3/4" hint="1 tài xế dự phòng" icon={Route} />
+          </div>
+
+          <div className="rounded-lg border bg-card p-4">
+            <div className="text-sm text-muted-foreground">
+              Đang áp dụng thời gian chung: {rangeLabel} · có {trips.length} chuyến nổi bật
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
+            <SectionCard title="Lịch giao nhận" description={`Xem nhanh theo ${rangeLabel}.`}>
+              <div className="space-y-3 p-4">
+                {slots.map(([time, type, order, className]) => (
+                  <button
+                    key={`${time}-${order}`}
+                    className="flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors hover:border-neutral-300"
+                  >
+                    <div>
+                      <p className="font-medium">{time}</p>
+                      <p className="text-sm text-muted-foreground">{order}</p>
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${className}`}>
+                      {type}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Danh sách chuyến trong ngày">
+              <Table className="min-w-[920px]">
             <TableCaption>Danh sách chuyến lấy/trả đồ cần điều phối hôm nay.</TableCaption>
             <TableHeader>
               <TableRow className="bg-muted/30">
@@ -130,19 +176,19 @@ export default function DeliveryPage() {
                 <TableCell className="text-right">3 người</TableCell>
               </TableRow>
             </TableFooter>
-          </Table>
-          <PaginationFooter
-            page={page}
-            pageCount={2}
-            total={trips.length + 4}
-            onPrev={() => setPage((current) => Math.max(current - 1, 1))}
-            onNext={() => setPage((current) => Math.min(current + 1, 2))}
-          />
-        </SectionCard>
-      </div>
+              </Table>
+              <PaginationFooter
+                page={page}
+                pageCount={2}
+                total={trips.length + 4}
+                onPrev={() => setPage((current) => Math.max(current - 1, 1))}
+                onNext={() => setPage((current) => Math.min(current + 1, 2))}
+              />
+            </SectionCard>
+          </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-        <SectionCard title="Phân công tài xế" description="Theo dõi tải công việc mỗi tài xế.">
+          <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
+            <SectionCard title="Phân công tài xế" description="Theo dõi tải công việc mỗi tài xế.">
           <div className="divide-y">
             {drivers.map(([name, points, load, status]) => (
               <div key={name} className="flex items-center justify-between gap-4 p-4">
@@ -154,9 +200,9 @@ export default function DeliveryPage() {
               </div>
             ))}
           </div>
-        </SectionCard>
+            </SectionCard>
 
-        <SectionCard title="Bản đồ tuyến đường" description="Mô phỏng các điểm lấy/trả trong ngày.">
+            <SectionCard title="Bản đồ tuyến đường" description="Mô phỏng các điểm lấy/trả trong ngày.">
           <div className="relative min-h-[320px] overflow-hidden bg-neutral-100">
             <div className="absolute inset-6 rounded-2xl border border-dashed border-neutral-300" />
             {[
@@ -178,11 +224,11 @@ export default function DeliveryPage() {
               Tuyến gợi ý: Q.1 → Q.3 → Q.1
             </div>
           </div>
-        </SectionCard>
-      </div>
+            </SectionCard>
+          </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <SectionCard title="Xác nhận OTP tài xế">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <SectionCard title="Xác nhận OTP tài xế">
           <div className="space-y-3 p-4">
             {[
               ["DH-1048", "OTP lấy đồ", "482193", "Đã xác nhận"],
@@ -198,9 +244,9 @@ export default function DeliveryPage() {
               </div>
             ))}
           </div>
-        </SectionCard>
+            </SectionCard>
 
-        <SectionCard title="Timestamp trạng thái">
+            <SectionCard title="Timestamp trạng thái">
           <div className="space-y-3 p-4 text-sm">
             {[
               ["08:32", "Anh Minh đã lấy DH-1048"],
@@ -214,9 +260,9 @@ export default function DeliveryPage() {
               </div>
             ))}
           </div>
-        </SectionCard>
+            </SectionCard>
 
-        <SectionCard title="Gợi ý tối ưu tuyến">
+            <SectionCard title="Gợi ý tối ưu tuyến">
           <div className="space-y-3 p-4 text-sm">
             <div className="rounded-lg bg-muted/40 p-3">
               <p className="font-medium">Tuyến Q.1 gom 4 điểm</p>
@@ -230,8 +276,10 @@ export default function DeliveryPage() {
               Áp dụng gợi ý
             </Button>
           </div>
-        </SectionCard>
-      </div>
+            </SectionCard>
+          </div>
+        </>
+      )}
     </PageShell>
   );
 }

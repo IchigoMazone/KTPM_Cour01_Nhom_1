@@ -4,6 +4,8 @@ import { useState } from "react";
 import { BadgeCheck, Gift, Plus, Receipt, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
+import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 import {
   Table,
   TableBody,
@@ -14,8 +16,6 @@ import {
 } from "@/components/ui/table";
 import {
   PageShell,
-  Period,
-  PeriodTabs,
   SectionCard,
   StatCard,
   StatusBadge,
@@ -50,8 +50,9 @@ const promotions = [
 
 export default function ServicesFinancePage() {
   const [tab, setTab] = useState("Dịch vụ & Bảng giá");
-  const [period, setPeriod] = useState<Period>("Tháng");
   const [openForm, setOpenForm] = useState(false);
+  const range = useDashboardTimeRangeStore((state) => state.range);
+  const rangeLabel = formatRange(normalizeRange(range));
 
   return (
     <PageShell
@@ -65,14 +66,13 @@ export default function ServicesFinancePage() {
       }
     >
       <div className="grid gap-4 md:grid-cols-4">
-        <StatCard label="Doanh thu tháng" value="186tr" hint="+14% so với tháng trước" icon={Wallet} tone="success" />
+        <StatCard label="Doanh thu" value="186tr" hint={`Theo ${rangeLabel}`} icon={Wallet} tone="success" />
         <StatCard label="Công nợ" value="4,54tr" hint="3 đơn chưa thu đủ" icon={Receipt} tone="warning" />
         <StatCard label="Chi phí" value="36,05tr" hint="Lương, hóa chất, điện nước" icon={BadgeCheck} />
         <StatCard label="Mã đang chạy" value="3" hint="1 mã tự động sinh nhật" icon={Gift} />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <PeriodTabs value={period} onChange={setPeriod} />
         {[
           "Dịch vụ & Bảng giá",
           "Doanh thu & Công nợ",
@@ -91,7 +91,7 @@ export default function ServicesFinancePage() {
       </div>
 
       {tab === "Dịch vụ & Bảng giá" && (
-        <SectionCard title="Danh mục dịch vụ">
+        <SectionCard title="Danh mục dịch vụ" description={`Áp dụng thời gian chung: ${rangeLabel}.`}>
           <Table className="min-w-[780px]">
             <TableHeader>
               <TableRow className="bg-muted/30">
@@ -256,7 +256,7 @@ export default function ServicesFinancePage() {
       </div>
 
       {openForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-xl border bg-white p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">Thêm cấu hình dịch vụ / tài chính</h2>
