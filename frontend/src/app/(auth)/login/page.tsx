@@ -8,7 +8,6 @@ import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 import { GradientText } from "@/src/components/ui/gradient-text";
 import { validateUsername, validatePassword } from "@/src/lib/validators/auth";
 import { toast } from "sonner";
-import { API_BASE_URL } from "@/src/lib/config";
 
 const images = ["/summer (1).jfif", "/summer (2).jfif", "/summer (3).jfif"];
 
@@ -53,39 +52,17 @@ export default function Page() {
     }
 
     setIsLoading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: username.trim(),
-          password,
-        }),
-      });
+    const normalizedUsername = username.trim().toLowerCase();
+    const role = normalizedUsername === "admin" ? "admin" : "customer";
 
-      const data = await response.json();
-      if (response.ok && data.success) {
-        toast.success(data.message || "Đăng nhập thành công!");
-        localStorage.setItem("token", data.access_token);
-        localStorage.setItem("role", data.role || "customer");
-        setTimeout(() => {
-          if (data.role === "admin") {
-            router.push("/home");
-          } else {
-            router.push("/user");
-          }
-        }, 1500);
-      } else {
-        toast.error(data.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản và mật khẩu.");
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error("Không thể kết nối đến máy chủ.");
-    } finally {
+    localStorage.setItem("token", "mock-login-token");
+    localStorage.setItem("role", role);
+    toast.success("Đăng nhập thành công!");
+
+    setTimeout(() => {
       setIsLoading(false);
-    }
+      router.push(role === "admin" ? "/home" : "/user");
+    }, 500);
   };
 
   const handleGoogleUnavailable = () => {
