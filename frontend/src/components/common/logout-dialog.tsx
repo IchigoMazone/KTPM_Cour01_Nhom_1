@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -43,7 +44,11 @@ export default function LogoutDialog({
           </DialogClose>
           <Button
             className="h-8 rounded-lg bg-[#1f1f1f] px-3 text-sm text-white shadow-sm hover:bg-black sm:w-auto"
-            onClick={() => router.push("/logout")}
+            onClick={() => {
+              localStorage.removeItem("token");
+              localStorage.removeItem("role");
+              router.push("/login");
+            }}
           >
             Tiếp tục
           </Button>

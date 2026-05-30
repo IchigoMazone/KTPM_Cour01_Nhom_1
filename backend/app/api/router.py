@@ -1,8 +1,18 @@
 from fastapi import APIRouter
 from app.api.auth import router_auth
+from app.api.booking import router_booking
+from app.api.order import router_order
 
 api_router = APIRouter()
 
 api_router.include_router(
     router_auth, prefix="/auth"
+)
+
+api_router.include_router(
+    router_booking, prefix="/bookings"
+)
+
+api_router.include_router(
+    router_order, prefix="/orders"
 )
