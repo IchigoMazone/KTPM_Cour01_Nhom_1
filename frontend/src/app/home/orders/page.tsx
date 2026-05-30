@@ -439,7 +439,7 @@ export default function OrdersPage() {
                       <TableCell>
                         <div className="flex min-w-0 items-center gap-2">
                           <Image
-                            src="/default_avatar.jfif"
+                            src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
                             alt={order.customer}
                             width={28}
                             height={28}
@@ -490,7 +490,7 @@ export default function OrdersPage() {
                             </div>
                           ) : (
                             <Image
-                              src="/default_avatar.jfif"
+                              src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
                               alt={order.staff}
                               width={24}
                               height={24}

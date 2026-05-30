@@ -46,7 +46,14 @@ export default function LogoutDialog({
             className="h-8 rounded-lg bg-[#1f1f1f] px-3 text-sm text-white shadow-sm hover:bg-black sm:w-auto"
             onClick={() => {
               localStorage.removeItem("token");
+              localStorage.removeItem("refreshToken");
               localStorage.removeItem("role");
+              localStorage.removeItem("username");
+              localStorage.removeItem("user_id");
+              localStorage.removeItem("accountName");
+              localStorage.removeItem("accountEmail");
+              localStorage.removeItem("accountAddress");
+              localStorage.removeItem("accountImageUrl");
               router.push("/login");
             }}
           >

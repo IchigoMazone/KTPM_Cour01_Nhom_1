@@ -23,6 +23,7 @@ type CurrentUser = {
   role: string;
   profile?: {
     full_name?: string | null;
+    image_url?: string | null;
   } | null;
 };
 
@@ -42,10 +43,14 @@ export default function Sidebar() {
   const fallbackRoleLabel = isUserArea ? "Tài khoản khách hàng" : "Tài khoản nội bộ";
   const [accountName, setAccountName] = useState("");
   const [accountRoleLabel, setAccountRoleLabel] = useState("");
+  const [accountImageUrl, setAccountImageUrl] = useState("https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
 
   React.useEffect(() => {
     let ignore = false;
     const token = localStorage.getItem("token");
+    const storedAccountName = localStorage.getItem("accountName");
+    const storedRole = localStorage.getItem("role");
+    const storedImageUrl = localStorage.getItem("accountImageUrl");
 
     if (!token) {
       return;
@@ -60,6 +65,21 @@ export default function Sidebar() {
       customer: "Tài khoản khách hàng",
     };
 
+    const timer = window.setTimeout(() => {
+      if (ignore) return;
+      if (storedAccountName) {
+        setAccountName(storedAccountName);
+      }
+
+      if (storedRole) {
+        setAccountRoleLabel(roleLabels[storedRole] || fallbackRoleLabel);
+      }
+
+      if (storedImageUrl) {
+        setAccountImageUrl(storedImageUrl);
+      }
+    }, 0);
+
     fetch(`${API_BASE_URL}/api/auth/me`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -71,8 +91,14 @@ export default function Sidebar() {
       })
       .then((user) => {
         if (ignore || !user) return;
-        setAccountName(user.profile?.full_name || user.username);
+        const nextAccountName = user.profile?.full_name || user.username;
+        setAccountName(nextAccountName);
         setAccountRoleLabel(roleLabels[user.role] || "Tài khoản");
+        localStorage.setItem("accountName", nextAccountName);
+        if (user.profile?.image_url) {
+          setAccountImageUrl(user.profile.image_url);
+          localStorage.setItem("accountImageUrl", user.profile.image_url);
+        }
       })
       .catch(() => {
         if (ignore) return;
@@ -82,8 +108,9 @@ export default function Sidebar() {
 
     return () => {
       ignore = true;
+      window.clearTimeout(timer);
     };
-  }, [isUserArea]);
+  }, [fallbackRoleLabel, isUserArea]);
 
   const activeMenus = (isUserArea ? userMenus : menus).filter((item) => {
     if (item.path === "/home/delivery" && !deliveryEnabled) {
@@ -203,7 +230,7 @@ export default function Sidebar() {
                 <button className="flex h-10 min-w-0 cursor-pointer items-center rounded-lg text-slate-600">
                   <div className="flex h-10 w-10 items-center justify-center">
                     <Image
-                      src="/default_avatar.jfif"
+                      src={accountImageUrl}
                       alt="avatar"
                       width={24}
                       height={24}
@@ -222,7 +249,7 @@ export default function Sidebar() {
                 <>
                   <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-2.5">
                     <Image
-                      src="/default_avatar.jfif"
+                      src={accountImageUrl}
                       alt="avatar"
                       width={28}
                       height={28}
@@ -248,7 +275,7 @@ export default function Sidebar() {
                     }}
                   >
                     <Image
-                      src="/default_avatar.jfif"
+                      src={accountImageUrl}
                       alt="default-avatar"
                       width={14}
                       height={14}

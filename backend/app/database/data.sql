@@ -5,14 +5,14 @@ INSERT INTO accounts (user_id, username, password, role, is_active) VALUES
 ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44', 'driver_user1', '$2b$12$2WA6N3l5sy4HDq5Tf3D8Q.wiMo.NR9pyfDDECaialGRX0iBnxyZju', 'user', TRUE),
 ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55', 'customer_user1', '$2b$12$ri8leoxMmO5iSIZxnK2Az.EYWC6kO.r8mQRi2CXsCfh5PqBWOTv9m', 'user', TRUE);
 
-INSERT INTO admin_profiles (profile_id, user_id, full_name, email, phone, address) VALUES
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Quản trị viên Hệ thống', 'admin@gmail.com', '0987654321', '123 Đường Cầu Giấy, Hà Nội'),
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Nguyễn Thu Quản', 'manager@begau.vn', '0987000001', '123 Đường Cầu Giấy, Hà Nội');
+INSERT INTO admin_profiles (profile_id, user_id, full_name, email, phone, address, image_url) VALUES
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Quản trị viên Hệ thống', 'admin@gmail.com', '0987654321', '123 Đường Cầu Giấy, Hà Nội', 'https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Nguyễn Thu Quản', 'manager@begau.vn', '0987000001', '123 Đường Cầu Giấy, Hà Nội', 'https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif');
 
-INSERT INTO user_profiles (profile_id, user_id, full_name, email, phone, address, loyalty_points, member_tier, special_notes, referral_code, employee_code, role_title, salary_rate, status) VALUES
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Trần Văn Giặt', 'staff@begau.vn', '0987000002', 'Khu vận hành BegauShop', 0, 'Thường', NULL, NULL, 'EMP-STAFF-001', 'Thợ giặt chính', 12000000.00, 'active'),
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44', 'Lê Minh Giao', 'driver@begau.vn', '0987000003', 'Khu giao nhận BegauShop', 0, 'Thường', NULL, NULL, 'EMP-DRIVER-001', 'Nhân viên giao nhận', 11000000.00, 'active'),
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55', 'Nguyễn Văn Khách', 'customer@gmail.com', '0912345678', '456 Đường Nguyễn Trãi, Thanh Xuân, Hà Nội', 1250, 'Bạc', 'Ưu tiên nước xả thơm nhẹ, tách riêng áo trắng.', 'PANDA-HUONG', NULL, NULL, 0, 'active');
+INSERT INTO user_profiles (profile_id, user_id, full_name, email, phone, address, image_url, loyalty_points, member_tier, special_notes, referral_code, employee_code, role_title, salary_rate, status) VALUES
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Trần Văn Giặt', 'staff@begau.vn', '0987000002', 'Khu vận hành BegauShop', 'https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif', 0, 'Thường', NULL, NULL, 'EMP-STAFF-001', 'Thợ giặt chính', 12000000.00, 'active'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44', 'Lê Minh Giao', 'driver@begau.vn', '0987000003', 'Khu giao nhận BegauShop', 'https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif', 0, 'Thường', NULL, NULL, 'EMP-DRIVER-001', 'Nhân viên giao nhận', 11000000.00, 'active'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55', 'Nguyễn Văn Khách', 'customer@gmail.com', '0912345678', '456 Đường Nguyễn Trãi, Thanh Xuân, Hà Nội', 'https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif', 1250, 'Bạc', 'Ưu tiên nước xả thơm nhẹ, tách riêng áo trắng.', 'PANDA-HUONG', NULL, NULL, 0, 'active');
 
 INSERT INTO staff_shifts (staff_id, shift_date, start_time, end_time, role_note, attendance_status) VALUES
 ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', CURRENT_DATE, '07:00:00', '15:00:00', 'Điều phối vận hành', 'scheduled'),

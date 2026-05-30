@@ -34,6 +34,15 @@ CREATE TABLE accounts (
     role VARCHAR(20) NOT NULL DEFAULT 'user'
         CHECK (role IN ('admin', 'user')),
     is_active BOOLEAN DEFAULT TRUE,
+    full_name VARCHAR(100),
+    email VARCHAR(100) UNIQUE,
+    phone VARCHAR(20),
+    address TEXT,
+    image_url TEXT,
+    loyalty_points INT DEFAULT 0,
+    member_tier VARCHAR(20) DEFAULT 'Thường'
+        CHECK (member_tier IN ('Thường', 'Bạc', 'Vàng', 'Kim Cương')),
+    special_notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -46,6 +55,7 @@ CREATE TABLE admin_profiles (
     email VARCHAR(100) UNIQUE,
     phone VARCHAR(20),
     address TEXT,
+    image_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -58,6 +68,7 @@ CREATE TABLE user_profiles (
     email VARCHAR(100) UNIQUE,
     phone VARCHAR(20),
     address TEXT,
+    image_url TEXT,
     loyalty_points INT DEFAULT 0,
     member_tier VARCHAR(20) DEFAULT 'Thường'
         CHECK (member_tier IN ('Thường', 'Bạc', 'Vàng', 'Kim Cương')),

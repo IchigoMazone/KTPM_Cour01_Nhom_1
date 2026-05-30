@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 import { GradientText } from "@/src/components/ui/gradient-text";
-import { validatePassword } from "@/src/lib/validators/auth";
+import { validatePassword, validateConfirmPassword } from "@/src/lib/validators/auth";
 import { toast } from "sonner";
 import { API_BASE_URL } from "@/src/lib/config";
 
@@ -32,7 +32,16 @@ function ResetPasswordContent() {
   const [errors, setErrors] = useState({
     token: "",
     password: "",
+    confirm: "",
   });
+
+  const isFormValid =
+    token.trim() &&
+    newPassword &&
+    confirmPassword &&
+    !errors.token &&
+    !errors.password &&
+    !errors.confirm;
 
   useEffect(() => {
     // Tự động đồng bộ token từ url nếu có thay đổi
@@ -51,21 +60,20 @@ function ResetPasswordContent() {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrors({ token: "", password: "" });
+    setErrors({ token: "", password: "", confirm: "" });
 
-    if (!token.trim()) {
-      setErrors((prev) => ({ ...prev, token: "Vui lòng nhập token xác thực." }));
-      return;
-    }
-
+    const tokenError = !token.trim() ? "Vui lòng nhập token xác thực." : "";
     const passError = validatePassword(newPassword);
-    if (passError) {
-      setErrors((prev) => ({ ...prev, password: passError }));
-      return;
-    }
+    const confirmError = validateConfirmPassword(newPassword, confirmPassword);
 
-    if (newPassword !== confirmPassword) {
-      toast.error("Mật khẩu xác nhận không khớp.");
+    if (tokenError || passError || confirmError) {
+      if (tokenError) {
+        setErrors({ token: tokenError, password: "", confirm: "" });
+      } else if (passError) {
+        setErrors({ token: "", password: passError, confirm: "" });
+      } else if (confirmError) {
+        setErrors({ token: "", password: "", confirm: confirmError });
+      }
       return;
     }
 
@@ -98,8 +106,6 @@ function ResetPasswordContent() {
       setIsLoading(false);
     }
   };
-
-  const passwordMismatch = newPassword && confirmPassword && newPassword !== confirmPassword;
 
   return (
     <div
@@ -194,8 +200,13 @@ function ResetPasswordContent() {
                   placeholder="Dán mã reset token của bạn vào đây"
                   value={token}
                   onChange={(e) => {
-                    setToken(e.target.value);
-                    setErrors((prev) => ({ ...prev, token: "" }));
+                    const value = e.target.value;
+                    setToken(value);
+                    setErrors({
+                      token: !value.trim() ? "Vui lòng nhập token xác thực." : "",
+                      password: "",
+                      confirm: "",
+                    });
                   }}
                   className="w-full h-10 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400 transition-all"
                 />
@@ -216,8 +227,13 @@ function ResetPasswordContent() {
                   placeholder="••••••••"
                   value={newPassword}
                   onChange={(e) => {
-                    setNewPassword(e.target.value);
-                    setErrors((prev) => ({ ...prev, password: "" }));
+                    const value = e.target.value;
+                    setNewPassword(value);
+                    setErrors({
+                      token: "",
+                      password: validatePassword(value),
+                      confirm: "",
+                    });
                   }}
                   className="w-full h-10 px-3 pr-10 rounded-md border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400 transition-all"
                 />
@@ -244,7 +260,15 @@ function ResetPasswordContent() {
                   type={showConfirm ? "text" : "password"}
                   placeholder="••••••••"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setConfirmPassword(value);
+                    setErrors({
+                      token: "",
+                      password: "",
+                      confirm: validateConfirmPassword(newPassword, value),
+                    });
+                  }}
                   className="w-full h-10 px-3 pr-10 rounded-md border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400 transition-all"
                 />
                 <button
@@ -255,8 +279,8 @@ function ResetPasswordContent() {
                   {showConfirm ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
                 </button>
               </div>
-              {passwordMismatch && (
-                <p className="text-xs text-red-400">Mật khẩu xác nhận không khớp.</p>
+              {errors.confirm && (
+                <p className="text-xs text-red-500">{errors.confirm}</p>
               )}
             </div>
           </div>
@@ -264,8 +288,10 @@ function ResetPasswordContent() {
           {/* Nút xác nhận */}
           <button
             type="submit"
-            disabled={isLoading || passwordMismatch || !newPassword || !confirmPassword}
-            className="w-full h-10 rounded-md bg-cyan-700 hover:bg-cyan-800 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] text-white text-sm font-semibold tracking-wide transition-all mb-4"
+            disabled={!isFormValid || isLoading}
+            className={`w-full h-10 rounded-md bg-cyan-700 hover:bg-cyan-800 ${
+              isFormValid && !isLoading ? "active:scale-[0.98] cursor-pointer" : "opacity-75 cursor-not-allowed"
+            } text-white text-sm font-semibold tracking-wide transition-all mb-4`}
           >
             {isLoading ? (
               <SpokeSpinner />

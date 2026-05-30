@@ -2,6 +2,7 @@
 
 import React from "react";
 import type { ReactNode } from "react";
+import AuthGuard from "@/src/components/common/auth-guard";
 import UserSearch from "@/src/components/common/user-search";
 import Sidebar from "@/src/components/common/sidebar";
 import { useNavbarStore } from "@/src/context/useNavbarStore";
@@ -10,6 +11,7 @@ export default function UserLayout({ children }: { children: ReactNode }) {
   const { open, toggle } = useNavbarStore();
 
   return (
+    <AuthGuard allowedRole="user">
     <div className="flex h-dvh min-w-0 overflow-hidden">
       <Sidebar />
 
@@ -26,5 +28,6 @@ export default function UserLayout({ children }: { children: ReactNode }) {
         </main>
       </div>
     </div>
+    </AuthGuard>
   );
 }

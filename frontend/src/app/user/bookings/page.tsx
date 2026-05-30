@@ -82,7 +82,10 @@ export default function UserBookingsPage() {
           setSelectedServiceId(data[0].service_id);
         }
       })
-      .catch((err) => console.error("Error fetching services:", err));
+      .catch(() => {
+        setServices([]);
+        toast.error("Không thể tải danh sách dịch vụ.");
+      });
   }, []);
 
   // Fetch logged in user profile & bookings list
@@ -101,7 +104,10 @@ export default function UserBookingsPage() {
           setUserBookings(data);
         }
       })
-      .catch((err) => console.error("Error fetching bookings:", err));
+      .catch(() => {
+        setUserBookings([]);
+        toast.error("Không thể tải lịch hẹn.");
+      });
   };
 
   useEffect(() => {
@@ -122,7 +128,9 @@ export default function UserBookingsPage() {
           setAddress(user.profile.address || "");
         }
       })
-      .catch((err) => console.error("Error fetching profile:", err));
+      .catch(() => {
+        toast.error("Không thể tải thông tin hồ sơ.");
+      });
 
     fetchBookings();
   }, []);
@@ -168,8 +176,7 @@ export default function UserBookingsPage() {
       } else {
         toast.error(data.detail || "Không thể đặt lịch hẹn. Vui lòng kiểm tra lại.");
       }
-    } catch (error) {
-      console.error(error);
+    } catch {
       toast.error("Không thể kết nối đến máy chủ.");
     } finally {
       setIsLoading(false);

@@ -112,13 +112,34 @@ const navGroups: NavGroup[] = [
 
 export default function SidebarMobile({ onClick }: { onClick: () => void }) {
   const [openGroup, setOpenGroup] = useState(navGroups[0].label);
+  const [isSessionReady, setIsSessionReady] = useState(false);
+  const [accountName, setAccountName] = useState("");
+  const [accountRole, setAccountRole] = useState("");
+  const [accountImageUrl, setAccountImageUrl] = useState("https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
+
+  const isLoggedIn = Boolean(accountRole);
+  const startPath = accountRole === "admin" ? "/home" : "/user";
 
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
+    const timer = window.setTimeout(() => {
+      const token = localStorage.getItem("token");
+      const role = localStorage.getItem("role");
+
+      if (token && role) {
+        setAccountName(localStorage.getItem("accountName") || localStorage.getItem("username") || "Tài khoản");
+        setAccountRole(role);
+        setAccountImageUrl(localStorage.getItem("accountImageUrl") || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
+      }
+
+      setIsSessionReady(true);
+    }, 0);
+
     return () => {
       document.body.style.overflow = originalOverflow;
+      window.clearTimeout(timer);
     };
   }, []);
 
@@ -219,24 +240,62 @@ export default function SidebarMobile({ onClick }: { onClick: () => void }) {
         </nav>
 
         <div className="border-t border-blue-100 p-3">
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="secondary"
-              className="h-10 bg-blue-50 text-blue-700 hover:bg-blue-100"
-              asChild
-            >
-              <Link href="/login" onClick={onClick}>
-                <LogIn className="size-4" />
-                Đăng nhập
+          {!isSessionReady ? (
+            <div className="h-10" aria-hidden="true" />
+          ) : isLoggedIn ? (
+            <div className="space-y-2">
+              <Link
+                href={startPath}
+                onClick={onClick}
+                className="flex min-w-0 items-center gap-2 rounded-lg px-1.5 py-1 text-sm font-medium text-slate-800 no-underline hover:text-blue-700"
+              >
+                <img
+                  src={accountImageUrl}
+                  alt=""
+                  className="size-8 shrink-0 rounded-full object-cover"
+                />
+                <span className="truncate">{accountName}</span>
               </Link>
-            </Button>
-            <Button className="h-10 bg-blue-600 text-white hover:bg-blue-700" asChild>
-              <Link href="/register" onClick={onClick}>
-                <UserPlus className="size-4" />
-                Đăng kí
-              </Link>
-            </Button>
-          </div>
+              <div className={accountRole === "admin" ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
+                {accountRole === "admin" && (
+                  <Button variant="secondary" className="h-10 bg-blue-50 text-blue-700 hover:bg-blue-100" asChild>
+                    <Link href="/home" onClick={onClick}>
+                      Admin
+                    </Link>
+                  </Button>
+                )}
+                <Button variant="secondary" className="h-10 bg-blue-50 text-blue-700 hover:bg-blue-100" asChild>
+                  <Link href="/user" onClick={onClick}>
+                    User
+                  </Link>
+                </Button>
+                <Button className="h-10 bg-blue-600 text-white hover:bg-blue-700" asChild>
+                  <Link href={startPath} onClick={onClick}>
+                    Bắt đầu
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="secondary"
+                className="h-10 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                asChild
+              >
+                <Link href="/login" onClick={onClick}>
+                  <LogIn className="size-4" />
+                  Đăng nhập
+                </Link>
+              </Button>
+              <Button className="h-10 bg-blue-600 text-white hover:bg-blue-700" asChild>
+                <Link href="/register" onClick={onClick}>
+                  <UserPlus className="size-4" />
+                  Đăng kí
+                </Link>
+              </Button>
+            </div>
+          )}
         </div>
       </aside>
     </div>

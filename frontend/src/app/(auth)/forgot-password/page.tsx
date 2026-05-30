@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { GradientText } from "@/src/components/ui/gradient-text";
-import { validateEmail } from "@/src/lib/validators/auth";
+import { validateEmail, validateUsername } from "@/src/lib/validators/auth";
 import { toast } from "sonner";
 import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 import { API_BASE_URL } from "@/src/lib/config";
@@ -22,8 +22,12 @@ export default function Page() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [usernameError, setUsernameError] = useState("");
-  const [emailError, setEmailError] = useState("");
+  const [errors, setErrors] = useState({
+    username: "",
+    email: "",
+  });
+
+  const isFormValid = username.trim() && email.trim() && !errors.username && !errors.email;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -35,17 +39,17 @@ export default function Page() {
 
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUsernameError("");
-    setEmailError("");
+    setErrors({ username: "", email: "" });
 
-    if (!username.trim()) {
-      setUsernameError("Tên đăng nhập không được để trống.");
-      return;
-    }
+    const uErr = validateUsername(username);
+    const eErr = validateEmail(email, true);
 
-    const err = validateEmail(email);
-    if (err) {
-      setEmailError(err);
+    if (uErr || eErr) {
+      if (uErr) {
+        setErrors({ username: uErr, email: "" });
+      } else {
+        setErrors({ username: "", email: eErr });
+      }
       return;
     }
 
@@ -171,13 +175,17 @@ export default function Page() {
                 placeholder="Nhập tên đăng nhập của bạn"
                 value={username}
                 onChange={(e) => {
-                  setUsername(e.target.value);
-                  setUsernameError("");
+                  const value = e.target.value;
+                  setUsername(value);
+                  setErrors({
+                    username: validateUsername(value),
+                    email: "",
+                  });
                 }}
                 className="w-full h-10 px-3 rounded-md border border-stone-200 bg-white text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 transition-all"
               />
-              {usernameError && (
-                <p className="text-xs text-orange-600">{usernameError}</p>
+              {errors.username && (
+                <p className="text-xs text-orange-600">{errors.username}</p>
               )}
             </div>
 
@@ -191,13 +199,17 @@ export default function Page() {
                 placeholder="example@gmail.com"
                 value={email}
                 onChange={(e) => {
-                  setEmail(e.target.value);
-                  setEmailError("");
+                  const value = e.target.value;
+                  setEmail(value);
+                  setErrors({
+                    username: "",
+                    email: validateEmail(value, true),
+                  });
                 }}
                 className="w-full h-10 px-3 rounded-md border border-stone-200 bg-white text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 transition-all"
               />
-              {emailError && (
-                <p className="text-xs text-orange-600">{emailError}</p>
+              {errors.email && (
+                <p className="text-xs text-orange-600">{errors.email}</p>
               )}
             </div>
           </div>
@@ -205,9 +217,9 @@ export default function Page() {
           {/* Nút xác nhận */}
           <button
             type="submit"
-            disabled={isLoading || !email || !username}
+            disabled={!isFormValid || isLoading}
             className={`w-full h-10 rounded-md bg-orange-700 hover:bg-orange-800 ${
-              isLoading || !email || !username ? "opacity-70 cursor-not-allowed" : "active:scale-[0.98] cursor-pointer"
+              isFormValid && !isLoading ? "active:scale-[0.98] cursor-pointer" : "opacity-75 cursor-not-allowed"
             } text-white text-sm font-semibold tracking-wide transition-all mb-4`}
           >
             {isLoading ? (
