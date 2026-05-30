@@ -203,7 +203,7 @@ export default function CustomersPage() {
         <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
           
           {/* ── Top Toolbar ── */}
-          <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-3 border-b border-slate-200 px-5 pt-1 pb-3 xl:flex-row xl:items-center xl:justify-between">
             {/* Left: View Tabs */}
             <div className="flex items-center gap-1">
               {([
@@ -231,7 +231,7 @@ export default function CustomersPage() {
               <div className="relative min-w-[220px] flex-1 xl:w-64 xl:flex-none">
                 <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" />
                 <Input
-                  className="h-8 rounded-md border-transparent bg-white pl-8 text-xs text-slate-700 shadow-none placeholder:text-slate-500 focus-visible:ring-slate-200"
+                  className="h-8 rounded-md border-slate-200 bg-white pl-8 text-xs text-slate-700 shadow-none placeholder:text-slate-500 focus-visible:ring-slate-200"
                   placeholder="Tìm tên, SĐT, địa chỉ..."
                   value={query}
                   onChange={(event) => {
@@ -470,7 +470,7 @@ export default function CustomersPage() {
           </div>
 
           {/* ── Pagination Footer ── */}
-          <div className="border-t border-slate-200 px-5 py-4">
+          <div className="border-t border-slate-200 px-5 pt-3 pb-1">
             <div className="flex flex-col gap-3 text-xs text-slate-700 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-3">
                 <span>Số khách hàng mỗi trang</span>
