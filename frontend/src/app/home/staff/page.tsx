@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Clock, Package, Plus, TrendingUp, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
+import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 import {
   Table,
   TableBody,
@@ -15,8 +17,6 @@ import {
 import {
   PageShell,
   PaginationFooter,
-  Period,
-  PeriodTabs,
   SectionCard,
   StatCard,
   StatusBadge,
@@ -65,9 +65,10 @@ const purchaseSummary = [
 
 export default function StaffOperationsPage() {
   const [tab, setTab] = useState("Nhân viên");
-  const [period, setPeriod] = useState<Period>("Tuần");
   const [page, setPage] = useState(1);
   const [openForm, setOpenForm] = useState(false);
+  const range = useDashboardTimeRangeStore((state) => state.range);
+  const rangeLabel = formatRange(normalizeRange(range));
 
   return (
     <PageShell
@@ -83,12 +84,11 @@ export default function StaffOperationsPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard label="Nhân viên" value="12" hint="3 vai trò vận hành" icon={Users} />
         <StatCard label="Ca hôm nay" value="3" hint="Sáng · Chiều · Tối" icon={Clock} />
-        <StatCard label="Năng suất" value="128 đơn" hint="+9% so với hôm qua" icon={TrendingUp} tone="success" />
+        <StatCard label="Năng suất" value="128 đơn" hint={`Theo ${rangeLabel}`} icon={TrendingUp} tone="success" />
         <StatCard label="Vật tư sắp hết" value="2" hint="Nước xả, móc áo" icon={Package} tone="danger" />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <PeriodTabs value={period} onChange={setPeriod} />
         {["Nhân viên", "Ca làm việc", "Năng suất", "Kho & Vật tư"].map((item) => (
           <Button
             key={item}
@@ -229,7 +229,7 @@ export default function StaffOperationsPage() {
 
           <SectionCard
             title="Thống kê vật tư đã mua"
-            description={`Tổng hợp theo ${period.toLowerCase()} để đối soát chi phí vật tư.`}
+            description={`Tổng hợp theo ${rangeLabel} để đối soát chi phí vật tư.`}
           >
             <Table className="min-w-[780px]">
               <TableHeader>
@@ -309,7 +309,7 @@ export default function StaffOperationsPage() {
       </div>
 
       {openForm && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-xl border bg-white p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">Thêm nhân sự / vật tư</h2>

@@ -9,31 +9,40 @@ import { Button } from "@/components/ui/button";
 export type Period = "Ngày" | "Tuần" | "Tháng";
 
 type PageShellProps = {
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
   action?: ReactNode;
   children: ReactNode;
+  fullHeight?: boolean;
 };
 
 export function PageShell({
-  title,
-  description,
+  title = "",
+  description = "",
   action,
   children,
+  fullHeight = false,
 }: PageShellProps) {
+  const hasHeader = title || description || action;
   return (
-    <div className="w-full min-w-0 space-y-4 p-4 sm:space-y-5 sm:p-5 lg:space-y-6 lg:p-8">
-      <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0 space-y-1">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-            {title}
-          </h1>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            {description}
-          </p>
+    <div className={`w-full min-w-0 py-1.5 px-2 sm:py-2 sm:px-2.5 lg:py-2 lg:px-2.5 ${fullHeight ? "flex h-full flex-col gap-3 min-h-0" : "space-y-4 sm:space-y-5 lg:space-y-6"}`}>
+      {hasHeader && (
+        <div className="flex min-w-0 shrink-0 flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0 space-y-1">
+            {title && (
+              <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+                {title}
+              </h1>
+            )}
+            {description && (
+              <p className="max-w-3xl text-sm text-muted-foreground">
+                {description}
+              </p>
+            )}
+          </div>
+          {action && <div className="shrink-0">{action}</div>}
         </div>
-        {action && <div className="shrink-0">{action}</div>}
-      </div>
+      )}
       {children}
     </div>
   );
@@ -86,14 +95,18 @@ export function SectionCard({
   description,
   action,
   children,
+  className = "",
+  contentClassName = "",
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
   children: ReactNode;
+  className?: string;
+  contentClassName?: string;
 }) {
   return (
-    <Card className="min-w-0 overflow-hidden border-border/70 shadow-sm">
+    <Card className={`min-w-0 overflow-hidden border-border/70 shadow-sm ${className}`}>
       <CardHeader className="flex flex-col items-stretch justify-between gap-3 border-b bg-card px-4 py-4 sm:flex-row sm:items-start sm:px-6">
         <div className="min-w-0 space-y-1">
           <CardTitle className="text-base">{title}</CardTitle>
@@ -103,7 +116,7 @@ export function SectionCard({
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </CardHeader>
-      <CardContent className="p-0">{children}</CardContent>
+      <CardContent className={`p-0 ${contentClassName}`}>{children}</CardContent>
     </Card>
   );
 }
