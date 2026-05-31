@@ -7,6 +7,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 import { GradientText } from "@/src/components/ui/gradient-text";
 import { validateUsername, validatePassword } from "@/src/lib/validators/auth";
+import { API_BASE_URL } from "@/src/lib/config";
 import { toast } from "sonner";
 
 const images = ["/summer (1).jfif", "/summer (2).jfif", "/summer (3).jfif"];
@@ -51,22 +52,45 @@ export default function Page() {
       return;
     }
 
-    setIsLoading(true);
-    const normalizedUsername = username.trim().toLowerCase();
-    const role = normalizedUsername === "admin" ? "admin" : "customer";
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: username.trim().toLowerCase(),
+          password,
+        }),
+      });
 
-    localStorage.setItem("token", "mock-login-token");
-    localStorage.setItem("role", role);
-    toast.success("Đăng nhập thành công!");
+      const data = await response.json();
 
-    setTimeout(() => {
-      setIsLoading(false);
+      if (!response.ok || !data.success) {
+        toast.error(data.detail || data.message || "Đăng nhập thất bại.");
+        return;
+      }
+
+      const role = data.role === "admin" ? "admin" : "customer";
+      localStorage.setItem("token", data.access_token);
+      localStorage.setItem("refreshToken", data.refresh_token);
+      localStorage.setItem("role", role);
+      localStorage.setItem("username", data.username);
+      localStorage.setItem("user_id", data.user_id);
+      localStorage.setItem("accountName", data.profile?.full_name || data.username);
+      localStorage.setItem("accountEmail", data.profile?.email || "");
+      localStorage.setItem("accountAddress", data.profile?.address || "");
+      localStorage.setItem("accountImageUrl", data.profile?.image_url || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
+      toast.success(data.message || "Đăng nhập thành công!");
+
       router.push(role === "admin" ? "/home" : "/user");
-    }, 500);
-  };
-
-  const handleGoogleUnavailable = () => {
-    toast.error("Tính năng đăng nhập bằng Google hiện không khả dụng.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể kết nối đến máy chủ.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -262,24 +286,7 @@ export default function Page() {
             ) : (
               "Đăng nhập"
             )}
-          </button>          {/* Divider */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400">hoặc</span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
-
-          {/* Nút Google */}
-          <div className="mb-6 w-full overflow-hidden rounded-md">
-            <button
-              type="button"
-              onClick={handleGoogleUnavailable}
-              className="flex h-10 w-full items-center justify-center gap-2.5 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-700 transition-all hover:bg-gray-50 active:scale-[0.98] cursor-pointer"
-            >
-              <img src="/google.png" alt="Google" className="h-[18px] w-[18px]" />
-              Tiếp tục với Google
-            </button>
-          </div>
+          </button>
 
           {/* Đăng ký */}
           <p className="text-center text-sm text-gray-500">

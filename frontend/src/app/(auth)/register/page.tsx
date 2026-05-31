@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
-import { GradientText } from "@/src/components/ui/gradient-text";
-import { validateEmail, validatePassword, validateUsername } from "@/src/lib/validators/auth";
+import { validateConfirmPassword, validateEmail, validatePassword, validatePhone, validateRequired, validateUsername } from "@/src/lib/validators/auth";
 import { toast } from "sonner";
 import { API_BASE_URL } from "@/src/lib/config";
 
@@ -25,16 +24,38 @@ export default function Page() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({
+    firstName: "",
+    lastName: "",
     username: "",
     password: "",
+    confirm: "",
     email: "",
+    phone: "",
   });
+
+  const isFormValid =
+    firstName.trim() &&
+    lastName.trim() &&
+    email.trim() &&
+    phone.trim() &&
+    username.trim() &&
+    password &&
+    confirm &&
+    agreed &&
+    !errors.firstName &&
+    !errors.lastName &&
+    !errors.email &&
+    !errors.phone &&
+    !errors.username &&
+    !errors.password &&
+    !errors.confirm;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -48,29 +69,33 @@ export default function Page() {
     e.preventDefault();
 
     // Reset errors
-    setErrors({ username: "", password: "", email: "" });
+    setErrors({ firstName: "", lastName: "", username: "", password: "", confirm: "", email: "", phone: "" });
 
     // Validate inputs locally
+    const firstNameError = validateRequired(firstName, "Họ");
+    const lastNameError = validateRequired(lastName, "Tên");
+    const emailError = validateEmail(email, true);
+    const phoneError = validatePhone(phone, true);
     const usernameError = validateUsername(username);
     const passwordError = validatePassword(password);
-    const emailError = validateEmail(email);
+    const confirmError = validateConfirmPassword(password, confirm);
 
-    if (usernameError || passwordError || emailError) {
-      setErrors({
-        username: usernameError,
-        password: passwordError,
-        email: emailError,
-      });
-      return;
-    }
-
-    if (!firstName.trim() || !lastName.trim()) {
-      toast.error("Vui lòng nhập đầy đủ Họ và Tên.");
-      return;
-    }
-
-    if (password !== confirm) {
-      toast.error("Mật khẩu xác nhận không khớp.");
+    if (firstNameError || lastNameError || emailError || phoneError || usernameError || passwordError || confirmError) {
+      if (firstNameError) {
+        setErrors({ firstName: firstNameError, lastName: "", email: "", phone: "", username: "", password: "", confirm: "" });
+      } else if (lastNameError) {
+        setErrors({ firstName: "", lastName: lastNameError, email: "", phone: "", username: "", password: "", confirm: "" });
+      } else if (emailError) {
+        setErrors({ firstName: "", lastName: "", email: emailError, phone: "", username: "", password: "", confirm: "" });
+      } else if (phoneError) {
+        setErrors({ firstName: "", lastName: "", email: "", phone: phoneError, username: "", password: "", confirm: "" });
+      } else if (usernameError) {
+        setErrors({ firstName: "", lastName: "", email: "", phone: "", username: usernameError, password: "", confirm: "" });
+      } else if (passwordError) {
+        setErrors({ firstName: "", lastName: "", email: "", phone: "", username: "", password: passwordError, confirm: "" });
+      } else if (confirmError) {
+        setErrors({ firstName: "", lastName: "", email: "", phone: "", username: "", password: "", confirm: confirmError });
+      }
       return;
     }
 
@@ -92,7 +117,7 @@ export default function Page() {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           email: email.trim(),
-          phone: "",
+          phone: phone.trim(),
           address: "",
         }),
       });
@@ -119,16 +144,11 @@ export default function Page() {
       } else {
         toast.error(data.message || "Đăng ký thất bại.");
       }
-    } catch (error) {
-      console.error(error);
+    } catch {
       toast.error("Không thể kết nối đến máy chủ.");
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleGoogleUnavailable = () => {
-    toast.error("Tính năng đăng nhập bằng Google hiện không khả dụng.");
   };
 
   return (
@@ -213,9 +233,24 @@ export default function Page() {
                   type="text"
                   placeholder="Nguyễn"
                   value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFirstName(value);
+                    setErrors({
+                      firstName: validateRequired(value, "Họ"),
+                      lastName: "",
+                      email: "",
+                      phone: "",
+                      username: "",
+                      password: "",
+                      confirm: "",
+                    });
+                  }}
                   className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
                 />
+                {errors.firstName && (
+                  <p className="text-xs text-pink-500">{errors.firstName}</p>
+                )}
               </div>
               <div className="flex-1 space-y-1.5">
                 <label className="text-xs font-medium text-gray-700 tracking-wide">
@@ -225,9 +260,24 @@ export default function Page() {
                   type="text"
                   placeholder="Văn A"
                   value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setLastName(value);
+                    setErrors({
+                      firstName: "",
+                      lastName: validateRequired(value, "Tên"),
+                      email: "",
+                      phone: "",
+                      username: "",
+                      password: "",
+                      confirm: "",
+                    });
+                  }}
                   className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
                 />
+                {errors.lastName && (
+                  <p className="text-xs text-pink-500">{errors.lastName}</p>
+                )}
               </div>
             </div>
 
@@ -240,11 +290,52 @@ export default function Page() {
                 type="email"
                 placeholder="example@gmail.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEmail(value);
+                  setErrors({
+                    firstName: "",
+                    lastName: "",
+                    email: validateEmail(value, true),
+                    phone: "",
+                    username: "",
+                    password: "",
+                    confirm: "",
+                  });
+                }}
                 className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
               />
               {errors.email && (
                 <p className="text-xs text-pink-500">{errors.email}</p>
+              )}
+            </div>
+
+            {/* Số điện thoại */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-700 tracking-wide">
+                Số điện thoại
+              </label>
+              <input
+                type="tel"
+                placeholder="0912345678"
+                value={phone}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setPhone(value);
+                  setErrors({
+                    firstName: "",
+                    lastName: "",
+                    email: "",
+                    phone: validatePhone(value, true),
+                    username: "",
+                    password: "",
+                    confirm: "",
+                  });
+                }}
+                className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
+              />
+              {errors.phone && (
+                <p className="text-xs text-pink-500">{errors.phone}</p>
               )}
             </div>
 
@@ -257,7 +348,19 @@ export default function Page() {
                 type="text"
                 placeholder="ichigomazone1"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setUsername(value);
+                  setErrors({
+                    firstName: "",
+                    lastName: "",
+                    email: "",
+                    phone: "",
+                    username: validateUsername(value),
+                    password: "",
+                    confirm: "",
+                  });
+                }}
                 className="w-full h-10 px-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
               />
               {errors.username && (
@@ -275,7 +378,19 @@ export default function Page() {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setPassword(value);
+                    setErrors({
+                      firstName: "",
+                      lastName: "",
+                      email: "",
+                      phone: "",
+                      username: "",
+                      password: validatePassword(value),
+                      confirm: "",
+                    });
+                  }}
                   className="w-full h-10 px-3 pr-10 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
                 />
                 <button
@@ -305,7 +420,19 @@ export default function Page() {
                   type={showConfirm ? "text" : "password"}
                   placeholder="••••••••"
                   value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setConfirm(value);
+                    setErrors({
+                      firstName: "",
+                      lastName: "",
+                      email: "",
+                      phone: "",
+                      username: "",
+                      password: "",
+                      confirm: validateConfirmPassword(password, value),
+                    });
+                  }}
                   className="w-full h-10 px-3 pr-10 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-300/50 focus:border-pink-300 transition-all"
                 />
                 <button
@@ -320,6 +447,9 @@ export default function Page() {
                   )}
                 </button>
               </div>
+              {errors.confirm && (
+                <p className="text-xs text-pink-500">{errors.confirm}</p>
+              )}
             </div>
           </div>
 
@@ -347,29 +477,16 @@ export default function Page() {
               )}
             </button>
             <span className="text-xs text-gray-600 leading-relaxed">
-              Tôi đồng ý với{" "}
-              <Link
-                href="/dieu-khoan"
-                className="text-pink-500 hover:text-orange-500 transition-colors"
-              >
-                Điều khoản dịch vụ
-              </Link>{" "}
-              và{" "}
-              <Link
-                href="/bao-mat"
-                className="text-pink-500 hover:text-orange-500 transition-colors"
-              >
-                Chính sách bảo mật
-              </Link>
+              Tôi đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.
             </span>
           </div>
 
           {/* Nút đăng ký */}
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={!isFormValid || isLoading}
             className={`w-full h-10 rounded-md bg-gradient-to-r from-pink-400 to-orange-400 hover:from-pink-500 hover:to-orange-500 text-white text-sm font-semibold tracking-wide transition-all mb-6 ${
-              isLoading ? "opacity-70 cursor-not-allowed" : "active:scale-[0.98]"
+              isFormValid && !isLoading ? "active:scale-[0.98] cursor-pointer" : "cursor-not-allowed opacity-75"
             }`}
           >
             {isLoading ? (
@@ -377,23 +494,6 @@ export default function Page() {
             ) : (
               "Đăng ký ngay"
             )}
-          </button>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400">hoặc</span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
-
-          {/* Nút Google */}
-          <button
-            type="button"
-            onClick={handleGoogleUnavailable}
-            className="w-full h-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.98] text-sm font-medium text-gray-700 flex items-center justify-center gap-2.5 transition-all mb-6 cursor-pointer"
-          >
-            <img src="/google.png" alt="Google" className="w-[18px] h-[18px]" />
-            Tiếp tục với Google
           </button>
 
           {/* Đăng nhập */}

@@ -159,8 +159,8 @@ const machines = [
 const todayMix = [
   { name: "Hoàn thành", value: 22, color: "#10b981" },
   { name: "Đang xử lý", value: 18, color: "#f59e0b" },
-  { name: "Quá hạn", value: 4, color: "#ef4444" },
-  { name: "Mới", value: 4, color: "#6366f1" },
+  { name: "Quá hạn", value: 4, color: "#f43f5e" },
+  { name: "Mới", value: 4, color: "#3b82f6" },
 ];
 
 function formatCurrency(value: number) {
@@ -391,9 +391,9 @@ export default function HomeOverview() {
               </div>
               <div className="divide-y divide-slate-100">
                 {[
-                  { time: "09:00", task: "Lấy đồ giặt sấy", customer: "Trần Minh", avatar: "/default_avatar.jfif", type: "Lấy đồ", color: "#3b82f6", bg: "rgba(59,130,246,0.06)", border: "rgba(59,130,246,0.12)" },
-                  { time: "10:30", task: "Giao đơn DH-1048", customer: "Nguyễn Thị Hương", avatar: "/default_avatar.jfif", type: "Giao đồ", color: "#10b981", bg: "rgba(16,185,129,0.06)", border: "rgba(16,185,129,0.12)" },
-                  { time: "13:00", task: "Lấy đồ chăn màn", customer: "Công ty ABC", avatar: "/default_avatar.jfif", type: "Lấy đồ", color: "#6366f1", bg: "rgba(99,102,241,0.06)", border: "rgba(99,102,241,0.12)" },
+                  { time: "09:00", task: "Lấy đồ giặt sấy", customer: "Trần Minh", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", type: "Lấy đồ", color: "#3b82f6", bg: "rgba(59,130,246,0.06)", border: "rgba(59,130,246,0.12)" },
+                  { time: "10:30", task: "Giao đơn DH-1048", customer: "Nguyễn Thị Hương", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", type: "Giao đồ", color: "#10b981", bg: "rgba(16,185,129,0.06)", border: "rgba(16,185,129,0.12)" },
+                  { time: "13:00", task: "Lấy đồ chăn màn", customer: "Công ty ABC", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", type: "Lấy đồ", color: "#6366f1", bg: "rgba(99,102,241,0.06)", border: "rgba(99,102,241,0.12)" },
                 ].map((item, index) => (
                   <div key={index} className="px-4 py-3.5 hover:bg-slate-50/60 transition-colors">
                     <div className="flex items-start justify-between gap-2.5">
@@ -600,7 +600,7 @@ export default function HomeOverview() {
                         </TableCell>
                         <TableCell>
                           <div className="flex min-w-0 items-center gap-2">
-                            <Image src="/default_avatar.jfif" alt={order.customerName} width={24} height={24} className="size-6 shrink-0 rounded-full object-cover" />
+                            <Image src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={order.customerName} width={24} height={24} className="size-6 shrink-0 rounded-full object-cover" />
                             <span className="truncate font-semibold text-slate-800">{order.customerName}</span>
                           </div>
                         </TableCell>

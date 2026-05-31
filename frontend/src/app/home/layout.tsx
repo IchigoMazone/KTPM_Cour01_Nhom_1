@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import AuthGuard from "@/src/components/common/auth-guard";
 import Sidebar from "@/src/components/common/sidebar";
 import Search from "@/src/components/common/search";
 
@@ -14,6 +15,7 @@ export default function HomeLayout({
   const { open, toggle } = useNavbarStore();
 
   return (
+    <AuthGuard allowedRole="admin">
     <div className="flex h-dvh min-w-0 overflow-hidden">
       <Sidebar />
 
@@ -30,5 +32,6 @@ export default function HomeLayout({
         </main>
       </div>
     </div>
+    </AuthGuard>
   );
 }

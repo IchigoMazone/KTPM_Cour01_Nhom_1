@@ -366,7 +366,7 @@ export default function CustomersPage() {
                             onClick={(e) => e.stopPropagation()}
                           />
                           <Image
-                            src="/default_avatar.jfif"
+                            src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
                             alt={c.name}
                             width={28}
                             height={28}

@@ -1,5 +1,5 @@
 from app.repositories.account_repository import AccountRepository
-from app.core.security import create_access_token, create_reset_token, decode_reset_token
+from app.core.security import create_access_token, create_refresh_token, create_reset_token, decode_refresh_token, decode_reset_token
 import bcrypt
 
 class AccountService:
@@ -17,6 +17,12 @@ class AccountService:
                     "success": False,
                     "message": "Tài khoản hoặc mật khẩu không chính xác."
                 }
+
+            if not account[4]:
+                return {
+                    "success": False,
+                    "message": "Tài khoản đã bị khóa."
+                }
             
             client_password = data['password'].encode('utf-8')
             server_password = account[2] if isinstance(account[2], bytes) else account[2].encode('utf-8')
@@ -27,17 +33,91 @@ class AccountService:
                     "message": "Tài khoản hoặc mật khẩu không chính xác."
                 }
 
+            repository.ensure_profile(
+                user_id=account[0],
+                username=account[1],
+                role=account[3]
+            )
+            profile_data = repository.get_profile_by_user_id(account[0], role=account[3])
+            self.connect.commit()
+
             access_token = create_access_token({
                 "user_id": str(account[0]),
                 "username": account[1],
                 "role": account[3]
             })
+            refresh_token = create_refresh_token({
+                "user_id": str(account[0]),
+                "username": account[1],
+                "role": account[3]
+            })
+
+            profile = None
+            if profile_data:
+                profile = {
+                    "profile_id": str(profile_data[0]),
+                    "full_name": profile_data[1],
+                    "email": profile_data[2],
+                    "phone": profile_data[3],
+                    "address": profile_data[4],
+                    "loyalty_points": profile_data[5],
+                    "member_tier": profile_data[6],
+                    "special_notes": profile_data[7],
+                    "image_url": profile_data[8]
+                }
 
             return {
                 "success": True,
                 "message": "Đăng nhập thành công.",
                 "access_token": access_token,
-                "role": account[3]
+                "refresh_token": refresh_token,
+                "token_type": "bearer",
+                "user_id": str(account[0]),
+                "username": account[1],
+                "role": account[3],
+                "profile": profile
+            }
+        except Exception as e:
+            self.connect.rollback()
+            return {
+                "success": False,
+                "message": f"Có lỗi xảy ra khi đăng nhập: {str(e)}"
+            }
+        finally:
+            cursor.close()
+
+    def refresh_access_token(self, refresh_token: str):
+        payload = decode_refresh_token(refresh_token)
+        if not payload:
+            return {
+                "success": False,
+                "message": "Refresh token không hợp lệ hoặc đã hết hạn."
+            }
+
+        user_id = payload.get("user_id")
+        cursor = self.connect.cursor()
+        try:
+            repository = AccountRepository(cursor)
+            account = repository.get_by_id(user_id)
+            if not account or not account[3]:
+                return {
+                    "success": False,
+                    "message": "Tài khoản không tồn tại hoặc đã bị khóa."
+                }
+
+            access_token = create_access_token({
+                "user_id": str(account[0]),
+                "username": account[1],
+                "role": account[2]
+            })
+
+            return {
+                "success": True,
+                "access_token": access_token,
+                "token_type": "bearer",
+                "user_id": str(account[0]),
+                "username": account[1],
+                "role": account[2]
             }
         finally:
             cursor.close()
@@ -55,13 +135,14 @@ class AccountService:
                     "message": "Tài khoản đã tồn tại."
                 }
             
-            # Kiểm tra email đã được sử dụng chưa
-            existing_email = repository.get_by_email(data['email'])
-            if existing_email:
-                return {
-                    "success": False,
-                    "message": "Email đã được sử dụng."
-                }
+            email = data.get('email')
+            if email:
+                existing_email = repository.get_by_email(email)
+                if existing_email:
+                    return {
+                        "success": False,
+                        "message": "Email đã được sử dụng."
+                    }
             
             # Băm mật khẩu
             password_hash = bcrypt.hashpw(
@@ -76,16 +157,12 @@ class AccountService:
             user_id = repository.create_account(
                 username=data['username'],
                 password_hash=password_hash,
-                role="user"
-            )
-            
-            # Tạo profile tương ứng
-            repository.create_profile(
-                user_id=user_id,
+                role="user",
                 full_name=full_name,
-                email=data['email'],
+                email=email,
                 phone=data.get('phone'),
-                address=data.get('address')
+                address=data.get('address'),
+                image_url="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
             )
             
             self.connect.commit()
@@ -122,7 +199,8 @@ class AccountService:
                     "address": profile_data[4],
                     "loyalty_points": profile_data[5],
                     "member_tier": profile_data[6],
-                    "special_notes": profile_data[7]
+                    "special_notes": profile_data[7],
+                    "image_url": profile_data[8]
                 }
             
             return {
@@ -140,8 +218,17 @@ class AccountService:
         try:
             repository = AccountRepository(cursor)
             current = self.get_me(user_id)
-            if not current or not current.get("profile"):
+            if not current:
                 return None
+
+            if not current.get("profile"):
+                repository.ensure_profile(
+                    user_id=user_id,
+                    username=current["username"],
+                    role=current["role"]
+                )
+                self.connect.commit()
+                current = self.get_me(user_id)
 
             profile = current["profile"]
             email = data.get("email", profile.get("email"))
@@ -153,6 +240,7 @@ class AccountService:
                 phone=data.get("phone", profile.get("phone")),
                 address=data.get("address", profile.get("address")),
                 special_notes=data.get("special_notes", profile.get("special_notes")),
+                image_url=data.get("image_url", profile.get("image_url")),
             )
             self.connect.commit()
             return self.get_me(user_id)
@@ -236,4 +324,3 @@ class AccountService:
             }
         finally:
             cursor.close()
-

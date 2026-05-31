@@ -1,1 +1,5 @@
 .env
+ichigomazone/
+.agents
+.codex
+__pycache__

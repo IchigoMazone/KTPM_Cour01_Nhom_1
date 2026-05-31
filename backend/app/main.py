@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from app.core.exceptions import validation_exception_handler
 from app.api.router import api_router
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI(
     title="Server fastAPI",

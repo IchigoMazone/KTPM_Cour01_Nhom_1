@@ -1,14 +1,24 @@
-import { EMAIL_REGEX, PASSWORD_REGEX, USERNAME_REGEX } from "./regex";
+import { EMAIL_REGEX, PASSWORD_REGEX, PHONE_REGEX, USERNAME_REGEX } from "./regex";
 
-export function validateEmail(email: string) {
-  if (!email) return "Email không được để trống.";
+export function validateEmail(email: string, required = true) {
+  if (!email.trim()) return required ? "Email không được để trống." : "";
   if (!EMAIL_REGEX.test(email)) return "Email không hợp lệ.";
+  return "";
+}
+
+export function validatePhone(phone: string, required = false) {
+  if (!phone.trim()) return required ? "Số điện thoại không được để trống." : "";
+  if (!PHONE_REGEX.test(phone.trim())) {
+    return "Số điện thoại không hợp lệ.";
+  }
   return "";
 }
 
 export function validatePassword(password: string) {
   if (!password) return "Mật khẩu không được để trống.";
-  if (!PASSWORD_REGEX.test(password)) return "Mật khẩu không hợp lệ.";
+  if (!PASSWORD_REGEX.test(password)) {
+    return "Mật khẩu 8-16 ký tự, gồm chữ hoa, thường, số, ký tự đặc biệt.";
+  }
   return "";
 }
 
@@ -85,6 +95,7 @@ export type RegisterField =
   | "firstName"
   | "lastName"
   | "email"
+  | "phone"
   | "username"
   | "password"
   | "confirm"
@@ -94,6 +105,7 @@ export type RegisterFormValues = {
   firstName: string;
   lastName: string;
   email: string;
+  phone: string;
   username: string;
   password: string;
   confirm: string;
@@ -108,7 +120,8 @@ export function validateRegisterField(
 ): string {
   if (field === "firstName") return validateRequired(values.firstName, "Họ");
   if (field === "lastName") return validateRequired(values.lastName, "Tên");
-  if (field === "email") return validateEmail(values.email);
+  if (field === "email") return validateEmail(values.email, true);
+  if (field === "phone") return validatePhone(values.phone, true);
   if (field === "username") return validateUsername(values.username);
   if (field === "password") return validatePassword(values.password);
   if (field === "confirm") {
@@ -125,6 +138,7 @@ export function validateRegisterForm(
     firstName: validateRegisterField("firstName", values),
     lastName: validateRegisterField("lastName", values),
     email: validateRegisterField("email", values),
+    phone: validateRegisterField("phone", values),
     username: validateRegisterField("username", values),
     password: validateRegisterField("password", values),
     confirm: validateRegisterField("confirm", values),
