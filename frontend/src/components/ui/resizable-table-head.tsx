@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TableHead } from "@/components/ui/table";
 
-export function ResizableTableHead({ children, className, width: initialWidth, ...props }: React.ComponentProps<"th"> & { width?: number | string }) {
+export function ResizableTableHead({ children, className, width: initialWidth, autoWidth, ...props }: React.ComponentProps<"th"> & { width?: number | string; autoWidth?: boolean }) {
   const [width, setWidth] = useState<number | string | undefined>(initialWidth);
 
+  useEffect(() => {
+    setWidth(initialWidth);
+  }, [initialWidth]);
+
   const startResize = (e: React.MouseEvent) => {
+    if (autoWidth) return;
     e.preventDefault();
     const startX = e.pageX;
     const thElement = (e.target as HTMLElement).closest('th');
@@ -78,23 +83,25 @@ export function ResizableTableHead({ children, className, width: initialWidth, .
     <TableHead
       {...props}
       className={`group/th relative px-0 ${className || ""}`}
-      style={{ width, minWidth: width, maxWidth: width, ...props.style }}
+      style={autoWidth ? props.style : { width, minWidth: width, maxWidth: width, ...props.style }}
     >
       <div className="w-full h-full flex items-center overflow-hidden px-4">
         <div className="truncate w-full">{children}</div>
       </div>
-      <div
-        onMouseDown={startResize}
-        draggable={true}
-        onDragStart={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        className="absolute right-[-12px] top-0 h-full w-6 cursor-col-resize z-50 flex items-center justify-center group/handle"
-        title="Kéo để thay đổi độ rộng"
-      >
-        <div className="h-full w-[2px] bg-slate-300 opacity-0 group-hover/handle:opacity-100 group-hover/handle:w-[3px] group-hover/handle:bg-slate-400 transition-all duration-200" />
-      </div>
+      {!autoWidth && (
+        <div
+          onMouseDown={startResize}
+          draggable={true}
+          onDragStart={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          className="absolute right-[-12px] top-0 h-full w-6 cursor-col-resize z-50 flex items-center justify-center group/handle"
+          title="Kéo để thay đổi độ rộng"
+        >
+          <div className="h-full w-[2px] bg-slate-300 opacity-0 group-hover/handle:opacity-100 group-hover/handle:w-[3px] group-hover/handle:bg-slate-400 transition-all duration-200" />
+        </div>
+      )}
     </TableHead>
   );
 }

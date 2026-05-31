@@ -256,25 +256,15 @@ export default function SidebarMobile({ onClick }: { onClick: () => void }) {
                 />
                 <span className="truncate">{accountName}</span>
               </Link>
-              <div className={accountRole === "admin" ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
-                {accountRole === "admin" && (
+              {accountRole === "admin" && (
+                <div className="grid grid-cols-1 gap-2">
                   <Button variant="secondary" className="h-10 bg-blue-50 text-blue-700 hover:bg-blue-100" asChild>
                     <Link href="/home" onClick={onClick}>
                       Admin
                     </Link>
                   </Button>
-                )}
-                <Button variant="secondary" className="h-10 bg-blue-50 text-blue-700 hover:bg-blue-100" asChild>
-                  <Link href="/user" onClick={onClick}>
-                    User
-                  </Link>
-                </Button>
-                <Button className="h-10 bg-blue-600 text-white hover:bg-blue-700" asChild>
-                  <Link href={startPath} onClick={onClick}>
-                    Bắt đầu
-                  </Link>
-                </Button>
-              </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">

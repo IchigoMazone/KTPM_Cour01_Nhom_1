@@ -90,6 +90,7 @@ export default function OrdersPage() {
   const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"Bảng" | "Bảng kéo">("Bảng");
+  const [tableResizeMode, setTableResizeMode] = useState<"fit" | "custom">("fit");
   const [draggedOrderId, setDraggedOrderId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<OrderStatus | null>(null);
   const [pageSize, setPageSize] = useState(10);
@@ -134,6 +135,10 @@ export default function OrdersPage() {
   );
   const visibleColumnIds = useMemo(
     () => new Set(columns.filter((column) => column.visible).map((column) => column.id)),
+    [columns],
+  );
+  const totalVisibleWidth = useMemo(
+    () => columns.filter((col) => col.visible).reduce((sum, col) => sum + (col.width || 150), 0),
     [columns],
   );
   const showField = (id: string) => visibleColumnIds.has(id);
@@ -458,6 +463,24 @@ export default function OrdersPage() {
                     <Plus className="size-3.5 mr-2" />
                     Thêm cột mới
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Co giãn dữ liệu bảng</DropdownMenuLabel>
+                  <DropdownMenuCheckboxItem
+                    checked={tableResizeMode === "fit"}
+                    onCheckedChange={(checked) => {
+                      if (checked) setTableResizeMode("fit");
+                    }}
+                  >
+                    Tự động vừa thiết bị
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={tableResizeMode === "custom"}
+                    onCheckedChange={(checked) => {
+                      if (checked) setTableResizeMode("custom");
+                    }}
+                  >
+                    Kéo giãn nâng cao
+                  </DropdownMenuCheckboxItem>
                   {customColumns.length > 0 && (
                     <>
                       <DropdownMenuSeparator />
@@ -553,15 +576,17 @@ export default function OrdersPage() {
             <>
               {/* ── Table ── */}
               <div className="flex-1 overflow-auto [&_div[data-slot=table-container]]:overflow-visible">
-                <Table className="w-max table-fixed text-xs">
+                <Table className={`${tableResizeMode === "fit" ? "w-full table-fixed" : "w-max table-fixed"} text-xs`}>
               <TableHeader>
                 <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
                   {columns.filter(c => c.visible).map(col => (
                     <ResizableTableHead
                       key={col.id}
-                      width={col.width}
+                      width={tableResizeMode === "fit" ? undefined : col.width}
+                      autoWidth={tableResizeMode === "fit"}
+                      style={tableResizeMode === "fit" ? { width: `${((col.width || 120) / totalVisibleWidth) * 100}%` } : undefined}
                       className={`text-xs font-medium text-slate-600 ${col.id === 'actions' ? 'text-left' : ''} ${dragOverColumnId === col.id ? 'bg-slate-200/50' : ''} ${draggedColumnId === col.id ? 'opacity-50' : ''}`}
-                      draggable
+                      draggable={tableResizeMode === "custom"}
                       onDragStart={(e) => handleDragStart(e, col.id)}
                       onDragOver={(e) => handleDragOver(e, col.id)}
                       onDragLeave={handleDragLeave}
