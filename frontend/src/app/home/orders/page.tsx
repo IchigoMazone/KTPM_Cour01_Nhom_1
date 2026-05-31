@@ -833,14 +833,20 @@ export default function OrdersPage() {
               </div>
             </>
           ) : (
-            <div className="flex flex-1 gap-4 overflow-x-auto bg-slate-50/30 p-5">
+            <div className={`flex-1 p-5 bg-slate-50/30 min-h-0 ${
+              tableResizeMode === "fit"
+                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 overflow-y-auto"
+                : "flex gap-4 overflow-x-auto"
+            }`}>
               {statuses.map((status) => {
                 const colOrders = filteredOrders.filter((order) => order.status === status);
 
                 return (
                   <div
                     key={status}
-                    className={`flex min-w-[300px] max-w-[300px] flex-col rounded-xl border border-slate-200 bg-slate-100/50 p-3 transition-colors ${dragOverStatus === status ? "border-slate-400 bg-slate-200/50" : ""}`}
+                    className={`flex flex-col rounded-xl border border-slate-200 bg-slate-100/50 p-3 transition-colors ${
+                      tableResizeMode === "fit" ? "w-full min-h-[300px]" : "min-w-[300px] max-w-[300px]"
+                    } ${dragOverStatus === status ? "border-slate-400 bg-slate-200/50" : ""}`}
                     onDragOver={(event) => {
                       event.preventDefault();
                       if (dragOverStatus !== status) setDragOverStatus(status);
