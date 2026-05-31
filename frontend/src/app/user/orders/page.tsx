@@ -323,7 +323,10 @@ export default function UserOrdersPage() {
 
   const fetchOrders = () => {
     const token = localStorage.getItem("token");
-    if (!token) return;
+    if (!token) {
+      setOrderList(orders as unknown as Order[]);
+      return;
+    }
     setIsLoading(true);
     fetch(`${API_BASE_URL}/api/orders`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -335,9 +338,14 @@ export default function UserOrdersPage() {
       .then((data) => {
         if (Array.isArray(data)) {
           setOrderList(data);
+        } else {
+          setOrderList(orders as unknown as Order[]);
         }
       })
-      .catch((err) => console.error("Error fetching orders:", err))
+      .catch((err) => {
+        console.error("Error fetching orders:", err);
+        setOrderList(orders as unknown as Order[]);
+      })
       .finally(() => {
         setIsLoading(false);
       });
@@ -354,7 +362,20 @@ export default function UserOrdersPage() {
     }
 
     const token = localStorage.getItem("token");
-    if (!token) return;
+    if (!token) {
+      const localDetail = getOrderDetails(selectedTimelineOrder.code);
+      const timeline = getOrderTimeline(selectedTimelineOrder);
+      setSelectedOrderDetail({
+        ...localDetail,
+        code: selectedTimelineOrder.code,
+        status: selectedTimelineOrder.status,
+        status_display: selectedTimelineOrder.status_display || selectedTimelineOrder.status,
+        tone: selectedTimelineOrder.tone,
+        total: selectedTimelineOrder.total,
+        timeline,
+      });
+      return;
+    }
 
     setIsDetailLoading(true);
     fetch(`${API_BASE_URL}/api/orders/${selectedTimelineOrder.code}`, {
@@ -369,7 +390,17 @@ export default function UserOrdersPage() {
       })
       .catch((err) => {
         console.error("Error fetching order details:", err);
-        toast.error("Không thể tải thông tin chi tiết đơn hàng.");
+        const localDetail = getOrderDetails(selectedTimelineOrder.code);
+        const timeline = getOrderTimeline(selectedTimelineOrder);
+        setSelectedOrderDetail({
+          ...localDetail,
+          code: selectedTimelineOrder.code,
+          status: selectedTimelineOrder.status,
+          status_display: selectedTimelineOrder.status_display || selectedTimelineOrder.status,
+          tone: selectedTimelineOrder.tone,
+          total: selectedTimelineOrder.total,
+          timeline,
+        });
       })
       .finally(() => {
         setIsDetailLoading(false);
