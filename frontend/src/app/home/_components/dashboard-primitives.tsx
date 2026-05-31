@@ -138,8 +138,8 @@ export function StatusBadge({
           : "border border-sky-200 bg-sky-100 text-sky-800 hover:bg-sky-100";
 
   return (
-    <Badge variant="secondary" className={`rounded-full font-medium ${className}`}>
-      {children}
+    <Badge variant="secondary" className={`rounded-full font-medium truncate max-w-full ${className}`}>
+      <span className="truncate">{children}</span>
     </Badge>
   );
 }
