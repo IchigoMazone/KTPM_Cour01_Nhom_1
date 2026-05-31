@@ -5,7 +5,7 @@ import {
   BadgeCheck,
   CalendarDays,
   Package,
-  ChartArea,
+  MessageCircle,
 } from "lucide-react";
 
 export const menus = [
@@ -47,9 +47,9 @@ export const menus = [
     description: "Nhân viên, ca làm, năng suất và kho vật tư",
   },
   {
-    label: "Báo cáo & Cài đặt",
-    icon: ChartArea,
-    path: "/home/reports",
-    description: "Thống kê, xuất dữ liệu, phân quyền và tích hợp",
+    label: "Hỗ trợ",
+    icon: MessageCircle,
+    path: "/home/support",
+    description: "Khiếu nại, phản hồi và yêu cầu hỗ trợ khách hàng",
   },
 ];

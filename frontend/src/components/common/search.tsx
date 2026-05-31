@@ -57,8 +57,7 @@ const dashboardCommands = [
   { label: "Cấu hình bảng giá", path: "/home/services", meta: "Dịch vụ" },
   { label: "Mã giảm giá & loyalty", path: "/home/services", meta: "Ưu đãi" },
   { label: "Kho vật tư sắp hết", path: "/home/staff", meta: "Vận hành" },
-  { label: "Phân quyền nhân viên", path: "/home/reports", meta: "Cài đặt" },
-  { label: "Template SMS/Zalo", path: "/home/reports", meta: "Thông báo" },
+  { label: "Ticket hỗ trợ", path: "/home/support", meta: "Hỗ trợ" },
 ];
 
 const pageTitles: Record<string, string> = {
@@ -68,7 +67,7 @@ const pageTitles: Record<string, string> = {
   "/home/customers": "Khách hàng",
   "/home/services": "Dịch vụ & Tài chính",
   "/home/staff": "Vận hành nội bộ",
-  "/home/reports": "Báo cáo & Cài đặt",
+  "/home/support": "Hỗ trợ",
 };
 
 function DashboardTimeRangeControl() {
