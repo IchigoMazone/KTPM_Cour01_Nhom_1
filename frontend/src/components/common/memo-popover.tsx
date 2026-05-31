@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus, Save, StickyNote, Trash2, X } from "lucide-react";
+import { NotebookPen, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -72,7 +72,7 @@ export default function MemoPopover({ className }: { className?: string }) {
           size="sm"
           className={className}
         >
-          <StickyNote className="size-4" />
+          <NotebookPen className="size-4" />
           Ghi nhớ
         </Button>
       </DialogTrigger>

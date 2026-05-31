@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import type { DateRange } from "react-day-picker";
 import {
   CalendarDays,
@@ -50,41 +50,17 @@ import {
   StatusBadge,
 } from "@/src/app/home/_components/dashboard-primitives";
 
-const orders = [
-  { code: "DH-1055", date: "17/05/2026", service: "Giặt thường", total: "92.000đ", status: "Đang giặt", tone: "default" },
-  { code: "DH-1048", date: "16/05/2026", service: "Giặt hấp", total: "180.000đ", status: "Sẵn sàng giao", tone: "success" },
-  { code: "DH-1032", date: "12/05/2026", service: "Chăn màn", total: "240.000đ", status: "Hoàn tất", tone: "success" },
-  { code: "DH-1019", date: "06/05/2026", service: "Giặt khô", total: "135.000đ", status: "Đã hủy", tone: "danger" },
-  { code: "DH-1015", date: "05/05/2026", service: "Giặt thường", total: "75.000đ", status: "Hoàn tất", tone: "success" },
-  { code: "DH-1012", date: "01/05/2026", service: "Giặt thường", total: "110.000đ", status: "Hoàn tất", tone: "success" },
-  { code: "DH-1008", date: "28/04/2026", service: "Giặt hấp", total: "150.000đ", status: "Hoàn tất", tone: "success" },
-  { code: "DH-1005", date: "20/04/2026", service: "Giặt hấp", total: "220.000đ", status: "Hoàn tất", tone: "success" },
-  { code: "DH-0998", date: "15/04/2026", service: "Giặt thường", total: "95.000đ", status: "Hoàn tất", tone: "success" },
-] as const;
-
-const monthNames = [
-  "Tháng 1",
-  "Tháng 2",
-  "Tháng 3",
-  "Tháng 4",
-  "Tháng 5",
-  "Tháng 6",
-  "Tháng 7",
-  "Tháng 8",
-  "Tháng 9",
-  "Tháng 10",
-  "Tháng 11",
-  "Tháng 12",
-];
+import { ResizableTableHead } from "@/src/components/ui/resizable-table-head";
+import { ColumnId } from "./types";
+import { orders, monthNames, defaultColumns } from "./data";
 
 const parseOrderDate = (dateStr: string) => {
   const [day, month, year] = dateStr.split("/").map(Number);
   return new Date(year, month - 1, day);
 };
-
 const getOrderTimeline = (order: { code: string; date: string; status: string }) => {
   const baseDate = order.date;
-  
+
   if (order.status === "Đang giặt") {
     return [
       { stage: "Đã nhận đồ", time: `${baseDate} 08:00`, status: "completed", desc: "Nhân viên Panda đã nhận túi đồ từ khách hàng." },
@@ -324,6 +300,7 @@ interface OrderDetail {
 }
 
 export default function UserOrdersPage() {
+  const [columns, setColumns] = useState(defaultColumns);
   const [orderList, setOrderList] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [deleteOrderCode, setDeleteOrderCode] = useState<string | null>(null);
@@ -435,6 +412,8 @@ export default function UserOrdersPage() {
   const paginatedOrders = useMemo(() => {
     return filteredOrders.slice((page - 1) * pageSize, page * pageSize);
   }, [filteredOrders, page, pageSize]);
+
+
 
   const totalOrders = filteredOrders.length;
   const completedOrders = filteredOrders.filter((o) => o.status === "Hoàn tất").length;
@@ -715,15 +694,18 @@ export default function UserOrdersPage() {
 
       <SectionCard title="Danh sách đơn hàng" description="Các đơn gần nhất của tài khoản này.">
         <div className="overflow-x-auto">
-          <Table>
+          <Table className="table-fixed w-max">
             <TableHeader>
               <TableRow className="bg-[#f7f7f7] hover:bg-[#f7f7f7]">
-                <TableHead>Mã đơn</TableHead>
-                <TableHead>Ngày</TableHead>
-                <TableHead>Dịch vụ</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead className="text-right">Tổng tiền</TableHead>
-                <TableHead className="text-right w-[80px]">Thao tác</TableHead>
+                {columns.filter(c => c.visible).map(col => (
+                  <ResizableTableHead key={col.id} width={col.width} className={col.alignRight ? "text-right" : ""}>
+                    {col.alignRight ? (
+                      <div className="text-right w-full">{col.label}</div>
+                    ) : (
+                      col.label
+                    )}
+                  </ResizableTableHead>
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -735,32 +717,39 @@ export default function UserOrdersPage() {
                     onClick={() => setSelectedTimelineOrder(order)}
                     title="Nhấp để xem tiến trình chi tiết"
                   >
-                    <TableCell className="font-semibold text-neutral-900">{order.code}</TableCell>
-                    <TableCell>{order.date}</TableCell>
-                    <TableCell>{order.service}</TableCell>
-                    <TableCell>
-                      <StatusBadge tone={order.tone}>{order.status}</StatusBadge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">{order.total}</TableCell>
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-md"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteOrderCode(order.code);
-                        }}
-                        title="Xóa đơn hàng"
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </TableCell>
+                    {columns.filter(c => c.visible).map(col => {
+                      if (col.id === "code") return <TableCell key={col.id} className="font-semibold text-neutral-900 truncate overflow-hidden max-w-0" title={order.code}>{order.code}</TableCell>;
+                      if (col.id === "date") return <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={order.date}>{order.date}</TableCell>;
+                      if (col.id === "service") return <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={order.service}>{order.service}</TableCell>;
+                      if (col.id === "status") return (
+                        <TableCell key={col.id} className="truncate overflow-hidden max-w-0">
+                          <StatusBadge tone={order.tone}>{order.status}</StatusBadge>
+                        </TableCell>
+                      );
+                      if (col.id === "total") return <TableCell key={col.id} className="text-right font-medium truncate overflow-hidden max-w-0" title={order.total}>{order.total}</TableCell>;
+                      if (col.id === "actions") return (
+                        <TableCell key={col.id} className="text-right overflow-hidden max-w-0" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-md"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteOrderCode(order.code);
+                            }}
+                            title="Xóa đơn hàng"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TableCell>
+                      );
+                      return null;
+                    })}
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={columns.filter(c => c.visible).length} className="h-24 text-center text-muted-foreground">
                     Không tìm thấy đơn hàng nào trong khoảng thời gian đã chọn.
                   </TableCell>
                 </TableRow>
@@ -829,7 +818,7 @@ export default function UserOrdersPage() {
               Ý kiến phản hồi của bạn giúp chúng tôi nâng cao chất lượng phục vụ mỗi ngày.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="px-5 pb-5">
             <div className="flex gap-2 justify-center my-4">
               {[1, 2, 3, 4, 5].map((star) => (
@@ -840,11 +829,10 @@ export default function UserOrdersPage() {
                   className="focus:outline-none transition-transform hover:scale-110"
                 >
                   <Star
-                    className={`size-8 ${
-                      star <= ratingValue
+                    className={`size-8 ${star <= ratingValue
                         ? "fill-amber-400 text-amber-400"
                         : "text-zinc-200 border-zinc-200"
-                    }`}
+                      }`}
                   />
                 </button>
               ))}
@@ -941,7 +929,7 @@ export default function UserOrdersPage() {
                       Authorization: `Bearer ${token}`,
                     },
                   });
-                  
+
                   const data = await response.json();
                   if (response.ok) {
                     toast.success(`Đã hủy đơn hàng ${deleteOrderCode} thành công!`);
@@ -1034,7 +1022,7 @@ export default function UserOrdersPage() {
                         ))}
                       </div>
                     </div>
-                    
+
                     <div className="border-t border-neutral-200/60 pt-2 mt-2 space-y-1">
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-neutral-400 font-medium">Thanh toán:</span>
@@ -1112,13 +1100,12 @@ export default function UserOrdersPage() {
                           return (
                             <TableRow key={idx} className={`h-8 hover:bg-neutral-50/50 transition-colors ${event.status === "pending" ? "bg-neutral-50/30 text-zinc-400" : ""}`}>
                               <TableCell className="text-center font-mono text-xs py-1.5">
-                                <span className={`inline-flex size-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                                  event.status === "pending"
+                                <span className={`inline-flex size-5 items-center justify-center rounded-full text-[10px] font-bold ${event.status === "pending"
                                     ? "border border-zinc-200 bg-white text-zinc-400"
                                     : event.status === "cancelled"
-                                    ? "bg-rose-500 text-white"
-                                    : "bg-neutral-900 text-white"
-                                }`}>
+                                      ? "bg-rose-500 text-white"
+                                      : "bg-neutral-900 text-white"
+                                  }`}>
                                   {idx + 1}
                                 </span>
                               </TableCell>

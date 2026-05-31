@@ -16,7 +16,7 @@ export default function HomeLayout({
 
   return (
     <AuthGuard allowedRole="admin">
-    <div className="flex h-dvh min-w-0 overflow-hidden">
+    <div className="flex fixed inset-0 min-w-0 overflow-hidden">
       <Sidebar />
 
       <div className="relative flex min-w-0 flex-1 flex-col">
