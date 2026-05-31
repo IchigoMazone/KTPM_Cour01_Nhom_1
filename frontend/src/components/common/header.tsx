@@ -115,7 +115,6 @@ export default function Header() {
   const [accountImageUrl, setAccountImageUrl] = useState("https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
 
   const isLoggedIn = Boolean(accountRole);
-  const startPath = accountRole === "admin" ? "/home" : "/user";
 
   const scrollToHash = useCallback((hash: string, updateHistory?: string) => {
     const execute = (el: HTMLElement) => {
@@ -262,7 +261,7 @@ export default function Header() {
             {!isSessionReady ? (
               <div className="h-9 w-[150px]" aria-hidden="true" />
             ) : isLoggedIn ? (
-              <>
+              accountRole === "admin" ? (
                 <Dropdown
                   trigger={
                     <button
@@ -278,23 +277,21 @@ export default function Header() {
                     </button>
                   }
                   position="bottom-end"
-                  className="min-w-[180px]"
+                  className="min-w-[220px]"
                 >
                   {({ close }) => (
                     <div className="space-y-1">
-                      {accountRole === "admin" && (
-                        <button
-                          type="button"
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-blue-50 hover:text-blue-700"
-                          onClick={() => {
-                            close();
-                            router.push("/home");
-                          }}
-                        >
-                          <PanelsTopLeft className="size-4" />
-                          Vào Admin
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-blue-50 hover:text-blue-700"
+                        onClick={() => {
+                          close();
+                          router.push("/home");
+                        }}
+                      >
+                        <PanelsTopLeft className="size-4" />
+                        Tài khoản quản trị
+                      </button>
                       <button
                         type="button"
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-blue-50 hover:text-blue-700"
@@ -304,27 +301,29 @@ export default function Header() {
                         }}
                       >
                         <UserRound className="size-4" />
-                        Vào User
+                        Tài khoản khách hàng
                       </button>
                     </div>
                   )}
                 </Dropdown>
-                {accountRole === "admin" && (
+              ) : (
+                <>
                   <Button
-                    variant="secondary"
-                    className="hidden bg-blue-50 px-3 text-sm text-blue-700 hover:bg-blue-100 sm:inline-flex"
+                    className="bg-blue-600 px-3 text-sm text-white hover:bg-blue-700 sm:px-4"
                     onClick={() => router.push("/user")}
                   >
-                    Vào User
+                    Bắt đầu
                   </Button>
-                )}
-                <Button
-                  className="bg-blue-600 px-3 text-sm text-white hover:bg-blue-700 sm:px-4"
-                  onClick={() => router.push(startPath)}
-                >
-                  Bắt đầu
-                </Button>
-              </>
+                  <div className="flex max-w-[170px] items-center gap-2 rounded-lg px-1.5 py-1 text-sm font-medium text-slate-800 sm:max-w-[210px]">
+                    <img
+                      src={accountImageUrl}
+                      alt=""
+                      className="size-6 shrink-0 rounded-full object-cover"
+                    />
+                    <span className="truncate">{accountName}</span>
+                  </div>
+                </>
+              )
             ) : (
               <>
                 <Button
