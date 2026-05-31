@@ -61,7 +61,7 @@ function ProtectedRouteSkeleton({ allowedRole }: { allowedRole: AllowedRole }) {
   const isAdmin = allowedRole === "admin";
 
   return (
-    <div className="flex h-dvh min-w-0 overflow-hidden bg-background">
+    <div className="flex fixed inset-0 min-w-0 overflow-hidden bg-background">
       <aside className="hidden h-screen w-[57px] shrink-0 border-r border-slate-200 bg-white xl:block">
         <div className="flex h-[65px] items-center justify-center">
           <Skeleton className="size-9 rounded-xl" />

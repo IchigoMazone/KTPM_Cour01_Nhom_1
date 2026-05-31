@@ -7,10 +7,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
+  PackagePlus,
   PackageSearch,
   RotateCcw,
   SearchIcon,
-  Sparkles,
   X,
 } from "lucide-react";
 import { vi } from "date-fns/locale";
@@ -115,7 +115,7 @@ function DashboardTimeRangeControl() {
         <Button
           type="button"
           variant="ghost"
-          className="flex h-9 min-w-0 shrink-0 gap-2 rounded-lg border border-slate-200 bg-white px-3 text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-none"
+          className="flex h-8 min-w-0 shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800"
         >
           <CalendarDays className="size-4" />
           <span className="hidden max-w-[150px] truncate sm:inline">
@@ -217,7 +217,7 @@ function DashboardTimeRangeControl() {
                     </span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-auto p-0">
+                <PopoverContent align="start" className="z-[2101] w-auto p-0">
                   <Calendar
                     mode="single"
                     selected={draftNormalizedRange.start}
@@ -255,7 +255,7 @@ function DashboardTimeRangeControl() {
                     </span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-auto p-0">
+                <PopoverContent align="start" className="z-[2101] w-auto p-0">
                   <Calendar
                     mode="single"
                     selected={draftNormalizedRange.end}
@@ -336,11 +336,19 @@ export default function Search() {
   }, [deliveryEnabled, query]);
 
   const title = pageTitles[pathname] ?? "Dashboard";
+  const openCreateOrder = () => {
+    if (pathname === "/home/orders") {
+      window.dispatchEvent(new Event("orders:create"));
+      return;
+    }
+
+    router.push("/home/orders?create=1");
+  };
 
   return (
     <>
-      <div className="relative z-[1000] min-h-16 border-b border-slate-200 bg-white px-3 sm:px-4">
-      <div className="flex min-h-16 min-w-0 items-center gap-2 sm:gap-3">
+      <div className="relative z-[1000] min-h-12 border-b border-slate-200 bg-white px-5">
+      <div className="flex min-h-12 min-w-0 items-center gap-2">
         <button
           type="button"
           aria-label="Mở menu"
@@ -361,7 +369,7 @@ export default function Search() {
               <Button
                 type="button"
                 variant="ghost"
-                className="size-10 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-none"
+                className="size-8 rounded-md border border-slate-200 bg-white text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800"
                 aria-label="Tìm kiếm"
               >
                 <SearchIcon className="size-4" />
@@ -444,18 +452,18 @@ export default function Search() {
         <DashboardTimeRangeControl />
         <Button
           variant="ghost"
-          className="hidden h-9 shrink-0 gap-2 md:flex rounded-lg border border-slate-200 bg-white px-3 text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-none"
+          className="hidden h-8 shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800 md:flex"
           onClick={() => setNotificationsOpen(true)}
         >
           <Bell className="size-4" />
           <span>5</span>
         </Button>
-        <MemoPopover className="hidden h-9 shrink-0 gap-2 lg:flex rounded-lg border border-slate-200 bg-white px-3 text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-none" />
+        <MemoPopover className="hidden h-8 shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800 lg:flex" />
         <Button
-          className="hidden h-9 shrink-0 gap-2 bg-slate-900 text-white hover:bg-slate-800 sm:flex rounded-lg px-4 font-medium transition-colors"
-          onClick={() => router.push("/home/orders")}
+          className="hidden h-8 shrink-0 gap-1.5 rounded-md bg-slate-900 px-3 text-xs font-medium text-white transition-colors hover:bg-slate-800 sm:flex"
+          onClick={openCreateOrder}
         >
-          <Sparkles className="size-4" />
+          <PackagePlus className="size-4" />
           Tạo đơn
         </Button>
       </div>
