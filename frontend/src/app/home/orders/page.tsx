@@ -8,11 +8,15 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Clock,
+  Download,
   EyeOff,
+  FileDown,
+  FileSpreadsheet,
   FileText,
+  FileType,
+  History,
   Kanban,
   List,
-  MoreHorizontal,
   Pencil,
   Plus,
   Search,
@@ -25,6 +29,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -35,6 +52,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -57,6 +75,7 @@ import {
   fromOrderDate,
   normalizeRange,
   startOfDay,
+  toInputDate,
 } from "@/src/utils/dashboard-time";
 
 import { ResizableTableHead } from "@/src/components/ui/resizable-table-head";
@@ -71,6 +90,22 @@ import {
   allStatusBgColor,
   defaultColumns,
 } from "./data";
+
+type ExportFormat = "pdf" | "excel" | "csv";
+type SaveFilePickerWindow = Window & {
+  showSaveFilePicker?: (options: {
+    suggestedName?: string;
+    types?: Array<{
+      description: string;
+      accept: Record<string, string[]>;
+    }>;
+  }) => Promise<{
+    createWritable: () => Promise<{
+      write: (data: Blob) => Promise<void>;
+      close: () => Promise<void>;
+    }>;
+  }>;
+};
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState(seedOrders);
@@ -97,6 +132,15 @@ export default function OrdersPage() {
   const [customPageSize, setCustomPageSize] = useState("");
   const [openPageSizeMenu, setOpenPageSizeMenu] = useState(false);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [currentStaffName] = useState(() => {
+    if (typeof window === "undefined") return "Chưa gán";
+
+    return (
+      localStorage.getItem("accountName") ||
+      localStorage.getItem("username") ||
+      "Chưa gán"
+    );
+  });
   const selectAllCheckboxRef = useRef<HTMLInputElement>(null);
   const normalizedRange = normalizeRange(range);
   const rangeLabel = formatRange(normalizedRange);
@@ -132,6 +176,18 @@ export default function OrdersPage() {
   const customColumns = useMemo(
     () => columns.filter((column) => !defaultColumns.some((defaultColumn) => defaultColumn.id === column.id)),
     [columns],
+  );
+  const exportColumns = useMemo(
+    () => columns.filter((column) => column.visible && column.id !== "actions"),
+    [columns],
+  );
+  const hourOptions = useMemo(
+    () => Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0")),
+    [],
+  );
+  const minuteOptions = useMemo(
+    () => Array.from({ length: 60 }, (_, minute) => String(minute).padStart(2, "0")),
+    [],
   );
   const visibleColumnIds = useMemo(
     () => new Set(columns.filter((column) => column.visible).map((column) => column.id)),
@@ -203,14 +259,6 @@ export default function OrdersPage() {
     });
   };
 
-  const colorWithAlpha = (hex: string, alpha: number) => {
-    const value = hex.replace("#", "");
-    const red = parseInt(value.slice(0, 2), 16);
-    const green = parseInt(value.slice(2, 4), 16);
-    const blue = parseInt(value.slice(4, 6), 16);
-    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-  };
-
   const updatePageSize = (size: number) => {
     const nextSize = Math.max(1, Math.min(500, Math.floor(size)));
     setPageSize(nextSize);
@@ -223,6 +271,248 @@ export default function OrdersPage() {
     if (!Number.isFinite(nextSize) || nextSize <= 0) return;
     updatePageSize(nextSize);
     setCustomPageSize("");
+  };
+
+  const getDeliveryTimeParts = () => {
+    if (!/^\d{2}:\d{2}$/.test(form.deliveryTime)) {
+      return { hour: "", minute: "" };
+    }
+
+    const [hour, minute] = form.deliveryTime.split(":");
+    return { hour, minute };
+  };
+
+  const updateDeliveryTimePart = (part: "hour" | "minute", value: string) => {
+    const current = getDeliveryTimeParts();
+    const nextHour = part === "hour" ? value : current.hour || "00";
+    const nextMinute = part === "minute" ? value : current.minute || "00";
+
+    setForm({ ...form, deliveryTime: `${nextHour}:${nextMinute}` });
+  };
+
+  const getCreatedAtDate = () => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.createdAt)) return undefined;
+
+    const date = fromOrderDate(form.createdAt);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  };
+
+  const getExportRows = () => {
+    return selectedOrderIds.size > 0 ? selectedOrders : orders;
+  };
+
+  const formatExportDate = (date: Date) =>
+    date.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+
+  const getExportValue = (order: Order, columnId: string) => {
+    const value = order[columnId];
+
+    if (columnId === "amount") {
+      return `${order.amount.toLocaleString("vi-VN")}đ`;
+    }
+
+    return value === undefined || value === null || value === "" ? "Chưa có" : String(value);
+  };
+
+  const downloadBlob = async (
+    content: BlobPart,
+    fileName: string,
+    type: string,
+    extension: string,
+    description: string,
+  ) => {
+    const blob = new Blob([content], { type });
+    const savePicker = (window as SaveFilePickerWindow).showSaveFilePicker;
+
+    if (savePicker) {
+      try {
+        const fileHandle = await savePicker({
+          suggestedName: fileName,
+          types: [
+            {
+              description,
+              accept: {
+                [type.split(";")[0]]: [extension],
+              },
+            },
+          ],
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  const sanitizeFileName = (value: string) =>
+    value
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, "-")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+
+  const getDefaultExportFileName = () => {
+    const fileScope = selectedOrderIds.size > 0 ? "da-chon" : "tat-ca";
+    const fileDate = new Date().toISOString().slice(0, 10);
+
+    return `don-hang-${fileScope}-${fileDate}`;
+  };
+
+  const handleExport = async (format: ExportFormat, fileName: string) => {
+    const rows = getExportRows();
+    if (rows.length === 0) return;
+
+    const fileScope = selectedOrderIds.size > 0 ? "da-chon" : "tat-ca";
+    const fileDate = new Date().toISOString().slice(0, 10);
+    const baseFileName = sanitizeFileName(fileName) || `don-hang-${fileScope}-${fileDate}`;
+    const exportStartDate = formatExportDate(normalizedRange.start);
+    const exportEndDate = formatExportDate(normalizedRange.end);
+    const exportedAt = new Date().toLocaleString("vi-VN");
+    const exportTotalAmount = rows.reduce((sum, order) => sum + order.amount, 0);
+    const exportTotalLabel = `${exportTotalAmount.toLocaleString("vi-VN")}đ`;
+
+    if (format === "csv") {
+      const csvRows = [
+        ["Từ ngày", exportStartDate],
+        ["Đến ngày", exportEndDate],
+        ["Thời điểm xuất file", exportedAt],
+        ["Số đơn", String(rows.length)],
+        ["Tổng doanh thu", exportTotalLabel],
+        [],
+        exportColumns.map((column) => column.label),
+        ...rows.map((order) => exportColumns.map((column) => getExportValue(order, column.id))),
+      ];
+      const csv = csvRows
+        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+      await downloadBlob(
+        `\uFEFF${csv}`,
+        `${baseFileName}.csv`,
+        "text/csv;charset=utf-8",
+        ".csv",
+        "CSV",
+      );
+      return;
+    }
+
+    const tableHead = exportColumns
+      .map((column) => `<th>${escapeHtml(column.label)}</th>`)
+      .join("");
+    const tableBody = rows
+      .map(
+        (order) =>
+          `<tr>${exportColumns
+            .map((column) => `<td>${escapeHtml(getExportValue(order, column.id))}</td>`)
+            .join("")}</tr>`,
+      )
+      .join("");
+    const htmlTable = `
+      <table>
+        <thead><tr>${tableHead}</tr></thead>
+        <tbody>${tableBody}</tbody>
+      </table>
+    `;
+    const exportSummary = `
+      <div class="summary">
+        <p><span>Thời gian:</span> từ ${escapeHtml(exportStartDate)} đến ${escapeHtml(exportEndDate)}</p>
+        <p><span>Thời điểm xuất file:</span> ${escapeHtml(exportedAt)}</p>
+        <p><span>Số đơn:</span> ${rows.length}</p>
+        <p><span>Tổng doanh thu:</span> ${escapeHtml(exportTotalLabel)}</p>
+      </div>
+    `;
+
+    if (format === "excel") {
+      const workbook = `
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <style>
+              h1 { font-size: 18px; }
+              .summary { margin-bottom: 16px; }
+              .summary p { margin: 0 0 4px; }
+              .summary span { font-weight: 700; }
+              table { border-collapse: collapse; }
+              th, td { border: 1px solid #d9e2ec; padding: 8px; }
+              th { background: #f8fafc; }
+            </style>
+          </head>
+          <body>
+            <h1>Danh sách đơn hàng</h1>
+            ${exportSummary}
+            ${htmlTable}
+          </body>
+        </html>
+      `;
+      await downloadBlob(
+        workbook,
+        `${baseFileName}.xls`,
+        "application/vnd.ms-excel;charset=utf-8",
+        ".xls",
+        "Excel",
+      );
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=1200,height=800");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html lang="vi">
+        <head>
+          <meta charset="utf-8" />
+          <title>${escapeHtml(baseFileName)}</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #0f172a; padding: 24px; }
+            h1 { font-size: 20px; margin: 0 0 6px; }
+            p { margin: 0 0 18px; color: #64748b; font-size: 12px; }
+            .summary { margin-bottom: 18px; }
+            .summary p { margin: 0 0 5px; color: #334155; font-size: 12px; }
+            .summary span { font-weight: 700; color: #0f172a; }
+            table { width: 100%; border-collapse: collapse; font-size: 11px; }
+            th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+            th { background: #f8fafc; font-weight: 700; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>Danh sách đơn hàng</h1>
+          <p>${rows.length} đơn · ${selectedOrderIds.size > 0 ? "Đơn đã chọn" : "Tất cả đơn hàng"}</p>
+          ${exportSummary}
+          ${htmlTable}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
 
   const getCustomFields = useCallback(
@@ -299,9 +589,9 @@ export default function OrdersPage() {
 
   const openCreateForm = useCallback(() => {
     setEditingOrderId(null);
-    setForm({ ...emptyForm, ...getCustomFields(), createdAt: new Date().toISOString().slice(0, 10) });
+    setForm({ ...emptyForm, ...getCustomFields(), staff: currentStaffName, createdAt: new Date().toISOString().slice(0, 10) });
     setOpenForm(true);
-  }, [getCustomFields]);
+  }, [currentStaffName, getCustomFields]);
 
   const openEditForm = (order: Order) => {
     setEditingOrderId(order.id);
@@ -358,7 +648,7 @@ export default function OrdersPage() {
       appointment: form.appointment || "Chưa hẹn",
       deliveryDate: form.deliveryDate || form.createdAt || new Date().toISOString().slice(0, 10),
       deliveryTime: form.deliveryTime || "Chưa hẹn",
-      staff: form.staff || "Chưa gán",
+      staff: currentStaffName || form.staff || "Chưa gán",
       createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
       note: `${form.note}${form.discount ? ` · Mã ${form.discount}` : ""}`,
       ...getCustomFields(form),
@@ -510,19 +800,43 @@ export default function OrdersPage() {
                   setOpenHistory(true);
                 }}
               >
-                <MoreHorizontal className="size-3.5" />
+                <History className="size-3.5" />
                 Lịch sử
               </button>
-              <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-                Xuất file
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50">
+                    <Download className="size-3.5" />
+                    Xuất file
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel>Chọn định dạng xuất</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {[
+                    { label: "PDF", hint: "Bản in, hóa đơn và báo cáo", icon: FileText, format: "pdf" },
+                    { label: "Excel", hint: "Đối soát, lọc và xử lý dữ liệu", icon: FileSpreadsheet, format: "excel" },
+                    { label: "CSV", hint: "Nhập dữ liệu sang hệ thống khác", icon: FileType, format: "csv" },
+                  ].map(({ label, hint, icon: Icon, format }) => (
+                    <DropdownMenuItem key={label} className="items-start gap-3 py-2.5" onClick={() => handleExport(format as ExportFormat, getDefaultExportFileName())}>
+                      <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
+                        {label === "PDF" ? <FileDown className="size-4" /> : <Icon className="size-4" />}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-xs font-medium text-slate-800">Xuất {label}</span>
+                        <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">{hint}</span>
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <button
                 type="button"
                 className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
                 onClick={openCreateForm}
               >
+                <Plus className="size-3.5" />
                 Thêm đơn
-                <ChevronDown className="size-3.5" />
               </button>
             </div>
           </div>
@@ -532,13 +846,37 @@ export default function OrdersPage() {
             <button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
               <CalendarClock className="size-3.5" />
               {rangeLabel}
-              <ChevronDown className="size-3.5" />
             </button>
-            <button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-              <SlidersHorizontal className="size-3.5" />
-              {selectedStatus}
-              <ChevronDown className="size-3.5" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
+                  <SlidersHorizontal className="size-3.5" />
+                  {selectedStatus}
+                  <ChevronDown className="size-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52">
+                <DropdownMenuLabel>Trạng thái đơn</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {(["Tất cả", ...statuses] as const).map((status) => {
+                  const isAll = status === "Tất cả";
+                  const statusColor = isAll ? allStatusColor : statusDotColor[status];
+
+                  return (
+                    <DropdownMenuItem
+                      key={status}
+                      onClick={() => {
+                        setSelectedStatus(status);
+                        setPage(1);
+                      }}
+                    >
+                      <span className="mr-2 size-2 rounded-full" style={{ backgroundColor: statusColor }} />
+                      {status}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <div className="ml-auto hidden flex-wrap gap-1.5 2xl:flex">
               {(["Tất cả", ...statuses] as const).map((status) => {
                 const active = selectedStatus === status;
@@ -893,7 +1231,19 @@ export default function OrdersPage() {
                               {order.deliveryDate}
                             </span>
                           </div>
-                          <p className="mt-2 text-sm font-medium text-slate-700">{order.customer}</p>
+                          <div className="mt-2 flex min-w-0 items-center gap-2">
+                            <Image
+                              src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+                              alt={order.customer}
+                              width={32}
+                              height={32}
+                              className="size-8 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-slate-700">{order.customer}</p>
+                              <p className="truncate text-[11px] text-slate-400">{order.phone}</p>
+                            </div>
+                          </div>
                           <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-slate-500">
                             <List className="size-3" /> {order.service} · {order.quantity}
                           </p>
@@ -901,9 +1251,25 @@ export default function OrdersPage() {
                             <Clock className="size-3" /> Hẹn: {order.appointment} · Giao: {order.deliveryTime}
                           </p>
                           <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2">
-                            <span className="text-[13px] font-bold text-slate-900">
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              {order.staff === "Chưa gán" ? (
+                                <div className="flex size-5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-[9px] font-bold text-slate-400">?</div>
+                              ) : (
+                                <Image
+                                  src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+                                  alt={order.staff}
+                                  width={20}
+                                  height={20}
+                                  className="size-5 shrink-0 rounded-full object-cover ring-1 ring-white"
+                                />
+                              )}
+                              <span className="truncate text-[11px] text-slate-500">{order.staff}</span>
+                            </div>
+                            <span className="shrink-0 text-[13px] font-bold text-slate-900">
                               {order.amount.toLocaleString("vi-VN")}đ
                             </span>
+                          </div>
+                          <div className="mt-2 flex justify-end">
                             <button
                               type="button"
                               onClick={() => openEditForm(order)}
@@ -929,24 +1295,23 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* ════════════ MODAL: Create / Edit ════════════ */}
-      {openForm && (
-        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <Card className="h-[min(86vh,680px)] w-[min(86vw,680px)] overflow-hidden rounded-xl border-2 border-slate-300 shadow-2xl">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-200 px-6 py-4">
-              <CardTitle className="text-lg font-semibold">
-                {editingOrderId ? `Chi tiết đơn ${editingOrderId}` : "Tạo đơn giặt mới"}
-              </CardTitle>
-              <button
-                type="button"
-                className="inline-flex size-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                onClick={closeForm}
-              >
-                <X className="size-5" />
-              </button>
-            </CardHeader>
-            <CardContent className="h-[calc(100%-73px)] overflow-y-auto p-6">
-              <div className="grid gap-4">
+      <Dialog open={openForm} onOpenChange={(open) => {
+        if (!open) closeForm();
+      }}>
+        <DialogContent showCloseButton={false} className="flex h-[min(86vh,680px)] w-[min(86vw,680px)] max-w-[min(86vw,680px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[680px]">
+          <DialogHeader className="flex-row items-center justify-between gap-3 border-b border-slate-200 px-6 py-4">
+            <DialogTitle className="text-lg font-semibold">
+              {editingOrderId ? `Chi tiết đơn ${editingOrderId}` : "Tạo đơn giặt mới"}
+            </DialogTitle>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon-sm" className="shrink-0">
+                <X className="size-4" />
+                <span className="sr-only">Đóng</span>
+              </Button>
+            </DialogClose>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">
+            <div className="grid gap-4">
                 {showField("customer") && (
                   <div className="space-y-2">
                     <Label>Khách hàng</Label>
@@ -974,25 +1339,91 @@ export default function OrdersPage() {
                 {showField("deliveryTime") && (
                   <div className="space-y-2">
                     <Label>Giờ giao</Label>
-                    <Input type="time" value={form.deliveryTime} onChange={(event) => setForm({ ...form, deliveryTime: event.target.value })} />
+                    <div className="grid grid-cols-[76px_76px_auto] items-center gap-2">
+                      <Select value={getDeliveryTimeParts().hour} onValueChange={(value) => updateDeliveryTimePart("hour", value)}>
+                        <SelectTrigger className="w-[76px]">
+                          <SelectValue placeholder="Giờ" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[2100]">
+                          {hourOptions.map((hour) => (
+                            <SelectItem key={hour} value={hour}>
+                              {hour}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={getDeliveryTimeParts().minute} onValueChange={(value) => updateDeliveryTimePart("minute", value)}>
+                        <SelectTrigger className="w-[76px]">
+                          <SelectValue placeholder="Phút" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[2100]">
+                          {minuteOptions.map((minute) => (
+                            <SelectItem key={minute} value={minute}>
+                              {minute}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant={/^\d{2}:\d{2}$/.test(form.deliveryTime) ? "outline" : "default"}
+                        onClick={() => setForm({ ...form, deliveryTime: "Chưa hẹn" })}
+                      >
+                        Chưa hẹn
+                      </Button>
+                    </div>
                   </div>
                 )}
                 {showField("createdAt") && (
                   <div className="space-y-2">
                     <Label>Thời gian</Label>
-                    <Input type="date" value={form.createdAt} onChange={(event) => setForm({ ...form, createdAt: event.target.value })} />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button type="button" variant="outline" className="w-full justify-start text-left font-normal">
+                          <CalendarClock className="size-4 text-muted-foreground" />
+                          {getCreatedAtDate() ? formatExportDate(getCreatedAtDate()!) : "Chọn ngày"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="z-[2100] w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={getCreatedAtDate()}
+                          defaultMonth={getCreatedAtDate()}
+                          onSelect={(date) => {
+                            if (date) setForm({ ...form, createdAt: toInputDate(date) });
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 )}
                 {showField("staff") && (
                   <div className="space-y-2">
                     <Label>Nhân viên xử lý</Label>
-                    <Input value={form.staff} onChange={(event) => setForm({ ...form, staff: event.target.value })} placeholder="Chưa gán" />
+                    <div className="flex h-8 items-center gap-2 rounded-lg border border-input bg-muted/30 px-2.5 text-sm text-slate-700">
+                      <Image
+                        src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+                        alt={currentStaffName}
+                        width={24}
+                        height={24}
+                        className="size-6 shrink-0 rounded-full object-cover ring-1 ring-white"
+                      />
+                      <span className="truncate font-medium">{currentStaffName}</span>
+                    </div>
                   </div>
                 )}
                 {showField("amount") && (
                   <div className="space-y-2">
-                    <Label>Tạm tính</Label>
-                    <Input type="number" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} />
+                    <Label>Giá tiền</Label>
+                    <div className="relative">
+                      <Input
+                        inputMode="numeric"
+                        value={form.amount}
+                        onChange={(event) => setForm({ ...form, amount: event.target.value.replace(/[^\d]/g, "") })}
+                        className="pr-8"
+                      />
+                      <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">VND</span>
+                    </div>
                   </div>
                 )}
                 {customColumns.filter((column) => column.visible).map((column) => (
@@ -1010,78 +1441,87 @@ export default function OrdersPage() {
                     <Label>Cập nhật trạng thái</Label>
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                       {statuses.map((status) => (
-                        <button
+                        <Button
                           key={status}
+                          variant={form.status === status ? "default" : "outline"}
                           type="button"
                           onClick={() => setForm({ ...form, status })}
-                          className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-all hover:shadow-sm ${form.status === status ? "shadow-sm ring-2 ring-offset-1" : ""}`}
-                          style={{
-                            color: form.status === status ? statusDotColor[status] : "#475569",
-                            backgroundColor: form.status === status ? colorWithAlpha(statusDotColor[status], 0.12) : "#fff",
-                            borderColor: form.status === status ? colorWithAlpha(statusDotColor[status], 0.35) : "#e2e8f0",
-                            ["--tw-ring-color" as string]: colorWithAlpha(statusDotColor[status], 0.16),
-                          }}
+                          className="h-9 justify-center"
                         >
                           <span
-                            className="size-2 rounded-full ring-2"
+                            className="size-2 rounded-full"
                             style={{
-                              backgroundColor: statusDotColor[status],
-                              ["--tw-ring-color" as string]: colorWithAlpha(statusDotColor[status], 0.16),
+                              backgroundColor: form.status === status ? "currentColor" : statusDotColor[status],
                             }}
                           />
                           {status}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   </div>
                 )}
-                <div className="md:col-span-2">
-                  <Button className="w-full bg-slate-900 text-white hover:bg-slate-800" onClick={saveOrder}>
-                    {editingOrderId ? "Lưu thay đổi" : "Lưu đơn và đưa vào tiếp nhận"}
-                  </Button>
-                </div>
-              </div>
-
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            </div>
+          </div>
+          <DialogFooter className="m-0 border-t border-slate-200 bg-white px-6 py-4">
+            <Button className="w-full justify-center bg-slate-900 text-center text-white hover:bg-slate-800 sm:w-auto" onClick={saveOrder}>
+              {editingOrderId ? "Lưu thay đổi" : "Lưu đơn và đưa vào tiếp nhận"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ════════════ MODAL: Invoice ════════════ */}
       {invoiceOrder && (
         <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <Card className="w-full max-w-lg rounded-2xl border-0 shadow-2xl">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-200 px-6 py-4">
+          <Card className="w-full max-w-lg overflow-hidden rounded-xl border-border bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10">
+            <CardHeader className="flex flex-row items-start justify-between border-b border-border bg-popover px-6 py-3">
               <CardTitle className="text-lg font-semibold">Hóa đơn {invoiceOrder.id}</CardTitle>
               <button
                 type="button"
-                className="inline-flex size-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                className="inline-flex size-8 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-muted"
                 onClick={() => setInvoiceOrder(null)}
               >
                 <X className="size-5" />
               </button>
             </CardHeader>
-            <CardContent className="space-y-4 p-6 text-sm">
-              <div className="flex items-start justify-between gap-4 rounded-xl border border-slate-200 p-4">
-                <div>
-                  <p className="font-semibold text-slate-900">{invoiceOrder.customer}</p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {invoiceOrder.deliveryTime} · {invoiceOrder.deliveryDate}
-                  </p>
+            <CardContent className="space-y-4 px-6 py-3 text-sm">
+              <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-muted/30 p-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <Image
+                    src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+                    alt={invoiceOrder.customer}
+                    width={32}
+                    height={32}
+                    className="size-8 shrink-0 rounded-full object-cover ring-1 ring-border"
+                  />
+                  <div className="min-w-0">
+                    <p className="font-semibold leading-none text-foreground">{invoiceOrder.customer}</p>
+                    {invoiceOrder.phone && (
+                      <p className="mt-1.5 text-xs text-muted-foreground">{invoiceOrder.phone}</p>
+                    )}
+                  </div>
                 </div>
-                <div className="grid size-20 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-[10px] font-medium text-slate-400">
-                  QR PAY
+                <div className="flex shrink-0 justify-end">
+                  <div
+                    aria-label={`QR thanh toán hóa đơn ${invoiceOrder.id}`}
+                    className="size-44 rounded-lg border border-border bg-background bg-[length:calc(100%-16px)_calc(100%-16px)] bg-center bg-no-repeat p-2 shadow-sm"
+                    style={{
+                      backgroundImage: `url("https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=1&data=${encodeURIComponent(`BEGAU PAY ${invoiceOrder.id} ${invoiceOrder.customer} ${invoiceOrder.amount} VND`)}")`,
+                    }}
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                <span className="text-slate-400">Dịch vụ</span>
-                <span className="text-right text-slate-700">{invoiceOrder.service}</span>
-                <span className="text-slate-400">Khối lượng</span>
-                <span className="text-right text-slate-700">{invoiceOrder.quantity}</span>
-                <span className="text-slate-400">Thanh toán</span>
-                <span className="text-right text-slate-700">Tiền mặt / QR</span>
-                <span className="text-slate-400">Trạng thái</span>
+                <span className="text-muted-foreground">Dịch vụ</span>
+                <span className="text-right text-foreground">{invoiceOrder.service}</span>
+                <span className="text-muted-foreground">Thời gian</span>
+                <span className="text-right text-foreground">{invoiceOrder.deliveryTime} · {invoiceOrder.deliveryDate}</span>
+                <span className="text-muted-foreground">Khối lượng</span>
+                <span className="text-right text-foreground">{invoiceOrder.quantity}</span>
+                <span className="text-muted-foreground">Thanh toán</span>
+                <span className="text-right text-foreground">Tiền mặt / QR</span>
+                <span className="text-muted-foreground">Trạng thái</span>
                 <span className="text-right">
                   <span
                     className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
@@ -1096,18 +1536,18 @@ export default function OrdersPage() {
                 </span>
               </div>
 
-              <div className="border-t border-slate-200 pt-3 text-xs">
+              <div className="border-t border-border pt-3 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Tạm tính</span>
-                  <span className="text-slate-700">{invoiceOrder.amount.toLocaleString("vi-VN")}đ</span>
+                  <span className="text-muted-foreground">Giá tiền</span>
+                  <span className="text-foreground">{invoiceOrder.amount.toLocaleString("vi-VN")}đ</span>
                 </div>
                 <div className="mt-1 flex justify-between">
-                  <span className="text-slate-400">Mã / điểm</span>
-                  <span className="text-slate-400">Không áp dụng</span>
+                  <span className="text-muted-foreground">Mã / điểm</span>
+                  <span className="text-muted-foreground">Không áp dụng</span>
                 </div>
                 <div className="mt-3 flex justify-between text-base font-bold">
-                  <span className="text-slate-900">Cần thanh toán</span>
-                  <span className="text-slate-900">{invoiceOrder.amount.toLocaleString("vi-VN")}đ</span>
+                  <span className="text-foreground">Cần thanh toán</span>
+                  <span className="text-foreground">{invoiceOrder.amount.toLocaleString("vi-VN")}đ</span>
                 </div>
               </div>
             </CardContent>
@@ -1117,8 +1557,8 @@ export default function OrdersPage() {
 
       {openHistory && (
         <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <Card className="max-h-[86dvh] w-full max-w-3xl overflow-hidden border-blue-100 bg-card shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-blue-100 bg-card px-4 py-3">
+          <Card className="flex h-[620px] max-h-[86dvh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border-border bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10">
+            <CardHeader className="flex flex-row items-start justify-between border-b border-border bg-popover px-4 py-3">
               <div>
                 <CardTitle className="text-base font-semibold">Lịch sử đơn hàng</CardTitle>
                 <p className="mt-0.5 text-xs text-muted-foreground">
@@ -1127,15 +1567,15 @@ export default function OrdersPage() {
               </div>
               <button
                 type="button"
-                className="inline-flex size-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                className="inline-flex size-8 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-muted"
                 onClick={() => setOpenHistory(false)}
               >
                 <X className="size-5" />
               </button>
             </CardHeader>
-            <CardContent className="grid max-h-[calc(86dvh-73px)] min-h-[420px] overflow-hidden p-0 md:grid-cols-[230px_1fr]">
-              <div className="border-b border-blue-100 bg-muted/30 p-2 md:border-b-0 md:border-r">
-                <div className="flex max-h-44 gap-1.5 overflow-x-auto md:max-h-[calc(86dvh-90px)] md:flex-col md:overflow-x-hidden md:overflow-y-auto">
+            <CardContent className="grid min-h-0 flex-1 overflow-hidden p-0 md:grid-cols-[230px_1fr]">
+              <div className="flex min-h-0 flex-col border-b border-border bg-muted/30 p-2 md:border-b-0 md:border-r">
+                <div className="flex min-h-0 flex-1 gap-1.5 overflow-x-auto [scrollbar-gutter:stable] md:flex-col md:overflow-x-hidden md:overflow-y-auto md:pr-1">
                   {selectedOrders.map((order) => {
                     const active = activeHistoryOrder?.id === order.id;
 
@@ -1144,42 +1584,62 @@ export default function OrdersPage() {
                         key={order.id}
                         type="button"
                         onClick={() => setActiveHistoryOrderId(order.id)}
-                        className={`min-w-[200px] rounded-md border px-2.5 py-2 text-left transition-colors md:min-w-0 ${active
-                          ? "border-blue-100 bg-card shadow-sm"
-                          : "border-transparent bg-transparent hover:border-blue-100 hover:bg-card"
+                        className={`min-w-[220px] rounded-md border px-2.5 py-2 text-left transition-colors md:min-w-0 ${active
+                          ? "border-border bg-popover shadow-sm"
+                          : "border-transparent bg-transparent hover:border-border hover:bg-popover"
                           }`}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="truncate text-xs font-semibold text-foreground">{order.id}</span>
-                          <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ color: statusDotColor[order.status], backgroundColor: statusBgColor[order.status] }}>
-                            {order.status}
-                          </span>
+                        <div className="flex min-w-0 items-start gap-2">
+                          <Image
+                            src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+                            alt={order.customer}
+                            width={28}
+                            height={28}
+                            className="size-7 shrink-0 rounded-full object-cover ring-1 ring-background"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate text-xs font-semibold text-foreground">{order.id}</span>
+                              <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ color: statusDotColor[order.status], backgroundColor: statusBgColor[order.status] }}>
+                                {order.status}
+                              </span>
+                            </div>
+                            <p className="mt-1.5 truncate text-xs font-medium text-foreground/80">{order.customer}</p>
+                            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{order.service} · {order.quantity}</p>
+                          </div>
                         </div>
-                        <p className="mt-1.5 truncate text-xs font-medium text-foreground/80">{order.customer}</p>
-                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{order.service} · {order.quantity}</p>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="overflow-y-auto p-4">
+              <div className="min-h-0 overflow-y-auto p-4 [scrollbar-gutter:stable]">
                 {activeHistoryOrder && (() => {
                   const currentStatusIndex = statuses.indexOf(activeHistoryOrder.status);
 
                   return (
                     <div>
                       <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">
-                            {activeHistoryOrder.id} · {activeHistoryOrder.customer}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {activeHistoryOrder.phone} · {activeHistoryOrder.address}
-                          </p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {activeHistoryOrder.service} · {activeHistoryOrder.quantity} · {activeHistoryOrder.staff}
-                          </p>
+                        <div className="flex min-w-0 items-start gap-3">
+                          <Image
+                            src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+                            alt={activeHistoryOrder.customer}
+                            width={40}
+                            height={40}
+                            className="size-10 shrink-0 rounded-full object-cover ring-1 ring-border"
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-foreground">
+                              {activeHistoryOrder.id} · {activeHistoryOrder.customer}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {activeHistoryOrder.phone} · {activeHistoryOrder.address}
+                            </p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {activeHistoryOrder.service} · {activeHistoryOrder.quantity} · {activeHistoryOrder.staff}
+                            </p>
+                          </div>
                         </div>
                         <span
                           className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
