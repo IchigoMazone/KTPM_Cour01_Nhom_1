@@ -21,7 +21,7 @@ export type Order = {
   staff: string;
   createdAt: string;
   note: string;
-  [key: string]: any;
+  [key: string]: string | number;
 };
 
 export type ColumnId = string;

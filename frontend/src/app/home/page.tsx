@@ -22,8 +22,6 @@ import type { LucideIcon } from "lucide-react";
 import {
   CartesianGrid,
   Cell,
-  Line,
-  LineChart,
   Area,
   AreaChart,
   Pie,
@@ -33,19 +31,31 @@ import {
   XAxis,
 } from "recharts";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { TableCell } from "@/components/ui/table";
 import { PageShell } from "./_components/dashboard-primitives";
+import {
+  DashboardDataTable,
+  type DashboardTableColumn,
+} from "@/src/components/common/dashboard-data-table";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { addDays, formatRange, normalizeRange, shortDateFormatter } from "@/src/utils/dashboard-time";
 
 type OrderStatus = "Tiếp nhận" | "Đang giặt" | "Kiểm tra" | "Chờ thanh toán" | "Hoàn thành" | "Quá hạn";
+
+const latestOrderColumns: DashboardTableColumn[] = [
+  { id: "id", label: "Mã đơn", width: 110, visible: true },
+  { id: "customerName", label: "Khách hàng", width: 170, visible: true },
+  { id: "customerType", label: "Loại khách", width: 100, visible: true },
+  { id: "service", label: "Dịch vụ", width: 100, visible: true },
+  { id: "weight", label: "Khối lượng", width: 100, visible: true },
+  { id: "status", label: "Trạng thái", width: 130, visible: true },
+  { id: "deliveryDate", label: "Ngày giao", width: 100, visible: true },
+  { id: "deliveryTime", label: "Giờ giao", width: 90, visible: true },
+  { id: "washer", label: "Máy giặt", width: 125, visible: true },
+  { id: "dryer", label: "Máy sấy", width: 125, visible: true },
+  { id: "staff", label: "Nhân viên", width: 110, visible: true },
+  { id: "actions", label: "Thao tác", width: 150, visible: true },
+];
 
 const statusStyle: Record<OrderStatus, { color: string; bg: string }> = {
   "Tiếp nhận": { color: "#6366f1", bg: "rgba(99,102,241,0.08)" },
@@ -236,6 +246,80 @@ export default function HomeOverview() {
     if (totalMachines === 0) return 0;
     return Math.round((activeMachinesCount / totalMachines) * 100);
   }, [activeMachinesCount, totalMachines]);
+  const latestOrderTotalWidth = latestOrderColumns.reduce((sum, column) => sum + (column.width || 150), 0);
+
+  const renderLatestOrderCell = (order: (typeof latestOrders)[number], column: DashboardTableColumn) => {
+    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{order.id}</TableCell>;
+    if (column.id === "customerName") {
+      return (
+        <TableCell key={column.id}>
+          <div className="flex min-w-0 items-center gap-2">
+            <Image src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={order.customerName} width={24} height={24} className="size-6 shrink-0 rounded-full object-cover" />
+            <span className="truncate font-semibold text-slate-800">{order.customerName}</span>
+          </div>
+        </TableCell>
+      );
+    }
+    if (column.id === "customerType") {
+      return (
+        <TableCell key={column.id}>
+          <span className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] font-bold ${
+            order.customerType === "Mới"
+              ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+              : "border-slate-200 bg-slate-50 text-slate-600"
+          }`}>
+            Khách {order.customerType}
+          </span>
+        </TableCell>
+      );
+    }
+    if (column.id === "status") {
+      const style = statusStyle[order.status];
+      return (
+        <TableCell key={column.id}>
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-0.5 font-medium" style={{ color: style.color, backgroundColor: style.bg }}>
+            <span className="size-1.5 rounded-full" style={{ backgroundColor: style.color }} />
+            {order.status}
+          </span>
+        </TableCell>
+      );
+    }
+    if (column.id === "washer" || column.id === "dryer") {
+      const machine = order[column.id];
+      const activeClass = column.id === "washer" ? "border-blue-100 bg-blue-50/50 text-blue-700" : "border-amber-100 bg-amber-50/50 text-amber-700";
+      const dotClass = column.id === "washer" ? "bg-blue-500" : "bg-amber-500";
+      return (
+        <TableCell key={column.id}>
+          {machine ? (
+            <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-semibold ${activeClass}`}>
+              <span className={`size-1.5 rounded-full ${dotClass}`} />
+              {machine}
+            </span>
+          ) : (
+            <span className="text-[11px] italic text-slate-400">Chưa dùng</span>
+          )}
+        </TableCell>
+      );
+    }
+    if (column.id === "actions") {
+      return (
+        <TableCell key={column.id} className="px-4">
+          <div className="flex items-center justify-start gap-1.5">
+            <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => { window.location.href = `/home/orders?id=${order.id}&action=edit`; }} title="Sửa đơn hàng">
+              <Pencil className="size-3" />
+              Sửa
+            </button>
+            <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => { window.location.href = `/home/orders?id=${order.id}&action=invoice`; }} title="Xem hóa đơn">
+              <FileText className="size-3" />
+              Hóa đơn
+            </button>
+          </div>
+        </TableCell>
+      );
+    }
+    const value = order[column.id as keyof typeof order];
+    return <TableCell key={column.id} className="font-medium text-slate-700">{String(value ?? "")}</TableCell>;
+  };
 
   return (
     <PageShell fullHeight>
@@ -555,130 +639,15 @@ export default function HomeOverview() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <Table className="w-[1410px] xl:w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-                <TableHeader>
-                  <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                    <TableHead className="w-[110px] pl-4 text-xs font-medium text-slate-600">
-                      <span className="inline-flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          aria-label="Chọn tất cả đơn mới"
-                          className="relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all duration-150 checked:border-slate-900 checked:bg-slate-900 after:absolute after:left-[4.5px] after:top-[1px] after:hidden after:h-[9px] after:w-[5px] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block"
-                        />
-                        Mã đơn
-                      </span>
-                    </TableHead>
-                    <TableHead className="w-[170px] border-l border-slate-100 text-xs font-medium text-slate-600">Khách hàng</TableHead>
-                    <TableHead className="w-[100px] border-l border-slate-100 text-xs font-medium text-slate-600">Loại khách</TableHead>
-                    <TableHead className="w-[100px] border-l border-slate-100 text-xs font-medium text-slate-600">Dịch vụ</TableHead>
-                    <TableHead className="w-[100px] border-l border-slate-100 text-xs font-medium text-slate-600">Khối lượng</TableHead>
-                    <TableHead className="w-[130px] border-l border-slate-100 text-xs font-medium text-slate-600">Trạng thái</TableHead>
-                    <TableHead className="w-[100px] border-l border-slate-100 text-xs font-medium text-slate-600">Ngày giao</TableHead>
-                    <TableHead className="w-[90px] border-l border-slate-100 text-xs font-medium text-slate-600">Giờ giao</TableHead>
-                    <TableHead className="w-[125px] border-l border-slate-100 text-xs font-medium text-slate-600">Máy giặt</TableHead>
-                    <TableHead className="w-[125px] border-l border-slate-100 text-xs font-medium text-slate-600">Máy sấy</TableHead>
-                    <TableHead className="w-[110px] border-l border-slate-100 text-xs font-medium text-slate-600">Nhân viên</TableHead>
-                    <TableHead className="w-[150px] border-l border-slate-100 px-4 text-left text-xs font-medium text-slate-600">Thao tác</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {latestOrders.map((order) => {
-                    const style = statusStyle[order.status];
-
-                    return (
-                      <TableRow key={order.id} className="h-11 border-b border-slate-100 text-slate-700 hover:bg-slate-50/60">
-                        <TableCell className="pl-4 font-medium text-slate-900">
-                          <span className="inline-flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              aria-label={`Chọn đơn ${order.id}`}
-                              className="relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all duration-150 checked:border-slate-900 checked:bg-slate-900 after:absolute after:left-[4.5px] after:top-[1px] after:hidden after:h-[9px] after:w-[5px] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block"
-                            />
-                            {order.id}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex min-w-0 items-center gap-2">
-                            <Image src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={order.customerName} width={24} height={24} className="size-6 shrink-0 rounded-full object-cover" />
-                            <span className="truncate font-semibold text-slate-800">{order.customerName}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${
-                            order.customerType === "Mới"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                              : "bg-slate-50 text-slate-600 border-slate-200"
-                          }`}>
-                            Khách {order.customerType}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-slate-600 font-medium">{order.service}</TableCell>
-                        <TableCell className="text-slate-600 font-semibold">{order.weight}</TableCell>
-                        <TableCell>
-                          <span
-                            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-0.5 font-medium"
-                            style={{ color: style.color, backgroundColor: style.bg }}
-                          >
-                            <span className="size-1.5 rounded-full" style={{ backgroundColor: style.color }} />
-                            {order.status}
-                          </span>
-                        </TableCell>
-                        <TableCell className="font-semibold text-slate-700">{order.deliveryDate}</TableCell>
-                        <TableCell className="font-semibold text-slate-900">{order.deliveryTime}</TableCell>
-                        <TableCell>
-                          {order.washer ? (
-                            <span className="inline-flex items-center gap-1 font-semibold text-blue-700 bg-blue-50/50 border border-blue-105 px-2 py-0.5 rounded-md">
-                              <span className="size-1.5 rounded-full bg-blue-500" />
-                              {order.washer}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 italic text-[11px]">Chưa dùng</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {order.dryer ? (
-                            <span className="inline-flex items-center gap-1 font-semibold text-amber-700 bg-amber-50/50 border border-amber-105 px-2 py-0.5 rounded-md">
-                              <span className="size-1.5 rounded-full bg-amber-500" />
-                              {order.dryer}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 italic text-[11px]">Chưa dùng</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-slate-600 font-medium">{order.staff}</TableCell>
-                        <TableCell className="px-4">
-                          <div className="flex items-center justify-start gap-1.5">
-                            <button
-                              type="button"
-                              className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
-                              onClick={() => {
-                                window.location.href = `/home/orders?id=${order.id}&action=edit`;
-                              }}
-                              title="Sửa đơn hàng"
-                            >
-                              <Pencil className="size-3" />
-                              Sửa
-                            </button>
-                            <button
-                              type="button"
-                              className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
-                              onClick={() => {
-                                window.location.href = `/home/orders?id=${order.id}&action=invoice`;
-                              }}
-                              title="Xem hóa đơn"
-                            >
-                              <FileText className="size-3" />
-                              Hóa đơn
-                            </button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+            <DashboardDataTable
+              columns={latestOrderColumns}
+              rows={latestOrders}
+              pageSize={latestOrders.length}
+              emptyMessage="Chưa có đơn hàng mới."
+              tableResizeMode="custom"
+              totalVisibleWidth={latestOrderTotalWidth}
+              renderCell={renderLatestOrderCell}
+            />
           </div>
         </div>
       </div>

@@ -1,12 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarClock,
   ChevronDown,
-  ChevronsLeft,
-  ChevronsRight,
   Clock,
   Download,
   EyeOff,
@@ -15,15 +13,14 @@ import {
   FileText,
   FileType,
   History,
-  Kanban,
   List,
   Pencil,
   Plus,
   Search,
   Settings,
   SlidersHorizontal,
-  Table2,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,15 +56,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TableCell } from "@/components/ui/table";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
+  ViewModeTabs,
   PageShell,
+  type DashboardViewMode,
 } from "../_components/dashboard-primitives";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import {
@@ -78,7 +71,11 @@ import {
   toInputDate,
 } from "@/src/utils/dashboard-time";
 
-import { ResizableTableHead } from "@/src/components/ui/resizable-table-head";
+import {
+  DashboardDataTable,
+  DashboardSelectionBar,
+  DashboardTableFooter,
+} from "@/src/components/common/dashboard-data-table";
 import { Order, OrderStatus } from "./types";
 import {
   statuses,
@@ -107,6 +104,38 @@ type SaveFilePickerWindow = Window & {
   }>;
 };
 
+function MetricCard({
+  title,
+  value,
+  hint,
+  icon: Icon,
+  color,
+}: {
+  title: string;
+  value: string;
+  hint: string;
+  icon: LucideIcon;
+  color: string;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <div className="flex min-w-0 items-center gap-2">
+        <span
+          className="grid size-7 shrink-0 place-items-center rounded-lg"
+          style={{ color, backgroundColor: `${color}14` }}
+        >
+          <Icon className="size-3.5" />
+        </span>
+        <p className="truncate text-xs font-semibold text-slate-900">{title}</p>
+      </div>
+      <p className="mt-3 text-xl font-semibold tracking-tight text-slate-950">
+        {value}
+      </p>
+      <p className="mt-2 truncate text-xs text-slate-400">{hint}</p>
+    </div>
+  );
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState(seedOrders);
   const [columns, setColumns] = useState(defaultColumns);
@@ -124,7 +153,7 @@ export default function OrdersPage() {
   const [newColumnName, setNewColumnName] = useState("");
   const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"Bảng" | "Bảng kéo">("Bảng");
+  const [viewMode, setViewMode] = useState<DashboardViewMode>("Bảng");
   const [tableResizeMode, setTableResizeMode] = useState<"fit" | "custom">("fit");
   const [draggedOrderId, setDraggedOrderId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<OrderStatus | null>(null);
@@ -141,7 +170,6 @@ export default function OrdersPage() {
       "Chưa gán"
     );
   });
-  const selectAllCheckboxRef = useRef<HTMLInputElement>(null);
   const normalizedRange = normalizeRange(range);
   const rangeLabel = formatRange(normalizedRange);
   const checkboxClass =
@@ -165,9 +193,24 @@ export default function OrdersPage() {
   const pageCount = Math.ceil(filteredOrders.length / pageSize);
   const paginatedOrders = filteredOrders.slice((page - 1) * pageSize, page * pageSize);
   const totalAmount = filteredOrders.reduce((sum, order) => sum + order.amount, 0);
+  const completedOrders = filteredOrders.filter((order) => order.status === "Hoàn thành").length;
+  const todayStart = startOfDay(new Date());
+  const overdueOrders = filteredOrders.filter((order) => {
+    const deliveryDate = fromOrderDate(order.deliveryDate);
+    return order.status !== "Hoàn thành" && deliveryDate < todayStart;
+  }).length;
+  const inProgressOrders = filteredOrders.filter((order) =>
+    ["Đang giặt", "Kiểm tra", "Chờ thanh toán"].includes(order.status),
+  ).length;
+  const averageAmount =
+    filteredOrders.length > 0 ? Math.round(totalAmount / filteredOrders.length) : 0;
   const visibleOrderIds = useMemo(
     () => paginatedOrders.map((order) => order.id),
     [paginatedOrders],
+  );
+  const kanbanOrderIds = useMemo(
+    () => filteredOrders.map((order) => order.id),
+    [filteredOrders],
   );
   const selectedOrders = useMemo(
     () => orders.filter((order) => selectedOrderIds.has(order.id)),
@@ -202,15 +245,10 @@ export default function OrdersPage() {
     selectedOrders.find((order) => order.id === activeHistoryOrderId) ?? selectedOrders[0] ?? null;
   const allVisibleSelected =
     visibleOrderIds.length > 0 && visibleOrderIds.every((id) => selectedOrderIds.has(id));
-  const someVisibleSelected =
-    visibleOrderIds.some((id) => selectedOrderIds.has(id)) && !allVisibleSelected;
-
-  useEffect(() => {
-    if (selectAllCheckboxRef.current) {
-      selectAllCheckboxRef.current.indeterminate = someVisibleSelected;
-    }
-  }, [someVisibleSelected]);
-
+  const allKanbanOrdersSelected =
+    kanbanOrderIds.length > 0 && kanbanOrderIds.every((id) => selectedOrderIds.has(id));
+  const selectedVisibleOrderCount = visibleOrderIds.filter((id) => selectedOrderIds.has(id)).length;
+  const selectedKanbanOrderCount = kanbanOrderIds.filter((id) => selectedOrderIds.has(id)).length;
 
   const toggleVisibleOrders = () => {
     setSelectedOrderIds((prev) => {
@@ -220,6 +258,20 @@ export default function OrdersPage() {
         visibleOrderIds.forEach((id) => next.delete(id));
       } else {
         visibleOrderIds.forEach((id) => next.add(id));
+      }
+
+      return next;
+    });
+  };
+
+  const toggleKanbanOrders = () => {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+
+      if (allKanbanOrdersSelected) {
+        kanbanOrderIds.forEach((id) => next.delete(id));
+      } else {
+        kanbanOrderIds.forEach((id) => next.add(id));
       }
 
       return next;
@@ -671,8 +723,130 @@ export default function OrdersPage() {
     closeForm();
   };
 
+  const renderOrderCell = (order: Order, col: { id: string }) => {
+    if (col.id === "id") return (
+      <TableCell key={col.id} className="font-medium text-slate-900 truncate overflow-hidden max-w-0" title={order.id}>
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            aria-label={`Chọn đơn ${order.id}`}
+            checked={selectedOrderIds.has(order.id)}
+            onChange={() => toggleOrder(order.id)}
+            className={`shrink-0 ${checkboxClass}`}
+          />
+          <span className="truncate">{order.id}</span>
+        </div>
+      </TableCell>
+    );
+    if (col.id === "customer") return (
+      <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={order.customer}>
+        <div className="flex min-w-0 items-center gap-2">
+          <Image src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={order.customer} width={28} height={28} className="size-6 shrink-0 rounded-full object-cover" />
+          <span className="truncate font-medium text-slate-900">{order.customer}</span>
+        </div>
+      </TableCell>
+    );
+    if (col.id === "phone") return (
+      <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={order.phone}>
+        <a href={`tel:${order.phone}`} className="text-slate-500 transition-colors hover:text-slate-800">{order.phone}</a>
+      </TableCell>
+    );
+    if (col.id === "service") return (
+      <TableCell key={col.id} className="text-slate-600 truncate overflow-hidden max-w-0" title={order.service}>{order.service}</TableCell>
+    );
+    if (col.id === "quantity") return (
+      <TableCell key={col.id} className="text-slate-600 truncate overflow-hidden max-w-0" title={order.quantity}>{order.quantity}</TableCell>
+    );
+    if (col.id === "amount") return (
+      <TableCell key={col.id} className="font-medium text-slate-900 truncate overflow-hidden max-w-0" title={`${order.amount.toLocaleString("vi-VN")}đ`}>
+        {order.amount.toLocaleString("vi-VN")}đ
+      </TableCell>
+    );
+    if (col.id === "deliveryTime") return (
+      <TableCell key={col.id} className="text-slate-500 truncate overflow-hidden max-w-0" title={order.deliveryTime}>{order.deliveryTime}</TableCell>
+    );
+    if (col.id === "staff") return (
+      <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={order.staff}>
+        <div className="flex items-center gap-2">
+          {order.staff === "Chưa gán" ? (
+            <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-400 border border-slate-200/60 shadow-sm">?</div>
+          ) : (
+            <Image src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={order.staff} width={24} height={24} className="size-6 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm" />
+          )}
+          <span className={`truncate ${order.staff === "Chưa gán" ? "text-slate-400" : "text-slate-600"}`}>{order.staff}</span>
+        </div>
+      </TableCell>
+    );
+    if (col.id === "status") return (
+      <TableCell key={col.id} className="truncate overflow-hidden max-w-0">
+        <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium truncate max-w-full" style={{ color: statusDotColor[order.status], backgroundColor: statusBgColor[order.status] }}>
+          <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusDotColor[order.status] }} />
+          <span className="truncate">{order.status}</span>
+        </span>
+      </TableCell>
+    );
+    if (col.id === "createdAt") return (
+      <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={order.createdAt}>
+        <div className="flex items-center gap-2 text-slate-500">
+          <span className="text-xs truncate">{order.createdAt}</span>
+        </div>
+      </TableCell>
+    );
+    if (col.id === "actions") return (
+      <TableCell key={col.id} className="px-4 overflow-hidden max-w-0">
+        <div className="flex items-center justify-start gap-1.5">
+          <button type="button" className="inline-flex shrink-0 h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openEditForm(order)} title="Xem chi tiết">
+            <Pencil className="size-3.5" />Sửa
+          </button>
+          <button type="button" className="inline-flex shrink-0 h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => setInvoiceOrder(order)} title="Hóa đơn">
+            <FileText className="size-3.5" />Hóa đơn
+          </button>
+        </div>
+      </TableCell>
+    );
+
+    const val = order[col.id];
+    const displayValue = val ? String(val) : "Chưa có";
+    return (
+      <TableCell key={col.id} className={`truncate overflow-hidden max-w-0 ${!val ? "text-slate-400 italic" : "text-slate-600"}`} title={displayValue}>
+        {displayValue}
+      </TableCell>
+    );
+  };
+
   return (
     <PageShell fullHeight>
+      <div className="grid shrink-0 gap-3 md:grid-cols-4">
+        <MetricCard
+          title="Đơn trong kỳ"
+          value={`${filteredOrders.length} đơn`}
+          hint={`${selectedStatus} · ${rangeLabel}`}
+          icon={FileText}
+          color="#2563eb"
+        />
+        <MetricCard
+          title="Đang xử lý"
+          value={`${inProgressOrders} đơn`}
+          hint="Đang giặt, kiểm tra, chờ thanh toán"
+          icon={Clock}
+          color="#f59e0b"
+        />
+        <MetricCard
+          title="Hoàn thành"
+          value={`${completedOrders} đơn`}
+          hint={overdueOrders > 0 ? `${overdueOrders} đơn quá hạn cần xử lý` : "Không có đơn quá hạn"}
+          icon={History}
+          color={overdueOrders > 0 ? "#ef4444" : "#10b981"}
+        />
+        <MetricCard
+          title="Doanh thu"
+          value={`${totalAmount.toLocaleString("vi-VN")}đ`}
+          hint={`Trung bình ${averageAmount.toLocaleString("vi-VN")}đ/đơn`}
+          icon={FileSpreadsheet}
+          color="#7c3aed"
+        />
+      </div>
+
       <div className="flex min-h-0 flex-1 flex-col">
         {/* ════════════ MAIN TABLE CONTAINER ════════════ */}
         <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
@@ -680,23 +854,7 @@ export default function OrdersPage() {
           <div className="flex flex-col gap-3 border-b border-slate-200 px-5 pt-1 pb-3 xl:flex-row xl:items-center xl:justify-between">
             {/* Left: view tabs */}
             <div className="flex items-center gap-1">
-              {([
-                ["Bảng", Table2],
-                ["Bảng kéo", Kanban],
-              ] as const).map(([label, Icon]) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => setViewMode(label)}
-                  className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-all ${viewMode === label
-                    ? "border-slate-300 bg-slate-50 text-slate-800 shadow-sm"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800"
-                    }`}
-                >
-                  <Icon className="size-3.5" />
-                  {label}
-                </button>
-              ))}
+              <ViewModeTabs value={viewMode} onChange={setViewMode} />
             </div>
 
             {/* Right: search + actions */}
@@ -877,6 +1035,15 @@ export default function OrdersPage() {
                 })}
               </DropdownMenuContent>
             </DropdownMenu>
+            <DashboardSelectionBar
+              checked={viewMode === "Bảng kéo" ? allKanbanOrdersSelected : allVisibleSelected}
+              disabled={viewMode === "Bảng kéo" ? kanbanOrderIds.length === 0 : visibleOrderIds.length === 0}
+              selectedCount={viewMode === "Bảng kéo" ? selectedKanbanOrderCount : selectedVisibleOrderCount}
+              totalCount={viewMode === "Bảng kéo" ? kanbanOrderIds.length : visibleOrderIds.length}
+              itemLabel="đơn"
+              checkboxClassName={checkboxClass}
+              onToggle={viewMode === "Bảng kéo" ? toggleKanbanOrders : toggleVisibleOrders}
+            />
             <div className="ml-auto hidden flex-wrap gap-1.5 2xl:flex">
               {(["Tất cả", ...statuses] as const).map((status) => {
                 const active = selectedStatus === status;
@@ -912,306 +1079,81 @@ export default function OrdersPage() {
 
           {viewMode === "Bảng" ? (
             <>
-              {/* ── Table ── */}
-              <div className="flex-1 overflow-auto [&_div[data-slot=table-container]]:overflow-visible">
-                <Table className={`${tableResizeMode === "fit" ? "w-full table-fixed" : "w-max table-fixed"} text-xs`}>
-              <TableHeader>
-                <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                  {columns.filter(c => c.visible).map(col => (
-                    <ResizableTableHead
-                      key={col.id}
-                      width={tableResizeMode === "fit" ? undefined : col.width}
-                      autoWidth={tableResizeMode === "fit"}
-                      style={tableResizeMode === "fit" ? { width: `${((col.width || 120) / totalVisibleWidth) * 100}%` } : undefined}
-                      className={`text-xs font-medium text-slate-600 ${col.id === 'actions' ? 'text-left' : ''} ${dragOverColumnId === col.id ? 'bg-slate-200/50' : ''} ${draggedColumnId === col.id ? 'opacity-50' : ''}`}
-                      draggable={tableResizeMode === "custom"}
-                      onDragStart={(e) => handleDragStart(e, col.id)}
-                      onDragOver={(e) => handleDragOver(e, col.id)}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, col.id)}
-                      onDragEnd={handleDragEnd}
-                    >
-                      {col.id === "id" ? (
-                        <span className="inline-flex items-center gap-2">
-                          <input
-                            ref={selectAllCheckboxRef}
-                            type="checkbox"
-                            aria-label="Chọn tất cả đơn hàng"
-                            checked={allVisibleSelected}
-                            disabled={visibleOrderIds.length === 0}
-                            onChange={toggleVisibleOrders}
-                            className={checkboxClass}
-                          />
-                          {col.label}
-                        </span>
-                      ) : (
-                        col.label
-                      )}
-                    </ResizableTableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedOrders.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={columns.filter(c => c.visible).length}>
-                      <div className="grid min-h-[360px] place-items-center text-sm text-slate-400">
-                        {emptyMessage}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedOrders.map((order) => (
-                    <TableRow
-                      key={order.id}
-                      className="group h-9 border-b border-slate-100 text-slate-700 transition-colors hover:bg-slate-50/60"
-                    >
-                      {columns.filter(c => c.visible).map(col => {
-                        if (col.id === "id") return (
-                          <TableCell key={col.id} className="font-medium text-slate-900 truncate overflow-hidden max-w-0" title={order.id}>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                aria-label={`Chọn đơn ${order.id}`}
-                                checked={selectedOrderIds.has(order.id)}
-                                onChange={() => toggleOrder(order.id)}
-                                className={`shrink-0 ${checkboxClass}`}
-                              />
-                              <span className="truncate">{order.id}</span>
-                            </div>
-                          </TableCell>
-                        );
-                        if (col.id === "customer") return (
-                          <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={order.customer}>
-                            <div className="flex min-w-0 items-center gap-2">
-                              <Image src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={order.customer} width={28} height={28} className="size-6 shrink-0 rounded-full object-cover" />
-                              <span className="truncate font-medium text-slate-900">{order.customer}</span>
-                            </div>
-                          </TableCell>
-                        );
-                        if (col.id === "phone") return (
-                          <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={order.phone}>
-                            <a href={`tel:${order.phone}`} className="text-slate-500 transition-colors hover:text-slate-800">{order.phone}</a>
-                          </TableCell>
-                        );
-                        if (col.id === "service") return (
-                          <TableCell key={col.id} className="text-slate-600 truncate overflow-hidden max-w-0" title={order.service}>{order.service}</TableCell>
-                        );
-                        if (col.id === "quantity") return (
-                          <TableCell key={col.id} className="text-slate-600 truncate overflow-hidden max-w-0" title={order.quantity}>{order.quantity}</TableCell>
-                        );
-                        if (col.id === "amount") return (
-                          <TableCell key={col.id} className="font-medium text-slate-900 truncate overflow-hidden max-w-0" title={`${order.amount.toLocaleString("vi-VN")}đ`}>
-                            {order.amount.toLocaleString("vi-VN")}đ
-                          </TableCell>
-                        );
-                        if (col.id === "deliveryTime") return (
-                          <TableCell key={col.id} className="text-slate-500 truncate overflow-hidden max-w-0" title={order.deliveryTime}>{order.deliveryTime}</TableCell>
-                        );
-                        if (col.id === "staff") return (
-                          <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={order.staff}>
-                            <div className="flex items-center gap-2">
-                              {order.staff === "Chưa gán" ? (
-                                <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-400 border border-slate-200/60 shadow-sm">?</div>
-                              ) : (
-                                <Image src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={order.staff} width={24} height={24} className="size-6 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm" />
-                              )}
-                              <span className={`truncate ${order.staff === "Chưa gán" ? "text-slate-400" : "text-slate-600"}`}>{order.staff}</span>
-                            </div>
-                          </TableCell>
-                        );
-                        if (col.id === "status") return (
-                          <TableCell key={col.id} className="truncate overflow-hidden max-w-0">
-                            <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium truncate max-w-full" style={{ color: statusDotColor[order.status], backgroundColor: statusBgColor[order.status] }}>
-                              <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusDotColor[order.status] }} />
-                              <span className="truncate">{order.status}</span>
-                            </span>
-                          </TableCell>
-                        );
-                        if (col.id === "createdAt") return (
-                          <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={order.createdAt}>
-                            <div className="flex items-center gap-2 text-slate-500">
-                              {/* <Clock className="size-3.5 shrink-0 text-slate-400" /> */}
-                              <span className="text-xs truncate">{order.createdAt}</span>
-                            </div>
-                          </TableCell>
-                        );
-                        if (col.id === "actions") return (
-                          <TableCell key={col.id} className="px-4 overflow-hidden max-w-0">
-                            <div className="flex items-center justify-start gap-1.5">
-                              <button type="button" className="inline-flex shrink-0 h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openEditForm(order)} title="Xem chi tiết">
-                                <Pencil className="size-3.5" />Sửa
-                              </button>
-                              <button type="button" className="inline-flex shrink-0 h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => setInvoiceOrder(order)} title="Hóa đơn">
-                                <FileText className="size-3.5" />Hóa đơn
-                              </button>
-                            </div>
-                          </TableCell>
-                        );
-
-                        // Default fallback for custom columns
-                        const val = order[col.id];
-                        return (
-                          <TableCell key={col.id} className={`truncate overflow-hidden max-w-0 ${!val ? "text-slate-400 italic" : "text-slate-600"}`} title={val || "Chưa có"}>
-                            {val || "Chưa có"}
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  ))
-                )}
-                {/* ── Empty filler rows to fill viewport ── */}
-                {paginatedOrders.length > 0 && paginatedOrders.length < pageSize &&
-                  Array.from({ length: pageSize - paginatedOrders.length }).map((_, i) => (
-                    <TableRow key={`empty-${i}`} className="border-b border-slate-100">
-                      <TableCell className="pl-4">
-                        <input type="checkbox" disabled className="size-4 rounded border-slate-200 opacity-0" />
-                      </TableCell>
-                      {Array.from({ length: columns.filter(c => c.visible).length - 1 }).map((_, j) => (
-                        <TableCell key={j}>&nbsp;</TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                }
-              </TableBody>
-                </Table>
-              </div>
-
-              {/* ── Pagination footer ── */}
-              <div className="border-t border-slate-200 px-5 pt-3 pb-1">
-                <div className="flex flex-col gap-3 text-xs text-slate-700 sm:flex-row sm:items-center sm:justify-between">
-	                  <div className="flex flex-wrap items-center gap-3">
-	                    <span>Số dòng mỗi trang</span>
-                      <DropdownMenu open={openPageSizeMenu} onOpenChange={setOpenPageSizeMenu}>
-                        <DropdownMenuTrigger asChild>
-                          <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50">
-                            {pageSize}
-                            <ChevronDown className="size-3.5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-44">
-                          {[5, 10, 20, 50].map((size) => (
-                            <DropdownMenuItem key={size} onClick={() => updatePageSize(size)}>
-                              {size} dòng
-                            </DropdownMenuItem>
-                          ))}
-                          <DropdownMenuSeparator />
-                          <div className="p-2">
-                            <Label htmlFor="customPageSize" className="text-xs text-slate-500">
-                              Tự nhập
-                            </Label>
-                            <div className="mt-1 flex gap-1.5">
-                              <Input
-                                id="customPageSize"
-                                type="number"
-                                min={1}
-                                max={500}
-                                value={customPageSize}
-                                onChange={(event) => setCustomPageSize(event.target.value)}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter") applyCustomPageSize();
-                                }}
-                                className="h-8 text-xs"
-                                placeholder="VD: 15"
-                              />
-                              <Button type="button" size="sm" className="h-8 px-2 text-xs" onClick={applyCustomPageSize}>
-                                OK
-                              </Button>
-                            </div>
-                          </div>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-	                    <span className="text-slate-400">
-                      {filteredOrders.length === 0 ? 0 : (page - 1) * pageSize + 1}–
-                      {Math.min(page * pageSize, filteredOrders.length)} trong {filteredOrders.length} dòng
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                      Tổng {totalAmount.toLocaleString("vi-VN")}đ
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-1">
-                    <button
-                      type="button"
-                      className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40"
-                      disabled={page <= 1}
-                      onClick={() => setPage(1)}
-                    >
-                      <ChevronsLeft className="size-4" />
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40"
-                      disabled={page <= 1}
-                      onClick={() => setPage((current) => Math.max(current - 1, 1))}
-                    >
-                      <ChevronDown className="size-4 rotate-90" />
-                    </button>
-                    <span className="px-3 text-sm font-medium text-slate-700">
-                      {page} / {pageCount || 1}
-                    </span>
-                    <button
-                      type="button"
-                      className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40"
-                      disabled={page >= pageCount}
-                      onClick={() => setPage((current) => Math.min(current + 1, pageCount))}
-                    >
-                      <ChevronDown className="size-4 -rotate-90" />
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40"
-                      disabled={page >= pageCount}
-                      onClick={() => setPage(pageCount || 1)}
-                    >
-                      <ChevronsRight className="size-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <DashboardDataTable
+                columns={columns}
+                rows={paginatedOrders}
+                pageSize={pageSize}
+                emptyMessage={emptyMessage}
+                tableResizeMode={tableResizeMode}
+                totalVisibleWidth={totalVisibleWidth}
+                renderCell={renderOrderCell}
+                columnDrag={{
+                  draggedColumnId,
+                  dragOverColumnId,
+                  onDragStart: handleDragStart,
+                  onDragOver: handleDragOver,
+                  onDragLeave: handleDragLeave,
+                  onDrop: handleDrop,
+                  onDragEnd: handleDragEnd,
+                }}
+              />
+              <DashboardTableFooter
+                page={page}
+                pageCount={pageCount}
+                pageSize={pageSize}
+                totalRows={filteredOrders.length}
+                totalLabel={`Tổng ${totalAmount.toLocaleString("vi-VN")}đ`}
+                customPageSize={customPageSize}
+                openPageSizeMenu={openPageSizeMenu}
+                onOpenPageSizeMenuChange={setOpenPageSizeMenu}
+                onCustomPageSizeChange={setCustomPageSize}
+                onApplyCustomPageSize={applyCustomPageSize}
+                onUpdatePageSize={updatePageSize}
+                onPageChange={setPage}
+              />
             </>
-          ) : (
+          ) : viewMode === "Bảng kéo" ? (
             <div className={`flex-1 p-5 bg-slate-50/30 min-h-0 ${
-              tableResizeMode === "fit"
-                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 overflow-y-auto"
-                : "flex gap-4 overflow-x-auto"
-            }`}>
-              {statuses.map((status) => {
-                const colOrders = filteredOrders.filter((order) => order.status === status);
+                tableResizeMode === "fit"
+                  ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 overflow-y-auto"
+                  : "flex gap-4 overflow-x-auto"
+              }`}>
+                {statuses.map((status) => {
+                  const colOrders = filteredOrders.filter((order) => order.status === status);
 
-                return (
-                  <div
-                    key={status}
-                    className={`flex flex-col rounded-xl border border-slate-200 bg-slate-100/50 p-3 transition-colors ${
-                      tableResizeMode === "fit" ? "w-full min-h-[300px]" : "min-w-[300px] max-w-[300px]"
-                    } ${dragOverStatus === status ? "border-slate-400 bg-slate-200/50" : ""}`}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      if (dragOverStatus !== status) setDragOverStatus(status);
-                    }}
-                    onDragLeave={() => setDragOverStatus(null)}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      if (draggedOrderId) {
-                        setOrders((prev) =>
-                          prev.map((order) =>
-                            order.id === draggedOrderId ? { ...order, status } : order,
-                          ),
-                        );
-                      }
-                      setDraggedOrderId(null);
-                      setDragOverStatus(null);
-                    }}
-                  >
-                    <div className="mb-3 flex items-center justify-between px-1">
-                      <span className="font-semibold text-slate-800">{status}</span>
-                      <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-500">
-                        {colOrders.length}
-                      </span>
-                    </div>
+                  return (
+                    <div
+                      key={status}
+                      className={`flex flex-col rounded-xl border border-slate-200 bg-slate-100/50 p-3 transition-colors ${
+                        tableResizeMode === "fit" ? "w-full min-h-[300px]" : "min-w-[300px] max-w-[300px]"
+                      } ${dragOverStatus === status ? "border-slate-400 bg-slate-200/50" : ""}`}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        if (dragOverStatus !== status) setDragOverStatus(status);
+                      }}
+                      onDragLeave={() => setDragOverStatus(null)}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (draggedOrderId) {
+                          setOrders((prev) =>
+                            prev.map((order) =>
+                              order.id === draggedOrderId ? { ...order, status } : order,
+                            ),
+                          );
+                        }
+                        setDraggedOrderId(null);
+                        setDragOverStatus(null);
+                      }}
+                    >
+                      <div className="mb-3 flex items-center justify-between px-1">
+                        <span className="font-semibold text-slate-800">{status}</span>
+                        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-500">
+                          {colOrders.length}
+                        </span>
+                      </div>
 
-                    <div className="flex h-full min-h-[100px] flex-col gap-3 overflow-y-auto px-1 pb-2">
-                      {colOrders.map((order) => (
+                      <div className="flex h-full min-h-[100px] flex-col gap-3 overflow-y-auto px-1 pb-2">
+                        {colOrders.map((order) => (
                         <div
                           key={order.id}
                           draggable
@@ -1225,8 +1167,19 @@ export default function OrdersPage() {
                           }}
                           className={`cursor-grab rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:cursor-grabbing ${draggedOrderId === order.id ? "opacity-50 ring-2 ring-slate-400" : ""}`}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-900">{order.id}</span>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <input
+                                type="checkbox"
+                                aria-label={`Chọn đơn ${order.id}`}
+                                checked={selectedOrderIds.has(order.id)}
+                                onMouseDown={(event) => event.stopPropagation()}
+                                onClick={(event) => event.stopPropagation()}
+                                onChange={() => toggleOrder(order.id)}
+                                className={`shrink-0 ${checkboxClass}`}
+                              />
+                              <span className="truncate text-xs font-semibold text-slate-900">{order.id}</span>
+                            </div>
                             <span className="rounded-sm bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
                               {order.deliveryDate}
                             </span>
@@ -1288,8 +1241,85 @@ export default function OrdersPage() {
                       )}
                     </div>
                   </div>
-                );
-              })}
+                  );
+                })}
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/30 p-4">
+              {paginatedOrders.length === 0 ? (
+                <div className="grid min-h-[320px] place-items-center rounded-lg border border-dashed border-slate-200 bg-white text-sm text-slate-400">
+                  {emptyMessage}
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {paginatedOrders.map((order) => (
+                    <div
+                      key={order.id}
+                      className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300"
+                    >
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <input
+                            type="checkbox"
+                            aria-label={`Chọn đơn ${order.id}`}
+                            checked={selectedOrderIds.has(order.id)}
+                            onChange={() => toggleOrder(order.id)}
+                            className={`mt-1 shrink-0 ${checkboxClass}`}
+                          />
+                          <Image
+                            src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+                            alt={order.customer}
+                            width={40}
+                            height={40}
+                            className="size-10 shrink-0 rounded-full object-cover"
+                          />
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-semibold text-slate-950">{order.customer}</p>
+                              <span className="text-xs font-medium text-slate-400">{order.id}</span>
+                              <span
+                                className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium"
+                                style={{ color: statusDotColor[order.status], backgroundColor: statusBgColor[order.status] }}
+                              >
+                                <span className="size-1.5 rounded-full" style={{ backgroundColor: statusDotColor[order.status] }} />
+                                {order.status}
+                              </span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                              <span>{order.phone}</span>
+                              <span>{order.service} · {order.quantity}</span>
+                              <span>Nhận: {order.createdAt} · Giao: {order.deliveryDate} {order.deliveryTime}</span>
+                            </div>
+                            <p className="mt-2 line-clamp-2 text-xs text-slate-400">{order.address}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            {order.amount.toLocaleString("vi-VN")}đ
+                          </span>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+                            onClick={() => openEditForm(order)}
+                          >
+                            <Pencil className="size-3.5" />
+                            Sửa
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+                            onClick={() => setInvoiceOrder(order)}
+                          >
+                            <FileText className="size-3.5" />
+                            Hóa đơn
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

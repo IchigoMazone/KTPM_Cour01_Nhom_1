@@ -4,16 +4,11 @@ import { useMemo, useState } from "react";
 import {
   CalendarClock,
   ChevronDown,
-  ChevronsLeft,
-  ChevronsRight,
   FileDown,
-  Kanban,
-  List,
   MessageCircle,
   Pencil,
   Plus,
   Search,
-  Table2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,15 +16,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TableCell } from "@/components/ui/table";
+import { PageShell, ViewModeTabs } from "../_components/dashboard-primitives";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { PageShell } from "../_components/dashboard-primitives";
+  DashboardDataTable,
+  DashboardTableFooter,
+  type DashboardTableColumn,
+} from "@/src/components/common/dashboard-data-table";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 
@@ -50,6 +43,19 @@ type Ticket = {
 };
 
 const pageSize = 10;
+const columns: DashboardTableColumn[] = [
+  { id: "id", label: "Mã", width: 104, visible: true },
+  { id: "type", label: "Loại", width: 112, visible: true },
+  { id: "customer", label: "Khách hàng", width: 150, visible: true },
+  { id: "phone", label: "SĐT", width: 116, visible: true },
+  { id: "orderId", label: "Đơn", width: 96, visible: true },
+  { id: "priority", label: "Ưu tiên", width: 96, visible: true },
+  { id: "owner", label: "Phụ trách", width: 104, visible: true },
+  { id: "status", label: "Trạng thái", width: 116, visible: true },
+  { id: "createdAt", label: "Ngày tạo", width: 104, visible: true },
+  { id: "note", label: "Nội dung", width: 240, visible: true },
+  { id: "actions", label: "Thao tác", width: 108, visible: true },
+];
 const statuses: Array<TicketStatus | "Tất cả"> = ["Tất cả", "Mới", "Đang xử lý", "Đã giải quyết"];
 
 const seedTickets: Ticket[] = [
@@ -116,6 +122,8 @@ export default function SupportPage() {
   const [openForm, setOpenForm] = useState(false);
   const [editingTicketId, setEditingTicketId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [openPageSizeMenu, setOpenPageSizeMenu] = useState(false);
+  const [customPageSize, setCustomPageSize] = useState("");
   const range = useDashboardTimeRangeStore((state) => state.range);
   const rangeLabel = formatRange(normalizeRange(range));
 
@@ -130,6 +138,7 @@ export default function SupportPage() {
 
   const pageCount = Math.ceil(filteredTickets.length / pageSize);
   const paginatedTickets = filteredTickets.slice((page - 1) * pageSize, page * pageSize);
+  const totalVisibleWidth = columns.reduce((sum, column) => sum + (column.width || 150), 0);
 
   const openCreateForm = () => {
     setEditingTicketId(null);
@@ -167,6 +176,27 @@ export default function SupportPage() {
     setOpenForm(false);
   };
 
+  const renderTicketCell = (ticket: Ticket, column: DashboardTableColumn) => {
+    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{ticket.id}</TableCell>;
+    if (column.id === "type") return <TableCell key={column.id}>{ticket.type}</TableCell>;
+    if (column.id === "customer") return <TableCell key={column.id} className="font-medium text-slate-900">{ticket.customer}</TableCell>;
+    if (column.id === "phone") return <TableCell key={column.id}><a href={`tel:${ticket.phone}`} className="text-slate-500 hover:text-slate-800">{ticket.phone}</a></TableCell>;
+    if (column.id === "orderId") return <TableCell key={column.id}>{ticket.orderId}</TableCell>;
+    if (column.id === "priority") return <TableCell key={column.id}><span className="font-medium" style={{ color: priorityColor[ticket.priority] }}>{ticket.priority}</span></TableCell>;
+    if (column.id === "owner") return <TableCell key={column.id}>{ticket.owner}</TableCell>;
+    if (column.id === "status") return <TableCell key={column.id}><StatusPill label={ticket.status} /></TableCell>;
+    if (column.id === "createdAt") return <TableCell key={column.id} className="text-slate-500">{ticket.createdAt}</TableCell>;
+    if (column.id === "note") return <TableCell key={column.id} className="truncate text-slate-500" title={ticket.note}>{ticket.note}</TableCell>;
+    return (
+      <TableCell key={column.id} className="px-4">
+        <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 hover:bg-slate-50" onClick={() => openEditForm(ticket)}>
+          <Pencil className="size-3.5" />
+          Sửa
+        </button>
+      </TableCell>
+    );
+  };
+
   return (
     <PageShell fullHeight>
       <div className="grid shrink-0 gap-3 md:grid-cols-4">
@@ -179,10 +209,7 @@ export default function SupportPage() {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-5 pt-1 pb-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap items-center gap-1">
-            {(["Bảng", "Bảng kéo", "Danh sách"] as const).map((label) => {
-              const Icon = label === "Bảng" ? Table2 : label === "Bảng kéo" ? Kanban : List;
-              return <button key={label} type="button" className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${label === "Bảng" ? "text-slate-800" : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"}`}><Icon className="size-3.5" />{label}</button>;
-            })}
+            <ViewModeTabs value="Bảng" onChange={() => {}} />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -207,54 +234,27 @@ export default function SupportPage() {
           <button type="button" className="inline-flex h-7 items-center gap-1.5 px-2 text-xs text-slate-500 transition-colors hover:text-slate-700"><Plus className="size-3.5" />Thêm bộ lọc</button>
         </div>
 
-        <div className="flex-1 overflow-auto">
-          <Table className="w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-            <TableHeader>
-              <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                <TableHead className="w-[104px] pl-4 text-xs font-medium text-slate-600">Mã</TableHead>
-                <TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Loại</TableHead>
-                <TableHead className="w-[150px] border-l border-slate-100 text-xs font-medium text-slate-600">Khách hàng</TableHead>
-                <TableHead className="w-[116px] border-l border-slate-100 text-xs font-medium text-slate-600">SĐT</TableHead>
-                <TableHead className="w-[96px] border-l border-slate-100 text-xs font-medium text-slate-600">Đơn</TableHead>
-                <TableHead className="w-[96px] border-l border-slate-100 text-xs font-medium text-slate-600">Ưu tiên</TableHead>
-                <TableHead className="w-[104px] border-l border-slate-100 text-xs font-medium text-slate-600">Phụ trách</TableHead>
-                <TableHead className="w-[116px] border-l border-slate-100 text-xs font-medium text-slate-600">Trạng thái</TableHead>
-                <TableHead className="w-[104px] border-l border-slate-100 text-xs font-medium text-slate-600">Ngày tạo</TableHead>
-                <TableHead className="w-[240px] border-l border-slate-100 text-xs font-medium text-slate-600">Nội dung</TableHead>
-                <TableHead className="w-[108px] border-l border-slate-100 px-4 text-xs font-medium text-slate-600">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedTickets.map((ticket) => (
-                <TableRow key={ticket.id} className="h-9 border-b border-slate-100 text-slate-700 hover:bg-slate-50/60">
-                  <TableCell className="pl-4 font-medium text-slate-900">{ticket.id}</TableCell>
-                  <TableCell>{ticket.type}</TableCell>
-                  <TableCell className="font-medium text-slate-900">{ticket.customer}</TableCell>
-                  <TableCell><a href={`tel:${ticket.phone}`} className="text-slate-500 hover:text-slate-800">{ticket.phone}</a></TableCell>
-                  <TableCell>{ticket.orderId}</TableCell>
-                  <TableCell><span className="font-medium" style={{ color: priorityColor[ticket.priority] }}>{ticket.priority}</span></TableCell>
-                  <TableCell>{ticket.owner}</TableCell>
-                  <TableCell><StatusPill label={ticket.status} /></TableCell>
-                  <TableCell className="text-slate-500">{ticket.createdAt}</TableCell>
-                  <TableCell className="truncate text-slate-500">{ticket.note}</TableCell>
-                  <TableCell className="px-4">
-                    <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 hover:bg-slate-50" onClick={() => openEditForm(ticket)}>
-                      <Pencil className="size-3.5" />
-                      Sửa
-                    </button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-
-        <div className="border-t border-slate-200 px-5 pt-3 pb-1">
-          <div className="flex flex-col gap-3 text-xs text-slate-700 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-3"><span>Số dòng mỗi trang</span><button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50">{pageSize}<ChevronDown className="size-3.5" /></button><span className="text-slate-400">{filteredTickets.length === 0 ? 0 : (page - 1) * pageSize + 1}-{Math.min(page * pageSize, filteredTickets.length)} trong {filteredTickets.length} dòng</span></div>
-            <div className="flex items-center justify-end gap-1"><button type="button" className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-40" disabled={page <= 1} onClick={() => setPage(1)}><ChevronsLeft className="size-4" /></button><button type="button" className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-40" disabled={page <= 1} onClick={() => setPage((current) => Math.max(current - 1, 1))}><ChevronDown className="size-4 rotate-90" /></button><span className="px-3 text-sm font-medium text-slate-700">{page} / {pageCount || 1}</span><button type="button" className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-40" disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(current + 1, pageCount))}><ChevronDown className="size-4 -rotate-90" /></button><button type="button" className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-40" disabled={page >= pageCount} onClick={() => setPage(pageCount || 1)}><ChevronsRight className="size-4" /></button></div>
-          </div>
-        </div>
+        <DashboardDataTable
+          columns={columns}
+          rows={paginatedTickets}
+          pageSize={pageSize}
+          emptyMessage="Không tìm thấy ticket phù hợp."
+          totalVisibleWidth={totalVisibleWidth}
+          renderCell={renderTicketCell}
+        />
+        <DashboardTableFooter
+          page={page}
+          pageCount={pageCount}
+          pageSize={pageSize}
+          totalRows={filteredTickets.length}
+          customPageSize={customPageSize}
+          openPageSizeMenu={openPageSizeMenu}
+          onOpenPageSizeMenuChange={setOpenPageSizeMenu}
+          onCustomPageSizeChange={setCustomPageSize}
+          onApplyCustomPageSize={() => setCustomPageSize("")}
+          onUpdatePageSize={() => setOpenPageSizeMenu(false)}
+          onPageChange={setPage}
+        />
       </div>
 
       {openForm && (

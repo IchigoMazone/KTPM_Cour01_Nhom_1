@@ -6,19 +6,14 @@ import {
   ArrowRight,
   CalendarClock,
   ChevronDown,
-  ChevronsLeft,
-  ChevronsRight,
   Clock,
   EyeOff,
   FileDown,
-  Kanban,
-  List,
   MapPin,
   Pencil,
   Plus,
   Search,
   Settings,
-  Table2,
   Users,
   X,
   Truck,
@@ -34,15 +29,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TableCell } from "@/components/ui/table";
+import { PageShell, ViewModeTabs } from "../_components/dashboard-primitives";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { PageShell } from "../_components/dashboard-primitives";
+  DashboardDataTable,
+  DashboardTableFooter,
+  type DashboardTableColumn,
+} from "@/src/components/common/dashboard-data-table";
 import { useDashboardSettingsStore } from "@/src/context/useDashboardSettingsStore";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
@@ -144,6 +137,47 @@ const emptyDriverForm = {
 };
 
 const pageSize = 10;
+const tripColumns: DashboardTableColumn[] = [
+  { id: "id", label: "Mã chuyến", width: 126, visible: true },
+  { id: "time", label: "Giờ hẹn", width: 110, visible: true },
+  { id: "type", label: "Loại chuyến", width: 112, visible: true },
+  { id: "customer", label: "Khách hàng", width: 180, visible: true },
+  { id: "address", label: "Địa chỉ", width: 200, visible: true },
+  { id: "driver", label: "Tài xế phụ trách", width: 132, visible: true },
+  { id: "status", label: "Trạng thái", width: 126, visible: true },
+  { id: "note", label: "Ghi chú", width: 180, visible: true },
+  { id: "actions", label: "Thao tác", width: 108, visible: true },
+];
+const driverColumns: DashboardTableColumn[] = [
+  { id: "id", label: "Mã tài xế", width: 126, visible: true },
+  { id: "name", label: "Họ và tên", width: 180, visible: true },
+  { id: "phone", label: "Số điện thoại", width: 140, visible: true },
+  { id: "rating", label: "Đánh giá", width: 110, visible: true },
+  { id: "load", label: "Tải công việc trong ngày", width: 140, visible: true },
+  { id: "status", label: "Trạng thái ca", width: 126, visible: true },
+  { id: "note", label: "Ghi chú vận chuyển", width: 200, visible: true },
+  { id: "actions", label: "Thao tác", width: 108, visible: true },
+];
+const routeColumns: DashboardTableColumn[] = [
+  { id: "id", label: "Mã tuyến", width: 112, visible: true },
+  { id: "route", label: "Gợi ý điều phối", width: 220, visible: true },
+  { id: "driver", label: "Tài xế", width: 132, visible: true },
+  { id: "orders", label: "Đơn liên quan", width: 168, visible: true },
+  { id: "eta", label: "ETA", width: 104, visible: true },
+  { id: "saving", label: "Hiệu quả", width: 148, visible: true },
+  { id: "status", label: "Trạng thái", width: 146, visible: true },
+  { id: "actions", label: "Thao tác", width: 116, visible: true },
+];
+const otpColumns: DashboardTableColumn[] = [
+  { id: "order", label: "Mã đơn", width: 104, visible: true },
+  { id: "type", label: "Loại OTP", width: 116, visible: true },
+  { id: "otp", label: "Mã OTP", width: 92, visible: true },
+  { id: "status", label: "Trạng thái", width: 142, visible: true },
+];
+const timelineColumns: DashboardTableColumn[] = [
+  { id: "time", label: "Thời gian", width: 88, visible: true },
+  { id: "event", label: "Nhật ký trạng thái", width: 420, visible: true },
+];
 const tripStatuses: Array<TripStatus | "Tất cả"> = ["Tất cả", "Đã lấy", "Đang giao", "Chờ lấy", "Chờ giao"];
 const driverStatuses: Array<DriverStatus | "Tất cả"> = ["Tất cả", "Đang giao", "Rảnh 30 phút", "Đang lấy", "Nghỉ"];
 
@@ -207,6 +241,8 @@ export default function DeliveryDashboardPage() {
   
   const [tripForm, setTripForm] = useState(emptyTripForm);
   const [driverForm, setDriverForm] = useState(emptyDriverForm);
+  const [openPageSizeMenu, setOpenPageSizeMenu] = useState(false);
+  const [customPageSize, setCustomPageSize] = useState("");
 
   const deliveryEnabled = useDashboardSettingsStore((state) => state.deliveryEnabled);
   const range = useDashboardTimeRangeStore((state) => state.range);
@@ -262,6 +298,10 @@ export default function DeliveryDashboardPage() {
   const paginatedRoutePlans = filteredRoutePlans.slice((page - 1) * pageSize, page * pageSize);
   const paginatedOtps = filteredOtpRows.slice((page - 1) * pageSize, page * pageSize);
   const paginatedTimeline = filteredTimeline.slice((page - 1) * pageSize, page * pageSize);
+  const activeColumns = tab === "Chuyến đi" ? tripColumns : tab === "Tài xế" ? driverColumns : tab === "Lộ trình" ? routeColumns : otpColumns;
+  const activePaginatedRows = tab === "Chuyến đi" ? paginatedTrips : tab === "Tài xế" ? paginatedDrivers : tab === "Lộ trình" ? paginatedRoutePlans : paginatedOtps;
+  const totalVisibleWidth = activeColumns.reduce((sum, column) => sum + (column.width || 150), 0);
+  const timelineTotalWidth = timelineColumns.reduce((sum, column) => sum + (column.width || 150), 0);
 
   const openCreateTrip = () => {
     setEditingTripId(null);
@@ -374,6 +414,63 @@ export default function DeliveryDashboardPage() {
     setOpenDriverForm(false);
   };
 
+  const renderTripCell = (trip: Trip, column: DashboardTableColumn) => {
+    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{trip.id}</TableCell>;
+    if (column.id === "type") return <TableCell key={column.id}><span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${trip.type === "Lấy đồ" ? "border-blue-100 bg-blue-50 text-blue-700" : "border-emerald-100 bg-emerald-50 text-emerald-700"}`}>{trip.type}</span></TableCell>;
+    if (column.id === "customer") {
+      return (
+        <TableCell key={column.id}>
+          <div className="flex min-w-0 items-center gap-2">
+            <Image src={trip.avatar} alt={trip.customer} width={24} height={24} className="size-6 shrink-0 rounded-full object-cover" />
+            <span className="whitespace-nowrap font-medium text-slate-900">{trip.customer}</span>
+          </div>
+        </TableCell>
+      );
+    }
+    if (column.id === "driver") return <TableCell key={column.id}><div className="flex items-center gap-1.5"><div className="size-1.5 shrink-0 rounded-full bg-indigo-500" /><span className="font-semibold text-slate-700">{trip.driver}</span></div></TableCell>;
+    if (column.id === "status") return <TableCell key={column.id}><StatusPill label={trip.status} colorMap={tripStatusColor} /></TableCell>;
+    if (column.id === "note") return <TableCell key={column.id} className="truncate text-slate-500" title={trip.note}>{trip.note}</TableCell>;
+    if (column.id === "actions") return <TableCell key={column.id} className="px-4"><button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openEditTrip(trip)}><Pencil className="size-3.5" />Sửa</button></TableCell>;
+    return <TableCell key={column.id} className={column.id === "time" ? "font-semibold text-slate-900" : "truncate font-medium text-slate-600"}>{String(trip[column.id as keyof Trip] ?? "")}</TableCell>;
+  };
+
+  const renderDriverCell = (driver: Driver, column: DashboardTableColumn) => {
+    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-semibold text-slate-900">{driver.id}</TableCell>;
+    if (column.id === "name") return <TableCell key={column.id}><div className="flex min-w-0 items-center gap-2"><Image src={driver.avatar} alt={driver.name} width={24} height={24} className="size-6 shrink-0 rounded-full object-cover" /><span className="whitespace-nowrap font-medium text-slate-900">{driver.name}</span></div></TableCell>;
+    if (column.id === "phone") return <TableCell key={column.id}><a href={`tel:${driver.phone}`} className="text-slate-500 hover:text-slate-800">{driver.phone}</a></TableCell>;
+    if (column.id === "status") return <TableCell key={column.id}><StatusPill label={driver.status} colorMap={driverStatusColor} /></TableCell>;
+    if (column.id === "note") return <TableCell key={column.id} className="truncate text-slate-500" title={driver.note}>{driver.note}</TableCell>;
+    if (column.id === "actions") return <TableCell key={column.id} className="px-4"><button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openEditDriver(driver)}><Pencil className="size-3.5" />Sửa</button></TableCell>;
+    return <TableCell key={column.id} className="font-medium text-slate-700">{String(driver[column.id as keyof Driver] ?? "")}</TableCell>;
+  };
+
+  const renderRouteCell = (item: (typeof seedRoutePlans)[number], column: DashboardTableColumn) => {
+    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{item.id}</TableCell>;
+    if (column.id === "route") return <TableCell key={column.id} className="font-medium text-slate-900">{item.route}</TableCell>;
+    if (column.id === "status") return <TableCell key={column.id}><span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium text-blue-700" style={{ backgroundColor: "rgba(37,99,235,0.08)" }}><span className="size-1.5 rounded-full bg-blue-600" />{item.status}</span></TableCell>;
+    if (column.id === "actions") return <TableCell key={column.id} className="px-4"><button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"><Zap className="size-3.5" />Áp dụng</button></TableCell>;
+    return <TableCell key={column.id} className="text-slate-600">{String(item[column.id as keyof typeof item] ?? "")}</TableCell>;
+  };
+
+  const renderOtpCell = (item: (typeof seedOtps)[number], column: DashboardTableColumn) => {
+    if (column.id === "order") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{item.order}</TableCell>;
+    if (column.id === "otp") return <TableCell key={column.id} className="font-mono font-semibold text-slate-900">{item.otp}</TableCell>;
+    if (column.id === "status") return <TableCell key={column.id}><span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700"><span className="size-1.5 rounded-full bg-slate-500" />{item.status}</span></TableCell>;
+    return <TableCell key={column.id}>{String(item[column.id as keyof typeof item] ?? "")}</TableCell>;
+  };
+
+  const renderTimelineCell = (item: (typeof seedTimeline)[number], column: DashboardTableColumn) => {
+    if (column.id === "time") return <TableCell key={column.id} className="pl-4 font-semibold text-slate-900">{item.time}</TableCell>;
+    return <TableCell key={column.id} className="text-slate-600">{item.event}</TableCell>;
+  };
+
+  const renderActiveCell = (row: Trip | Driver | (typeof seedRoutePlans)[number] | (typeof seedOtps)[number], column: DashboardTableColumn) => {
+    if (tab === "Chuyến đi") return renderTripCell(row as Trip, column);
+    if (tab === "Tài xế") return renderDriverCell(row as Driver, column);
+    if (tab === "Lộ trình") return renderRouteCell(row as (typeof seedRoutePlans)[number], column);
+    return renderOtpCell(row as (typeof seedOtps)[number], column);
+  };
+
   return (
     <PageShell fullHeight>
       {/* ── Delivery Enabled Check ── */}
@@ -452,24 +549,7 @@ export default function DeliveryDashboardPage() {
                 
                 <span className="mx-2 hidden h-4 w-px bg-slate-200 sm:block" />
                 
-                {([
-                  ["Bảng", Table2],
-                  ["Bảng kéo", Kanban],
-                  ["Danh sách", List],
-                ] as const).map(([label, Icon]) => (
-                  <button
-                    key={label}
-                    type="button"
-                    className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                      label === "Bảng"
-                        ? "text-slate-800"
-                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
-                    }`}
-                  >
-                    <Icon className="size-3.5" />
-                    {label}
-                  </button>
-                ))}
+                <ViewModeTabs value="Bảng" onChange={() => {}} />
               </div>
 
               {/* Right Search Box & Actions */}
@@ -594,352 +674,52 @@ export default function DeliveryDashboardPage() {
             </div>
 
             {/* ── Table & Interactive Layout Content Area ── */}
-            <div className="flex-1 overflow-auto">
-              
-              {/* TAB 1: CHUYẾN ĐI (Trips Spreadsheet Table) */}
-              {tab === "Chuyến đi" && (
-                <Table className="w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-                  <TableHeader>
-                    <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                      <TableHead className="w-[126px] pl-4 text-xs font-medium text-slate-600">
-                        <span className="inline-flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            className="relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all duration-150 checked:border-slate-900 checked:bg-slate-900 after:absolute after:left-[4.5px] after:top-[1px] after:hidden after:h-[9px] after:w-[5px] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block"
-                            aria-label="Chọn tất cả chuyến đi"
-                          />
-                          Mã chuyến
-                        </span>
-                      </TableHead>
-                      <TableHead className="w-[110px] border-l border-slate-100 text-xs font-medium text-slate-600">Giờ hẹn</TableHead>
-                      <TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Loại chuyến</TableHead>
-                      <TableHead className="w-[180px] border-l border-slate-100 text-xs font-medium text-slate-600">Khách hàng</TableHead>
-                      <TableHead className="w-[200px] border-l border-slate-100 text-xs font-medium text-slate-600">Địa chỉ</TableHead>
-                      <TableHead className="w-[132px] border-l border-slate-100 text-xs font-medium text-slate-600">Tài xế phụ trách</TableHead>
-                      <TableHead className="w-[126px] border-l border-slate-100 text-xs font-medium text-slate-600">Trạng thái</TableHead>
-                      <TableHead className="w-[180px] border-l border-slate-100 text-xs font-medium text-slate-600">Ghi chú</TableHead>
-                      <TableHead className="w-[108px] border-l border-slate-100 px-4 text-left text-xs font-medium text-slate-600">Thao tác</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedTrips.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9}>
-                          <div className="grid min-h-[300px] place-items-center text-sm text-slate-400">
-                            Không tìm thấy chuyến giao nhận phù hợp.
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      paginatedTrips.map((trip) => (
-                        <TableRow
-                          key={trip.id}
-                          className="group h-9 border-b border-slate-100 text-slate-700 transition-colors hover:bg-slate-50/60"
-                        >
-                          <TableCell className="pl-4 font-medium text-slate-900">
-                            <span className="inline-flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                className="relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all duration-150 checked:border-slate-900 checked:bg-slate-900 after:absolute after:left-[4.5px] after:top-[1px] after:hidden after:h-[9px] after:w-[5px] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block"
-                                aria-label={`Chọn chuyến ${trip.id}`}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              {trip.id}
-                            </span>
-                          </TableCell>
-                          <TableCell className="font-semibold text-slate-900">{trip.time}</TableCell>
-                          <TableCell>
-                            {trip.type === "Lấy đồ" ? (
-                              <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
-                                {trip.type}
-                              </span>
-                            ) : (
-                              <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                                {trip.type}
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex min-w-0 items-center gap-2">
-                              <Image
-                                src={trip.avatar}
-                                alt={trip.customer}
-                                width={24}
-                                height={24}
-                                className="size-6 shrink-0 rounded-full object-cover"
-                              />
-                              <span className="whitespace-nowrap font-medium text-slate-900">{trip.customer}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="truncate font-medium text-slate-600">{trip.address}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5">
-                              <div className="size-1.5 shrink-0 rounded-full bg-indigo-500" />
-                              <span className="font-semibold text-slate-700">{trip.driver}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <StatusPill label={trip.status} colorMap={tripStatusColor} />
-                          </TableCell>
-                          <TableCell className="truncate text-slate-500">{trip.note}</TableCell>
-                          <TableCell className="px-4">
-                            <button
-                              type="button"
-                              className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
-                              onClick={() => openEditTrip(trip)}
-                            >
-                              <Pencil className="size-3.5" />
-                              Sửa
-                            </button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                    {/* Empty placeholder rows to fill the height to 10 rows */}
-                    {paginatedTrips.length > 0 && paginatedTrips.length < pageSize &&
-                      Array.from({ length: pageSize - paginatedTrips.length }).map((_, i) => (
-                        <TableRow key={`empty-${i}`} className="border-b border-slate-100">
-                          <TableCell className="pl-4">
-                            <input type="checkbox" disabled className="size-4 opacity-0" />
-                          </TableCell>
-                          {Array.from({ length: 8 }).map((_, j) => (
-                            <TableCell key={j}>&nbsp;</TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    }
-                  </TableBody>
-                </Table>
-              )}
-
-              {/* TAB 2: TÀI XẾ (Drivers Spreadsheet Table) */}
-              {tab === "Tài xế" && (
-                <Table className="w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-                  <TableHeader>
-                    <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                      <TableHead className="w-[126px] pl-4 text-xs font-medium text-slate-600">Mã tài xế</TableHead>
-                      <TableHead className="w-[180px] border-l border-slate-100 text-xs font-medium text-slate-600">Họ và tên</TableHead>
-                      <TableHead className="w-[140px] border-l border-slate-100 text-xs font-medium text-slate-600">Số điện thoại</TableHead>
-                      <TableHead className="w-[110px] border-l border-slate-100 text-xs font-medium text-slate-600">Đánh giá</TableHead>
-                      <TableHead className="w-[140px] border-l border-slate-100 text-xs font-medium text-slate-600">Tải công việc trong ngày</TableHead>
-                      <TableHead className="w-[126px] border-l border-slate-100 text-xs font-medium text-slate-600">Trạng thái ca</TableHead>
-                      <TableHead className="w-[200px] border-l border-slate-100 text-xs font-medium text-slate-600">Ghi chú vận chuyển</TableHead>
-                      <TableHead className="w-[108px] border-l border-slate-100 px-4 text-xs font-medium text-slate-600">Thao tác</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedDrivers.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={8}>
-                          <div className="grid min-h-[300px] place-items-center text-sm text-slate-400">
-                            Không tìm thấy tài xế phù hợp.
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      paginatedDrivers.map((d) => (
-                        <TableRow
-                          key={d.id}
-                          className="h-9 border-b border-slate-100 text-slate-700 transition-colors hover:bg-slate-50/60"
-                        >
-                          <TableCell className="pl-4 font-semibold text-slate-900">{d.id}</TableCell>
-                          <TableCell>
-                            <div className="flex min-w-0 items-center gap-2">
-                              <Image
-                                src={d.avatar}
-                                alt={d.name}
-                                width={24}
-                                height={24}
-                                className="size-6 shrink-0 rounded-full object-cover"
-                              />
-                              <span className="whitespace-nowrap font-medium text-slate-900">{d.name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <a href={`tel:${d.phone}`} className="text-slate-500 hover:text-slate-800">
-                              {d.phone}
-                            </a>
-                          </TableCell>
-                          <TableCell className="font-semibold text-slate-800">{d.rating}</TableCell>
-                          <TableCell className="font-medium text-slate-700">{d.load}</TableCell>
-                          <TableCell>
-                            <StatusPill label={d.status} colorMap={driverStatusColor} />
-                          </TableCell>
-                          <TableCell className="truncate text-slate-500">{d.note}</TableCell>
-                          <TableCell className="px-4">
-                            <button
-                              type="button"
-                              className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
-                              onClick={() => openEditDriver(d)}
-                            >
-                              <Pencil className="size-3.5" />
-                              Sửa
-                            </button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                    {/* Empty placeholder rows to fill the height to 10 rows */}
-                    {paginatedDrivers.length > 0 && paginatedDrivers.length < pageSize &&
-                      Array.from({ length: pageSize - paginatedDrivers.length }).map((_, i) => (
-                        <TableRow key={`empty-${i}`} className="border-b border-slate-100">
-                          <TableCell className="pl-4 font-semibold text-slate-900">&nbsp;</TableCell>
-                          {Array.from({ length: 7 }).map((_, j) => (
-                            <TableCell key={j}>&nbsp;</TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    }
-                  </TableBody>
-                </Table>
-              )}
-
-              {tab === "Lộ trình" && (
-                <Table className="w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-                  <TableHeader>
-                    <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                      <TableHead className="w-[112px] pl-4 text-xs font-medium text-slate-600">Mã tuyến</TableHead>
-                      <TableHead className="w-[220px] border-l border-slate-100 text-xs font-medium text-slate-600">Gợi ý điều phối</TableHead>
-                      <TableHead className="w-[132px] border-l border-slate-100 text-xs font-medium text-slate-600">Tài xế</TableHead>
-                      <TableHead className="w-[168px] border-l border-slate-100 text-xs font-medium text-slate-600">Đơn liên quan</TableHead>
-                      <TableHead className="w-[104px] border-l border-slate-100 text-xs font-medium text-slate-600">ETA</TableHead>
-                      <TableHead className="w-[148px] border-l border-slate-100 text-xs font-medium text-slate-600">Hiệu quả</TableHead>
-                      <TableHead className="w-[146px] border-l border-slate-100 text-xs font-medium text-slate-600">Trạng thái</TableHead>
-                      <TableHead className="w-[116px] border-l border-slate-100 px-4 text-xs font-medium text-slate-600">Thao tác</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedRoutePlans.map((item) => (
-                      <TableRow key={item.id} className="h-9 border-b border-slate-100 text-slate-700 transition-colors hover:bg-slate-50/60">
-                        <TableCell className="pl-4 font-medium text-slate-900">{item.id}</TableCell>
-                        <TableCell className="font-medium text-slate-900">{item.route}</TableCell>
-                        <TableCell>{item.driver}</TableCell>
-                        <TableCell className="text-slate-500">{item.orders}</TableCell>
-                        <TableCell className="font-semibold text-slate-800">{item.eta}</TableCell>
-                        <TableCell className="text-slate-600">{item.saving}</TableCell>
-                        <TableCell>
-                          <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium text-blue-700" style={{ backgroundColor: "rgba(37,99,235,0.08)" }}>
-                            <span className="size-1.5 rounded-full bg-blue-600" />
-                            {item.status}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-4">
-                          <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-                            <Zap className="size-3.5" />
-                            Áp dụng
-                          </button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-
-              {tab === "OTP & Nhật ký" && (
-                <div className="grid min-h-full grid-cols-1 lg:grid-cols-[1fr_1.15fr]">
-                  <div className="border-r border-slate-100">
-                    <Table className="w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-                      <TableHeader>
-                        <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                          <TableHead className="w-[104px] pl-4 text-xs font-medium text-slate-600">Mã đơn</TableHead>
-                          <TableHead className="w-[116px] border-l border-slate-100 text-xs font-medium text-slate-600">Loại OTP</TableHead>
-                          <TableHead className="w-[92px] border-l border-slate-100 text-xs font-medium text-slate-600">Mã OTP</TableHead>
-                          <TableHead className="w-[142px] border-l border-slate-100 text-xs font-medium text-slate-600">Trạng thái</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedOtps.map((item) => (
-                          <TableRow key={item.order} className="h-9 border-b border-slate-100 text-slate-700 transition-colors hover:bg-slate-50/60">
-                            <TableCell className="pl-4 font-medium text-slate-900">{item.order}</TableCell>
-                            <TableCell>{item.type}</TableCell>
-                            <TableCell className="font-mono font-semibold text-slate-900">{item.otp}</TableCell>
-                            <TableCell>
-                              <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700">
-                                <span className="size-1.5 rounded-full bg-slate-500" />
-                                {item.status}
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-
-                  <Table className="w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-                    <TableHeader>
-                      <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                        <TableHead className="w-[88px] pl-4 text-xs font-medium text-slate-600">Thời gian</TableHead>
-                        <TableHead className="border-l border-slate-100 text-xs font-medium text-slate-600">Nhật ký trạng thái</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedTimeline.map((item) => (
-                        <TableRow key={item.event} className="h-9 border-b border-slate-100 text-slate-700 transition-colors hover:bg-slate-50/60">
-                          <TableCell className="pl-4 font-semibold text-slate-900">{item.time}</TableCell>
-                          <TableCell className="text-slate-600">{item.event}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+            {tab === "OTP & Nhật ký" ? (
+              <div className="grid min-h-0 flex-1 grid-cols-1 overflow-auto lg:grid-cols-[1fr_1.15fr]">
+                <div className="min-h-0 border-r border-slate-100">
+                  <DashboardDataTable
+                    columns={otpColumns}
+                    rows={paginatedOtps}
+                    pageSize={pageSize}
+                    emptyMessage="Không tìm thấy OTP phù hợp."
+                    totalVisibleWidth={otpColumns.reduce((sum, column) => sum + (column.width || 150), 0)}
+                    renderCell={renderOtpCell}
+                  />
                 </div>
-              )}
-
-            </div>
+                <DashboardDataTable
+                  columns={timelineColumns}
+                  rows={paginatedTimeline}
+                  pageSize={pageSize}
+                  emptyMessage="Không có nhật ký phù hợp."
+                  totalVisibleWidth={timelineTotalWidth}
+                  renderCell={renderTimelineCell}
+                />
+              </div>
+            ) : (
+              <DashboardDataTable
+                columns={activeColumns}
+                rows={activePaginatedRows}
+                pageSize={pageSize}
+                emptyMessage={tab === "Chuyến đi" ? "Không tìm thấy chuyến giao nhận phù hợp." : tab === "Tài xế" ? "Không tìm thấy tài xế phù hợp." : "Không tìm thấy lộ trình phù hợp."}
+                totalVisibleWidth={totalVisibleWidth}
+                renderCell={renderActiveCell}
+              />
+            )}
 
             {/* ── Pagination Footer ── */}
-            <div className="border-t border-slate-200 px-5 pt-3 pb-1">
-              <div className="flex flex-col gap-3 text-xs text-slate-700 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap items-center gap-3">
-                  <span>Số dòng mỗi trang</span>
-                  <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50">
-                    {pageSize}
-                    <ChevronDown className="size-3.5" />
-                  </button>
-                  <span className="text-slate-400">
-                    {activeRows.length === 0 ? 0 : (page - 1) * pageSize + 1}–
-                    {Math.min(page * pageSize, activeRows.length)} trong {activeRows.length} dòng
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-end gap-1">
-                  <button
-                    type="button"
-                    className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40"
-                    disabled={page <= 1}
-                    onClick={() => setPage(1)}
-                  >
-                    <ChevronsLeft className="size-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40"
-                    disabled={page <= 1}
-                    onClick={() => setPage((current) => Math.max(current - 1, 1))}
-                  >
-                    <ChevronDown className="size-4 rotate-90" />
-                  </button>
-                  <span className="px-3 text-sm font-medium text-slate-700">
-                    {page} / {pageCount || 1}
-                  </span>
-                  <button
-                    type="button"
-                    className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40"
-                    disabled={page >= pageCount}
-                    onClick={() => setPage((current) => Math.min(current + 1, pageCount))}
-                  >
-                    <ChevronDown className="size-4 -rotate-90" />
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40"
-                    disabled={page >= pageCount}
-                    onClick={() => setPage(pageCount || 1)}
-                  >
-                    <ChevronsRight className="size-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
+            <DashboardTableFooter
+              page={page}
+              pageCount={pageCount}
+              pageSize={pageSize}
+              totalRows={activeRows.length}
+              customPageSize={customPageSize}
+              openPageSizeMenu={openPageSizeMenu}
+              onOpenPageSizeMenuChange={setOpenPageSizeMenu}
+              onCustomPageSizeChange={setCustomPageSize}
+              onApplyCustomPageSize={() => setCustomPageSize("")}
+              onUpdatePageSize={() => setOpenPageSizeMenu(false)}
+              onPageChange={setPage}
+            />
           </div>
         </>
       )}

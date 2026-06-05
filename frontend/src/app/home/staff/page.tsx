@@ -4,19 +4,14 @@ import { useMemo, useState } from "react";
 import {
   CalendarClock,
   ChevronDown,
-  ChevronsLeft,
-  ChevronsRight,
   Clock,
   EyeOff,
   FileDown,
-  Kanban,
-  List,
   Package,
   Pencil,
   Plus,
   Search,
   Settings,
-  Table2,
   TrendingUp,
   Users,
   X,
@@ -26,15 +21,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TableCell } from "@/components/ui/table";
+import { PageShell, ViewModeTabs } from "../_components/dashboard-primitives";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { PageShell } from "../_components/dashboard-primitives";
+  DashboardDataTable,
+  DashboardTableFooter,
+  type DashboardTableColumn,
+} from "@/src/components/common/dashboard-data-table";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 
@@ -78,6 +71,40 @@ type Supply = {
 };
 
 const pageSize = 10;
+const staffColumns: DashboardTableColumn[] = [
+  { id: "id", label: "Mã NV", width: 104, visible: true },
+  { id: "name", label: "Họ tên", width: 168, visible: true },
+  { id: "role", label: "Vai trò", width: 112, visible: true },
+  { id: "shift", label: "Ca", width: 82, visible: true },
+  { id: "phone", label: "SĐT", width: 116, visible: true },
+  { id: "productivity", label: "Năng suất", width: 112, visible: true },
+  { id: "rating", label: "Đánh giá", width: 84, visible: true },
+  { id: "status", label: "Trạng thái", width: 112, visible: true },
+  { id: "note", label: "Ghi chú", width: 180, visible: true },
+  { id: "actions", label: "Thao tác", width: 108, visible: true },
+];
+const shiftColumns: DashboardTableColumn[] = [
+  { id: "id", label: "Mã ca", width: 116, visible: true },
+  { id: "day", label: "Ngày", width: 104, visible: true },
+  { id: "morning", label: "Ca sáng", width: 190, visible: true },
+  { id: "afternoon", label: "Ca chiều", width: 190, visible: true },
+  { id: "evening", label: "Ca tối", width: 190, visible: true },
+  { id: "workload", label: "Tải việc", width: 160, visible: true },
+  { id: "status", label: "Trạng thái", width: 112, visible: true },
+];
+const supplyColumns: DashboardTableColumn[] = [
+  { id: "id", label: "Mã VT", width: 104, visible: true },
+  { id: "name", label: "Vật tư", width: 156, visible: true },
+  { id: "category", label: "Nhóm", width: 110, visible: true },
+  { id: "stock", label: "Tồn kho", width: 90, visible: true },
+  { id: "threshold", label: "Ngưỡng", width: 90, visible: true },
+  { id: "supplier", label: "Nhà cung cấp", width: 132, visible: true },
+  { id: "lastImport", label: "Ngày nhập", width: 110, visible: true },
+  { id: "cost", label: "Chi phí", width: 112, visible: true },
+  { id: "status", label: "Cảnh báo", width: 104, visible: true },
+  { id: "note", label: "Ghi chú", width: 160, visible: true },
+  { id: "actions", label: "Thao tác", width: 108, visible: true },
+];
 const staffStatuses: Array<StaffStatus | "Tất cả"> = ["Tất cả", "Hoạt động", "Nghỉ phép", "Tạm nghỉ"];
 const supplyStatuses: Array<SupplyStatus | "Tất cả"> = ["Tất cả", "Ổn định", "Sắp hết", "Cần mua"];
 
@@ -183,6 +210,8 @@ export default function StaffOperationsPage() {
   const [editingSupplyId, setEditingSupplyId] = useState<string | null>(null);
   const [staffForm, setStaffForm] = useState(emptyStaffForm);
   const [supplyForm, setSupplyForm] = useState(emptySupplyForm);
+  const [openPageSizeMenu, setOpenPageSizeMenu] = useState(false);
+  const [customPageSize, setCustomPageSize] = useState("");
   const range = useDashboardTimeRangeStore((state) => state.range);
   const rangeLabel = formatRange(normalizeRange(range));
 
@@ -213,6 +242,9 @@ export default function StaffOperationsPage() {
   const paginatedStaff = filteredStaff.slice((page - 1) * pageSize, page * pageSize);
   const paginatedShifts = filteredShifts.slice((page - 1) * pageSize, page * pageSize);
   const paginatedSupplies = filteredSupplies.slice((page - 1) * pageSize, page * pageSize);
+  const activeColumns = tab === "Nhân viên" ? staffColumns : tab === "Ca làm" ? shiftColumns : supplyColumns;
+  const activePaginatedRows = tab === "Nhân viên" ? paginatedStaff : tab === "Ca làm" ? paginatedShifts : paginatedSupplies;
+  const totalVisibleWidth = activeColumns.reduce((sum, column) => sum + (column.width || 150), 0);
   const lowStock = supplies.filter((item) => item.status !== "Ổn định").length;
   const purchaseCost = supplies.reduce((sum, item) => sum + item.cost, 0);
 
@@ -258,6 +290,56 @@ export default function StaffOperationsPage() {
     setOpenSupplyForm(false);
   };
 
+  const renderStaffCell = (item: Staff, column: DashboardTableColumn) => {
+    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{item.id}</TableCell>;
+    if (column.id === "name") return <TableCell key={column.id} className="font-medium text-slate-900">{item.name}</TableCell>;
+    if (column.id === "phone") return <TableCell key={column.id}><a href={`tel:${item.phone}`} className="text-slate-500 hover:text-slate-800">{item.phone}</a></TableCell>;
+    if (column.id === "status") return <TableCell key={column.id}><StatusPill label={item.status} /></TableCell>;
+    if (column.id === "note") return <TableCell key={column.id} className="truncate text-slate-500" title={item.note}>{item.note}</TableCell>;
+    if (column.id === "actions") {
+      return (
+        <TableCell key={column.id} className="px-4">
+          <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 hover:bg-slate-50" onClick={() => openEditStaff(item)}>
+            <Pencil className="size-3.5" />
+            Sửa
+          </button>
+        </TableCell>
+      );
+    }
+    return <TableCell key={column.id}>{String(item[column.id as keyof Staff] ?? "")}</TableCell>;
+  };
+
+  const renderShiftCell = (item: Shift, column: DashboardTableColumn) => {
+    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{item.id}</TableCell>;
+    if (column.id === "status") return <TableCell key={column.id}><StatusPill label={item.status} /></TableCell>;
+    return <TableCell key={column.id}>{String(item[column.id as keyof Shift] ?? "")}</TableCell>;
+  };
+
+  const renderSupplyCell = (item: Supply, column: DashboardTableColumn) => {
+    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{item.id}</TableCell>;
+    if (column.id === "name") return <TableCell key={column.id} className="font-medium text-slate-900">{item.name}</TableCell>;
+    if (column.id === "cost") return <TableCell key={column.id} className="font-medium text-slate-900">{formatCurrency(item.cost)}</TableCell>;
+    if (column.id === "status") return <TableCell key={column.id}><StatusPill label={item.status} /></TableCell>;
+    if (column.id === "note") return <TableCell key={column.id} className="truncate text-slate-500" title={item.note}>{item.note}</TableCell>;
+    if (column.id === "actions") {
+      return (
+        <TableCell key={column.id} className="px-4">
+          <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 hover:bg-slate-50" onClick={() => openEditSupply(item)}>
+            <Pencil className="size-3.5" />
+            Sửa
+          </button>
+        </TableCell>
+      );
+    }
+    return <TableCell key={column.id}>{String(item[column.id as keyof Supply] ?? "")}</TableCell>;
+  };
+
+  const renderActiveCell = (row: Staff | Shift | Supply, column: DashboardTableColumn) => {
+    if (tab === "Nhân viên") return renderStaffCell(row as Staff, column);
+    if (tab === "Ca làm") return renderShiftCell(row as Shift, column);
+    return renderSupplyCell(row as Supply, column);
+  };
+
   return (
     <PageShell fullHeight>
       <div className="grid shrink-0 gap-3 md:grid-cols-4">
@@ -277,10 +359,7 @@ export default function StaffOperationsPage() {
               </button>
             ))}
             <span className="mx-2 hidden h-4 w-px bg-slate-200 sm:block" />
-            {(["Bảng", "Bảng kéo", "Danh sách"] as const).map((label) => {
-              const Icon = label === "Bảng" ? Table2 : label === "Bảng kéo" ? Kanban : List;
-              return <button key={label} type="button" className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${label === "Bảng" ? "text-slate-800" : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"}`}><Icon className="size-3.5" />{label}</button>;
-            })}
+            <ViewModeTabs value="Bảng" onChange={() => {}} />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -310,39 +389,27 @@ export default function StaffOperationsPage() {
           <button type="button" className="inline-flex h-7 items-center gap-1.5 px-2 text-xs text-slate-500 transition-colors hover:text-slate-700"><Plus className="size-3.5" />Thêm bộ lọc</button>
         </div>
 
-        <div className="flex-1 overflow-auto">
-          {tab === "Nhân viên" && (
-            <Table className="w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-              <TableHeader><TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                <TableHead className="w-[104px] pl-4 text-xs font-medium text-slate-600">Mã NV</TableHead><TableHead className="w-[168px] border-l border-slate-100 text-xs font-medium text-slate-600">Họ tên</TableHead><TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Vai trò</TableHead><TableHead className="w-[82px] border-l border-slate-100 text-xs font-medium text-slate-600">Ca</TableHead><TableHead className="w-[116px] border-l border-slate-100 text-xs font-medium text-slate-600">SĐT</TableHead><TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Năng suất</TableHead><TableHead className="w-[84px] border-l border-slate-100 text-xs font-medium text-slate-600">Đánh giá</TableHead><TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Trạng thái</TableHead><TableHead className="w-[180px] border-l border-slate-100 text-xs font-medium text-slate-600">Ghi chú</TableHead><TableHead className="w-[108px] border-l border-slate-100 px-4 text-xs font-medium text-slate-600">Thao tác</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {paginatedStaff.map((item) => <TableRow key={item.id} className="h-9 border-b border-slate-100 text-slate-700 hover:bg-slate-50/60"><TableCell className="pl-4 font-medium text-slate-900">{item.id}</TableCell><TableCell className="font-medium text-slate-900">{item.name}</TableCell><TableCell>{item.role}</TableCell><TableCell>{item.shift}</TableCell><TableCell><a href={`tel:${item.phone}`} className="text-slate-500 hover:text-slate-800">{item.phone}</a></TableCell><TableCell>{item.productivity}</TableCell><TableCell>{item.rating}</TableCell><TableCell><StatusPill label={item.status} /></TableCell><TableCell className="truncate text-slate-500">{item.note}</TableCell><TableCell className="px-4"><button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 hover:bg-slate-50" onClick={() => openEditStaff(item)}><Pencil className="size-3.5" />Sửa</button></TableCell></TableRow>)}
-              </TableBody>
-            </Table>
-          )}
-
-          {tab === "Ca làm" && (
-            <Table className="w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-              <TableHeader><TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50"><TableHead className="w-[116px] pl-4 text-xs font-medium text-slate-600">Mã ca</TableHead><TableHead className="w-[104px] border-l border-slate-100 text-xs font-medium text-slate-600">Ngày</TableHead><TableHead className="w-[190px] border-l border-slate-100 text-xs font-medium text-slate-600">Ca sáng</TableHead><TableHead className="w-[190px] border-l border-slate-100 text-xs font-medium text-slate-600">Ca chiều</TableHead><TableHead className="w-[190px] border-l border-slate-100 text-xs font-medium text-slate-600">Ca tối</TableHead><TableHead className="w-[160px] border-l border-slate-100 text-xs font-medium text-slate-600">Tải việc</TableHead><TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Trạng thái</TableHead></TableRow></TableHeader>
-              <TableBody>{paginatedShifts.map((item) => <TableRow key={item.id} className="h-9 border-b border-slate-100 text-slate-700 hover:bg-slate-50/60"><TableCell className="pl-4 font-medium text-slate-900">{item.id}</TableCell><TableCell>{item.day}</TableCell><TableCell>{item.morning}</TableCell><TableCell>{item.afternoon}</TableCell><TableCell>{item.evening}</TableCell><TableCell>{item.workload}</TableCell><TableCell><StatusPill label={item.status} /></TableCell></TableRow>)}</TableBody>
-            </Table>
-          )}
-
-          {tab === "Kho vật tư" && (
-            <Table className="w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-              <TableHeader><TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50"><TableHead className="w-[104px] pl-4 text-xs font-medium text-slate-600">Mã VT</TableHead><TableHead className="w-[156px] border-l border-slate-100 text-xs font-medium text-slate-600">Vật tư</TableHead><TableHead className="w-[110px] border-l border-slate-100 text-xs font-medium text-slate-600">Nhóm</TableHead><TableHead className="w-[90px] border-l border-slate-100 text-xs font-medium text-slate-600">Tồn kho</TableHead><TableHead className="w-[90px] border-l border-slate-100 text-xs font-medium text-slate-600">Ngưỡng</TableHead><TableHead className="w-[132px] border-l border-slate-100 text-xs font-medium text-slate-600">Nhà cung cấp</TableHead><TableHead className="w-[110px] border-l border-slate-100 text-xs font-medium text-slate-600">Ngày nhập</TableHead><TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Chi phí</TableHead><TableHead className="w-[104px] border-l border-slate-100 text-xs font-medium text-slate-600">Cảnh báo</TableHead><TableHead className="w-[160px] border-l border-slate-100 text-xs font-medium text-slate-600">Ghi chú</TableHead><TableHead className="w-[108px] border-l border-slate-100 px-4 text-xs font-medium text-slate-600">Thao tác</TableHead></TableRow></TableHeader>
-              <TableBody>{paginatedSupplies.map((item) => <TableRow key={item.id} className="h-9 border-b border-slate-100 text-slate-700 hover:bg-slate-50/60"><TableCell className="pl-4 font-medium text-slate-900">{item.id}</TableCell><TableCell className="font-medium text-slate-900">{item.name}</TableCell><TableCell>{item.category}</TableCell><TableCell>{item.stock}</TableCell><TableCell>{item.threshold}</TableCell><TableCell>{item.supplier}</TableCell><TableCell>{item.lastImport}</TableCell><TableCell className="font-medium text-slate-900">{formatCurrency(item.cost)}</TableCell><TableCell><StatusPill label={item.status} /></TableCell><TableCell className="truncate text-slate-500">{item.note}</TableCell><TableCell className="px-4"><button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 hover:bg-slate-50" onClick={() => openEditSupply(item)}><Pencil className="size-3.5" />Sửa</button></TableCell></TableRow>)}</TableBody>
-            </Table>
-          )}
-        </div>
-
-        <div className="border-t border-slate-200 px-5 pt-3 pb-1">
-          <div className="flex flex-col gap-3 text-xs text-slate-700 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-3"><span>Số dòng mỗi trang</span><button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50">{pageSize}<ChevronDown className="size-3.5" /></button><span className="text-slate-400">{activeRows.length === 0 ? 0 : (page - 1) * pageSize + 1}-{Math.min(page * pageSize, activeRows.length)} trong {activeRows.length} dòng</span></div>
-            <div className="flex items-center justify-end gap-1"><button type="button" className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-40" disabled={page <= 1} onClick={() => setPage(1)}><ChevronsLeft className="size-4" /></button><button type="button" className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-40" disabled={page <= 1} onClick={() => setPage((current) => Math.max(current - 1, 1))}><ChevronDown className="size-4 rotate-90" /></button><span className="px-3 text-sm font-medium text-slate-700">{page} / {pageCount || 1}</span><button type="button" className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-40" disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(current + 1, pageCount))}><ChevronDown className="size-4 -rotate-90" /></button><button type="button" className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-40" disabled={page >= pageCount} onClick={() => setPage(pageCount || 1)}><ChevronsRight className="size-4" /></button></div>
-          </div>
-        </div>
+        <DashboardDataTable
+          columns={activeColumns}
+          rows={activePaginatedRows}
+          pageSize={pageSize}
+          emptyMessage="Không có dữ liệu phù hợp."
+          totalVisibleWidth={totalVisibleWidth}
+          renderCell={renderActiveCell}
+        />
+        <DashboardTableFooter
+          page={page}
+          pageCount={pageCount}
+          pageSize={pageSize}
+          totalRows={activeRows.length}
+          customPageSize={customPageSize}
+          openPageSizeMenu={openPageSizeMenu}
+          onOpenPageSizeMenuChange={setOpenPageSizeMenu}
+          onCustomPageSizeChange={setCustomPageSize}
+          onApplyCustomPageSize={() => setCustomPageSize("")}
+          onUpdatePageSize={() => setOpenPageSizeMenu(false)}
+          onPageChange={setPage}
+        />
       </div>
 
       {openStaffForm && (

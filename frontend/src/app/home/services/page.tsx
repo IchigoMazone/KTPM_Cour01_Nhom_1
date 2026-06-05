@@ -4,20 +4,15 @@ import { useMemo, useState } from "react";
 import {
   CalendarClock,
   ChevronDown,
-  ChevronsLeft,
-  ChevronsRight,
   CircleDollarSign,
   EyeOff,
   FileDown,
   Gift,
-  Kanban,
-  List,
   Pencil,
   Plus,
   ReceiptText,
   Search,
   Settings,
-  Table2,
   Tags,
   Wallet,
   X,
@@ -27,15 +22,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TableCell } from "@/components/ui/table";
+import { PageShell, ViewModeTabs } from "../_components/dashboard-primitives";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { PageShell } from "../_components/dashboard-primitives";
+  DashboardDataTable,
+  DashboardTableFooter,
+  type DashboardTableColumn,
+} from "@/src/components/common/dashboard-data-table";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 
@@ -114,6 +107,44 @@ const seedPromotions: Promotion[] = [
 ];
 
 const pageSize = 10;
+const serviceColumns: DashboardTableColumn[] = [
+  { id: "id", label: "Mã dịch vụ", width: 132, visible: true },
+  { id: "name", label: "Tên dịch vụ", width: 184, visible: true },
+  { id: "category", label: "Nhóm", width: 140, visible: true },
+  { id: "unit", label: "Đơn vị", width: 76, visible: true },
+  { id: "price", label: "Đơn giá", width: 112, visible: true },
+  { id: "turnaround", label: "Thời gian", width: 112, visible: true },
+  { id: "status", label: "Trạng thái", width: 126, visible: true },
+  { id: "promotion", label: "Ưu đãi", width: 120, visible: true },
+  { id: "note", label: "Ghi chú", width: 190, visible: true },
+  { id: "actions", label: "Thao tác", width: 108, visible: true },
+];
+const promotionColumns: DashboardTableColumn[] = [
+  { id: "id", label: "Mã ID", width: 112, visible: true },
+  { id: "code", label: "Code", width: 138, visible: true },
+  { id: "name", label: "Chương trình", width: 170, visible: true },
+  { id: "type", label: "Loại", width: 96, visible: true },
+  { id: "value", label: "Giá trị", width: 112, visible: true },
+  { id: "startDate", label: "Bắt đầu", width: 104, visible: true },
+  { id: "endDate", label: "Kết thúc", width: 112, visible: true },
+  { id: "usage", label: "Sử dụng", width: 112, visible: true },
+  { id: "status", label: "Trạng thái", width: 116, visible: true },
+  { id: "note", label: "Ghi chú", width: 190, visible: true },
+  { id: "actions", label: "Thao tác", width: 108, visible: true },
+];
+const financeColumns: DashboardTableColumn[] = [
+  { id: "id", label: "Mã giao dịch", width: 116, visible: true },
+  { id: "date", label: "Ngày", width: 104, visible: true },
+  { id: "type", label: "Loại", width: 106, visible: true },
+  { id: "customer", label: "Khách / đối tác", width: 168, visible: true },
+  { id: "orderId", label: "Đơn", width: 92, visible: true },
+  { id: "method", label: "Phương thức", width: 116, visible: true },
+  { id: "amount", label: "Số tiền", width: 120, visible: true },
+  { id: "status", label: "Trạng thái", width: 104, visible: true },
+  { id: "owner", label: "Phụ trách", width: 104, visible: true },
+  { id: "note", label: "Ghi chú", width: 164, visible: true },
+  { id: "actions", label: "Thao tác", width: 108, visible: true },
+];
 
 const emptyServiceForm = {
   name: "",
@@ -235,6 +266,8 @@ export default function ServicesFinancePage() {
   const [serviceForm, setServiceForm] = useState(emptyServiceForm);
   const [financeForm, setFinanceForm] = useState(emptyFinanceForm);
   const [promotionForm, setPromotionForm] = useState(emptyPromotionForm);
+  const [openPageSizeMenu, setOpenPageSizeMenu] = useState(false);
+  const [customPageSize, setCustomPageSize] = useState("");
   const range = useDashboardTimeRangeStore((state) => state.range);
   const rangeLabel = formatRange(normalizeRange(range));
 
@@ -270,6 +303,9 @@ export default function ServicesFinancePage() {
   const paginatedServices = filteredServices.slice((page - 1) * pageSize, page * pageSize);
   const paginatedFinance = filteredFinanceRecords.slice((page - 1) * pageSize, page * pageSize);
   const paginatedPromotions = filteredPromotions.slice((page - 1) * pageSize, page * pageSize);
+  const activeColumns = tab === "Dịch vụ" ? serviceColumns : tab === "Tài chính" ? financeColumns : promotionColumns;
+  const activePaginatedRows = tab === "Dịch vụ" ? paginatedServices : tab === "Tài chính" ? paginatedFinance : paginatedPromotions;
+  const totalVisibleWidth = activeColumns.reduce((sum, column) => sum + (column.width || 150), 0);
   const revenue = financeRecords.filter((item) => item.type === "Doanh thu" && item.status === "Đã thu").reduce((sum, item) => sum + item.amount, 0);
   const receivable = financeRecords.filter((item) => item.type === "Công nợ").reduce((sum, item) => sum + item.amount, 0);
   const expense = financeRecords.filter((item) => item.type === "Chi phí" || item.type === "Hoàn tiền").reduce((sum, item) => sum + item.amount, 0);
@@ -316,6 +352,25 @@ export default function ServicesFinancePage() {
 
     setPage(1);
     setOpenServiceForm(false);
+  };
+
+  const renderServiceCell = (service: Service, column: DashboardTableColumn) => {
+    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{service.id}</TableCell>;
+    if (column.id === "name") return <TableCell key={column.id} className="font-medium text-slate-900">{service.name}</TableCell>;
+    if (column.id === "price") return <TableCell key={column.id} className="font-medium text-slate-900">{formatCurrency(service.price)}</TableCell>;
+    if (column.id === "status") return <TableCell key={column.id}><StatusPill label={service.status} /></TableCell>;
+    if (column.id === "note") return <TableCell key={column.id} className="truncate text-slate-500" title={service.note}>{service.note}</TableCell>;
+    if (column.id === "actions") {
+      return (
+        <TableCell key={column.id} className="px-4">
+          <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openEditServiceForm(service)}>
+            <Pencil className="size-3.5" />
+            Sửa
+          </button>
+        </TableCell>
+      );
+    }
+    return <TableCell key={column.id} className="text-slate-600">{String(service[column.id as keyof Service] ?? "")}</TableCell>;
   };
 
   const openCreateFinanceForm = () => {
@@ -410,6 +465,59 @@ export default function ServicesFinancePage() {
     setOpenPromotionForm(false);
   };
 
+  const renderFinanceCell = (record: FinanceRecord, column: DashboardTableColumn) => {
+    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{record.id}</TableCell>;
+    if (column.id === "type") {
+      return (
+        <TableCell key={column.id}>
+          <span className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium" style={{ color: typeColor[record.type], backgroundColor: `${typeColor[record.type]}14` }}>
+            <span className="size-1.5 rounded-full" style={{ backgroundColor: typeColor[record.type] }} />
+            {record.type}
+          </span>
+        </TableCell>
+      );
+    }
+    if (column.id === "amount") return <TableCell key={column.id} className="font-medium text-slate-900">{formatCurrency(record.amount)}</TableCell>;
+    if (column.id === "status") return <TableCell key={column.id}><StatusPill label={record.status} /></TableCell>;
+    if (column.id === "note") return <TableCell key={column.id} className="truncate text-slate-500" title={record.note}>{record.note}</TableCell>;
+    if (column.id === "actions") {
+      return (
+        <TableCell key={column.id} className="px-4">
+          <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openEditFinanceForm(record)}>
+            <Pencil className="size-3.5" />
+            Sửa
+          </button>
+        </TableCell>
+      );
+    }
+    return <TableCell key={column.id} className="text-slate-600">{String(record[column.id as keyof FinanceRecord] ?? "")}</TableCell>;
+  };
+
+  const renderPromotionCell = (promotion: Promotion, column: DashboardTableColumn) => {
+    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{promotion.id}</TableCell>;
+    if (column.id === "code") return <TableCell key={column.id} className="font-semibold text-slate-900">{promotion.code}</TableCell>;
+    if (column.id === "name") return <TableCell key={column.id} className="font-medium text-slate-900">{promotion.name}</TableCell>;
+    if (column.id === "status") return <TableCell key={column.id}><StatusPill label={promotion.status} /></TableCell>;
+    if (column.id === "note") return <TableCell key={column.id} className="truncate text-slate-500" title={promotion.note}>{promotion.note}</TableCell>;
+    if (column.id === "actions") {
+      return (
+        <TableCell key={column.id} className="px-4">
+          <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openEditPromotionForm(promotion)}>
+            <Pencil className="size-3.5" />
+            Sửa
+          </button>
+        </TableCell>
+      );
+    }
+    return <TableCell key={column.id} className="text-slate-600">{String(promotion[column.id as keyof Promotion] ?? "")}</TableCell>;
+  };
+
+  const renderActiveCell = (row: Service | FinanceRecord | Promotion, column: DashboardTableColumn) => {
+    if (tab === "Dịch vụ") return renderServiceCell(row as Service, column);
+    if (tab === "Tài chính") return renderFinanceCell(row as FinanceRecord, column);
+    return renderPromotionCell(row as Promotion, column);
+  };
+
   return (
     <PageShell fullHeight>
       <div className="grid shrink-0 gap-3 md:grid-cols-4">
@@ -440,21 +548,7 @@ export default function ServicesFinancePage() {
               </button>
             ))}
             <span className="mx-2 h-4 w-px bg-slate-200" />
-            {(["Bảng", "Bảng kéo", "Danh sách"] as const).map((label) => {
-              const Icon = label === "Bảng" ? Table2 : label === "Bảng kéo" ? Kanban : List;
-              return (
-                <button
-                  key={label}
-                  type="button"
-                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                    label === "Bảng" ? "text-slate-800" : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
-                  }`}
-                >
-                  <Icon className="size-3.5" />
-                  {label}
-                </button>
-              );
-            })}
+            <ViewModeTabs value="Bảng" onChange={() => {}} />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -525,185 +619,27 @@ export default function ServicesFinancePage() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto">
-          {tab === "Dịch vụ" ? (
-            <Table className="w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-              <TableHeader>
-                <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                  <TableHead className="w-[132px] pl-4 text-xs font-medium text-slate-600">Mã dịch vụ</TableHead>
-                  <TableHead className="w-[184px] border-l border-slate-100 text-xs font-medium text-slate-600">Tên dịch vụ</TableHead>
-                  <TableHead className="w-[140px] border-l border-slate-100 text-xs font-medium text-slate-600">Nhóm</TableHead>
-                  <TableHead className="w-[76px] border-l border-slate-100 text-xs font-medium text-slate-600">Đơn vị</TableHead>
-                  <TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Đơn giá</TableHead>
-                  <TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Thời gian</TableHead>
-                  <TableHead className="w-[126px] border-l border-slate-100 text-xs font-medium text-slate-600">Trạng thái</TableHead>
-                  <TableHead className="w-[120px] border-l border-slate-100 text-xs font-medium text-slate-600">Ưu đãi</TableHead>
-                  <TableHead className="w-[190px] border-l border-slate-100 text-xs font-medium text-slate-600">Ghi chú</TableHead>
-                  <TableHead className="w-[108px] border-l border-slate-100 px-4 text-xs font-medium text-slate-600">Thao tác</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedServices.map((service) => (
-                  <TableRow key={service.id} className="h-9 border-b border-slate-100 text-slate-700 transition-colors hover:bg-slate-50/60">
-                    <TableCell className="pl-4 font-medium text-slate-900">{service.id}</TableCell>
-                    <TableCell className="font-medium text-slate-900">{service.name}</TableCell>
-                    <TableCell className="text-slate-600">{service.category}</TableCell>
-                    <TableCell className="text-slate-500">{service.unit}</TableCell>
-                    <TableCell className="font-medium text-slate-900">{formatCurrency(service.price)}</TableCell>
-                    <TableCell className="text-slate-600">{service.turnaround}</TableCell>
-                    <TableCell><StatusPill label={service.status} /></TableCell>
-                    <TableCell className="text-slate-500">{service.promotion}</TableCell>
-                    <TableCell className="truncate text-slate-500">{service.note}</TableCell>
-                    <TableCell className="px-4">
-                      <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openEditServiceForm(service)}>
-                        <Pencil className="size-3.5" />
-                        Sửa
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {paginatedServices.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={10}>
-                      <div className="grid min-h-[320px] place-items-center text-sm text-slate-400">Không tìm thấy dịch vụ phù hợp.</div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          ) : tab === "Mã giảm giá" ? (
-            <Table className="w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-              <TableHeader>
-                <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                  <TableHead className="w-[112px] pl-4 text-xs font-medium text-slate-600">Mã ID</TableHead>
-                  <TableHead className="w-[138px] border-l border-slate-100 text-xs font-medium text-slate-600">Code</TableHead>
-                  <TableHead className="w-[170px] border-l border-slate-100 text-xs font-medium text-slate-600">Chương trình</TableHead>
-                  <TableHead className="w-[96px] border-l border-slate-100 text-xs font-medium text-slate-600">Loại</TableHead>
-                  <TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Giá trị</TableHead>
-                  <TableHead className="w-[104px] border-l border-slate-100 text-xs font-medium text-slate-600">Bắt đầu</TableHead>
-                  <TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Kết thúc</TableHead>
-                  <TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Sử dụng</TableHead>
-                  <TableHead className="w-[116px] border-l border-slate-100 text-xs font-medium text-slate-600">Trạng thái</TableHead>
-                  <TableHead className="w-[190px] border-l border-slate-100 text-xs font-medium text-slate-600">Ghi chú</TableHead>
-                  <TableHead className="w-[108px] border-l border-slate-100 px-4 text-xs font-medium text-slate-600">Thao tác</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedPromotions.map((promotion) => (
-                  <TableRow key={promotion.id} className="h-9 border-b border-slate-100 text-slate-700 transition-colors hover:bg-slate-50/60">
-                    <TableCell className="pl-4 font-medium text-slate-900">{promotion.id}</TableCell>
-                    <TableCell className="font-semibold text-slate-900">{promotion.code}</TableCell>
-                    <TableCell className="font-medium text-slate-900">{promotion.name}</TableCell>
-                    <TableCell className="text-slate-600">{promotion.type}</TableCell>
-                    <TableCell className="font-medium text-slate-900">{promotion.value}</TableCell>
-                    <TableCell className="text-slate-500">{promotion.startDate}</TableCell>
-                    <TableCell className="text-slate-500">{promotion.endDate}</TableCell>
-                    <TableCell className="text-slate-600">{promotion.usage}</TableCell>
-                    <TableCell><StatusPill label={promotion.status} /></TableCell>
-                    <TableCell className="truncate text-slate-500">{promotion.note}</TableCell>
-                    <TableCell className="px-4">
-                      <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openEditPromotionForm(promotion)}>
-                        <Pencil className="size-3.5" />
-                        Sửa
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {paginatedPromotions.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={11}>
-                      <div className="grid min-h-[320px] place-items-center text-sm text-slate-400">Không tìm thấy mã giảm giá phù hợp.</div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          ) : (
-            <Table className="w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-              <TableHeader>
-                <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                  <TableHead className="w-[116px] pl-4 text-xs font-medium text-slate-600">Mã giao dịch</TableHead>
-                  <TableHead className="w-[104px] border-l border-slate-100 text-xs font-medium text-slate-600">Ngày</TableHead>
-                  <TableHead className="w-[106px] border-l border-slate-100 text-xs font-medium text-slate-600">Loại</TableHead>
-                  <TableHead className="w-[168px] border-l border-slate-100 text-xs font-medium text-slate-600">Khách / đối tác</TableHead>
-                  <TableHead className="w-[92px] border-l border-slate-100 text-xs font-medium text-slate-600">Đơn</TableHead>
-                  <TableHead className="w-[116px] border-l border-slate-100 text-xs font-medium text-slate-600">Phương thức</TableHead>
-                  <TableHead className="w-[120px] border-l border-slate-100 text-xs font-medium text-slate-600">Số tiền</TableHead>
-                  <TableHead className="w-[104px] border-l border-slate-100 text-xs font-medium text-slate-600">Trạng thái</TableHead>
-                  <TableHead className="w-[104px] border-l border-slate-100 text-xs font-medium text-slate-600">Phụ trách</TableHead>
-                  <TableHead className="w-[164px] border-l border-slate-100 text-xs font-medium text-slate-600">Ghi chú</TableHead>
-                  <TableHead className="w-[108px] border-l border-slate-100 px-4 text-xs font-medium text-slate-600">Thao tác</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedFinance.map((record) => (
-                  <TableRow key={record.id} className="h-9 border-b border-slate-100 text-slate-700 transition-colors hover:bg-slate-50/60">
-                    <TableCell className="pl-4 font-medium text-slate-900">{record.id}</TableCell>
-                    <TableCell className="text-slate-500">{record.date}</TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium" style={{ color: typeColor[record.type], backgroundColor: `${typeColor[record.type]}14` }}>
-                        <span className="size-1.5 rounded-full" style={{ backgroundColor: typeColor[record.type] }} />
-                        {record.type}
-                      </span>
-                    </TableCell>
-                    <TableCell className="font-medium text-slate-900">{record.customer}</TableCell>
-                    <TableCell className="text-slate-500">{record.orderId}</TableCell>
-                    <TableCell className="text-slate-600">{record.method}</TableCell>
-                    <TableCell className="font-medium text-slate-900">{formatCurrency(record.amount)}</TableCell>
-                    <TableCell><StatusPill label={record.status} /></TableCell>
-                    <TableCell className="text-slate-600">{record.owner}</TableCell>
-                    <TableCell className="truncate text-slate-500">{record.note}</TableCell>
-                    <TableCell className="px-4">
-                      <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openEditFinanceForm(record)}>
-                        <Pencil className="size-3.5" />
-                        Sửa
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {paginatedFinance.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={11}>
-                      <div className="grid min-h-[320px] place-items-center text-sm text-slate-400">Không tìm thấy giao dịch phù hợp.</div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-
-        <div className="border-t border-slate-200 px-5 pt-3 pb-1">
-          <div className="flex flex-col gap-3 text-xs text-slate-700 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-3">
-              <span>Số dòng mỗi trang</span>
-              <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50">
-                {pageSize}
-                <ChevronDown className="size-3.5" />
-              </button>
-              <span className="text-slate-400">
-                {activeRows.length === 0 ? 0 : (page - 1) * pageSize + 1}-
-                {Math.min(page * pageSize, activeRows.length)} trong {activeRows.length} dòng
-              </span>
-            </div>
-
-            <div className="flex items-center justify-end gap-1">
-              <button type="button" className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40" disabled={page <= 1} onClick={() => setPage(1)}>
-                <ChevronsLeft className="size-4" />
-              </button>
-              <button type="button" className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40" disabled={page <= 1} onClick={() => setPage((current) => Math.max(current - 1, 1))}>
-                <ChevronDown className="size-4 rotate-90" />
-              </button>
-              <span className="px-3 text-sm font-medium text-slate-700">{page} / {pageCount || 1}</span>
-              <button type="button" className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40" disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(current + 1, pageCount))}>
-                <ChevronDown className="size-4 -rotate-90" />
-              </button>
-              <button type="button" className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40" disabled={page >= pageCount} onClick={() => setPage(pageCount || 1)}>
-                <ChevronsRight className="size-4" />
-              </button>
-            </div>
-          </div>
-        </div>
+        <DashboardDataTable
+          columns={activeColumns}
+          rows={activePaginatedRows}
+          pageSize={pageSize}
+          emptyMessage={tab === "Dịch vụ" ? "Không tìm thấy dịch vụ phù hợp." : tab === "Mã giảm giá" ? "Không tìm thấy mã giảm giá phù hợp." : "Không tìm thấy giao dịch phù hợp."}
+          totalVisibleWidth={totalVisibleWidth}
+          renderCell={renderActiveCell}
+        />
+        <DashboardTableFooter
+          page={page}
+          pageCount={pageCount}
+          pageSize={pageSize}
+          totalRows={activeRows.length}
+          customPageSize={customPageSize}
+          openPageSizeMenu={openPageSizeMenu}
+          onOpenPageSizeMenuChange={setOpenPageSizeMenu}
+          onCustomPageSizeChange={setCustomPageSize}
+          onApplyCustomPageSize={() => setCustomPageSize("")}
+          onUpdatePageSize={() => setOpenPageSizeMenu(false)}
+          onPageChange={setPage}
+        />
       </div>
 
       {openServiceForm && (

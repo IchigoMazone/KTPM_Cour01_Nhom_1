@@ -2,11 +2,13 @@
 
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import { Kanban, List, Table2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 export type Period = "Ngày" | "Tuần" | "Tháng";
+export type DashboardViewMode = "Bảng" | "Bảng kéo" | "Danh sách";
 
 type PageShellProps = {
   title?: string;
@@ -178,6 +180,38 @@ export function PeriodTabs({
         >
           {period}
         </Button>
+      ))}
+    </div>
+  );
+}
+
+export function ViewModeTabs({
+  value,
+  onChange,
+}: {
+  value: DashboardViewMode;
+  onChange: (value: DashboardViewMode) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      {([
+        ["Bảng", Table2],
+        ["Bảng kéo", Kanban],
+        ["Danh sách", List],
+      ] as const).map(([label, Icon]) => (
+        <button
+          key={label}
+          type="button"
+          onClick={() => onChange(label)}
+          className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${
+            value === label
+              ? "bg-slate-100 text-slate-900"
+              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+          }`}
+        >
+          <Icon className="size-3.5" />
+          {label}
+        </button>
       ))}
     </div>
   );
