@@ -2,6 +2,15 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
+import { MetricCard } from "../_components/metric-card";
+import { Toolbar } from "../_components/toolbar";
+import { FilterBar } from "../_components/filter-bar";
+import { TableView } from "../_components/table-view";
+import { KanbanView } from "../_components/kanban-view";
+import { ListView } from "../_components/list-view";
+import { FormDialog, type FormField } from "../_components/form-dialog";
+import { HistoryModal } from "../_components/history-modal";
+import { AddColumnDialog } from "../_components/add-column-dialog";
 import {
   Search,
   Star,
@@ -177,6 +186,25 @@ export default function CustomersPage() {
   const [openForm, setOpenForm] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [form, setForm] = useState<typeof emptyForm & Record<string, string>>(emptyForm);
+
+  const customerFormFields = useMemo<FormField[]>(() => {
+    const baseFields: FormField[] = [
+      { id: "name", label: "Họ tên", type: "text", placeholder: "Họ và tên" },
+      { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
+      { id: "email", label: "Email", type: "text", placeholder: "khachhang@example.com" },
+      { id: "birthday", label: "Ngày sinh", type: "date" },
+      { id: "address", label: "Địa chỉ mặc định", type: "text", placeholder: "Số nhà, tên đường, quận/huyện..." },
+      { id: "note", label: "Ghi chú đặc biệt", type: "text", placeholder: "Dị ứng hóa chất, giờ giao hàng yêu thích..." },
+    ];
+    if (editingCustomerId) {
+      baseFields.push(
+        { id: "rank", label: "Hạng khách hàng", type: "text", placeholder: "Thường, Bạc, Vàng, Kim cương" },
+        { id: "points", label: "Điểm tích lũy", type: "number" },
+        { id: "createdAt", label: "Ngày tham gia", type: "date" }
+      );
+    }
+    return baseFields;
+  }, [editingCustomerId]);
 
   const range = useDashboardTimeRangeStore((state) => state.range);
   const rangeLabel = formatRange(normalizeRange(range));
@@ -722,715 +750,359 @@ export default function CustomersPage() {
     );
   };
 
+  const customerFilterOptions = useMemo(() => {
+    return (["Tất cả", ...rankOptions] as const).map((rank) => {
+      const isAll = rank === "Tất cả";
+      return {
+        id: rank,
+        label: rank,
+        color: isAll ? allRankColor : rankColor[rank].text,
+        bgColor: isAll ? allRankBgColor : rankColor[rank].bg,
+      };
+    });
+  }, []);
+
+  const customerKanbanColumns = useMemo(() => {
+    return rankOptions.map((rank) => ({
+      id: rank,
+      label: rank,
+      color: { text: rankColor[rank].text, bg: rankColor[rank].bg },
+    }));
+  }, []);
+
+  const renderCustomerKanbanCard = (customer: Customer) => {
+    return (
+      <div
+        key={customer.id}
+        draggable
+        onDragStart={(event) => {
+          setDraggedCustomerId(customer.id);
+          event.dataTransfer.effectAllowed = "move";
+        }}
+        onDragEnd={() => {
+          setDraggedCustomerId(null);
+          setDragOverRank(null);
+        }}
+        className={`cursor-grab rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:cursor-grabbing ${draggedCustomerId === customer.id ? "opacity-50 ring-2 ring-slate-400" : ""}`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <input
+              type="checkbox"
+              aria-label={`Chọn ${customer.name}`}
+              checked={selectedCustomerIds.has(customer.id)}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
+              onChange={() => toggleCustomer(customer.id)}
+              className={`shrink-0 ${checkboxClass}`}
+            />
+            <Image
+              src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+              alt={customer.name}
+              width={32}
+              height={32}
+              className="size-8 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
+            />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-slate-700">{customer.name}</p>
+              <p className="truncate text-[11px] text-slate-400">{customer.phone}</p>
+            </div>
+          </div>
+          <span className="shrink-0 text-[11px] font-semibold text-slate-400">{customer.id}</span>
+        </div>
+        <p className="mt-2 truncate text-xs text-slate-500">{customer.email}</p>
+        <p className="mt-1 truncate text-xs text-slate-500">{customer.totalOrders} đơn · {customer.points.toLocaleString("vi-VN")} điểm</p>
+        <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2">
+          <span className="truncate text-[11px] text-slate-500">{formatBirthday(customer.birthday)}</span>
+          <span className="text-[13px] font-bold text-slate-900">{customer.totalSpend.toLocaleString("vi-VN")}đ</span>
+        </div>
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => openEditForm(customer)}
+            className="inline-flex h-6 items-center rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200"
+          >
+            Chi tiết
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCustomerListRow = (customer: Customer) => {
+    return (
+      <div key={customer.id} className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <input
+              type="checkbox"
+              aria-label={`Chọn ${customer.name}`}
+              checked={selectedCustomerIds.has(customer.id)}
+              onChange={() => toggleCustomer(customer.id)}
+              className={`mt-1 shrink-0 ${checkboxClass}`}
+            />
+            <Image
+              src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+              alt={customer.name}
+              width={40}
+              height={40}
+              className="size-10 shrink-0 rounded-full object-cover"
+            />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-slate-950">{customer.name}</p>
+                <span className="text-xs font-medium text-slate-400">{customer.id}</span>
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium"
+                  style={{
+                    color: rankColor[customer.rank]?.text || "#475569",
+                    backgroundColor: rankColor[customer.rank]?.bg || "rgba(71,85,105,0.08)",
+                  }}
+                >
+                  <span className="size-1.5 rounded-full" style={{ backgroundColor: rankColor[customer.rank]?.text || "#475569" }} />
+                  {customer.rank}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                <span>{customer.phone}</span>
+                <span>{customer.email}</span>
+                <span>{customer.totalOrders} đơn · {customer.points.toLocaleString("vi-VN")} điểm</span>
+              </div>
+              <p className="mt-2 line-clamp-2 text-xs text-slate-400">{customer.address}</p>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              {customer.totalSpend.toLocaleString("vi-VN")}đ
+            </span>
+            <button
+              type="button"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+              onClick={() => openEditForm(customer)}
+            >
+              <Pencil className="size-3.5" />
+              Sửa
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600"
+              onClick={(event) => deleteCustomer(customer.id, event)}
+            >
+              <Trash2 className="size-3.5" />
+              Xóa
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <PageShell fullHeight>
       <div className="grid shrink-0 gap-3 md:grid-cols-4">
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600">
-              <Star className="size-3.5" />
-            </span>
-            <p className="truncate text-xs font-semibold text-slate-900">Khách trong bộ lọc</p>
-          </div>
-          <p className="mt-3 text-xl font-semibold tracking-tight text-slate-950">{filteredCustomers.length}</p>
-          <p className="mt-2 truncate text-xs text-slate-400">{selectedRank} · {rangeLabel}</p>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-600">
-              <History className="size-3.5" />
-            </span>
-            <p className="truncate text-xs font-semibold text-slate-900">Khách VIP</p>
-          </div>
-          <p className="mt-3 text-xl font-semibold tracking-tight text-slate-950">{vipCustomers}</p>
-          <p className="mt-2 truncate text-xs text-slate-400">Vàng và Kim cương</p>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-600">
-              <Clock className="size-3.5" />
-            </span>
-            <p className="truncate text-xs font-semibold text-slate-900">Tổng chi tiêu</p>
-          </div>
-          <p className="mt-3 text-xl font-semibold tracking-tight text-slate-950">{totalSpend.toLocaleString("vi-VN")}đ</p>
-          <p className="mt-2 truncate text-xs text-slate-400">Theo khách đang hiển thị</p>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-violet-50 text-violet-600">
-              <Search className="size-3.5" />
-            </span>
-            <p className="truncate text-xs font-semibold text-slate-900">Chi tiêu TB</p>
-          </div>
-          <p className="mt-3 text-xl font-semibold tracking-tight text-slate-950">{averageSpend.toLocaleString("vi-VN")}đ</p>
-          <p className="mt-2 truncate text-xs text-slate-400">Trung bình mỗi khách</p>
-        </div>
+        <MetricCard title="Khách trong bộ lọc" value={String(filteredCustomers.length)} hint={`${selectedRank} · ${rangeLabel}`} icon={Star} color="#2563eb" />
+        <MetricCard title="Khách VIP" value={String(vipCustomers)} hint="Vàng và Kim cương" icon={History} color="#d97706" />
+        <MetricCard title="Tổng chi tiêu" value={`${totalSpend.toLocaleString("vi-VN")}đ`} hint="Theo khách đang hiển thị" icon={Clock} color="#10b981" />
+        <MetricCard title="Chi tiêu TB" value={`${averageSpend.toLocaleString("vi-VN")}đ`} hint="Trung bình mỗi khách" icon={Search} color="#8b5cf6" />
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
-        {/* ════════════ MAIN TABLE CONTAINER ════════════ */}
         <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
-          
-          {/* ── Top Toolbar ── */}
-          <div className="flex flex-col gap-3 border-b border-slate-200 px-5 pt-1 pb-3 xl:flex-row xl:items-center xl:justify-between">
-            {/* Left: View Tabs */}
-            <div className="flex items-center gap-1">
-              <ViewModeTabs value={viewMode} onChange={setViewMode} />
-            </div>
-
-            {/* Right: Search & Actions */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative min-w-[220px] flex-1 xl:w-64 xl:flex-none">
-                <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" />
-                <Input
-                  className="h-8 rounded-md border-slate-200 bg-white pl-8 text-xs text-slate-700 shadow-none placeholder:text-slate-500 focus-visible:ring-slate-200"
-                  placeholder="Tìm tên, SĐT, địa chỉ..."
-                  value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    setPage(1);
-                  }}
-                />
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-                    <EyeOff className="size-3.5" />
-                    Ẩn cột
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuLabel>Hiển thị cột</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {columns.map((column) => (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      checked={column.visible}
-                      onCheckedChange={(value) => {
-                        setColumns((prev) =>
-                          prev.map((item) =>
-                            item.id === column.id ? { ...item, visible: !!value } : item,
-                          ),
-                        );
-                      }}
-                    >
-                      {column.label}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-                    <Settings className="size-3.5" />
-                    Tùy chỉnh
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={() => setColumns(defaultColumns)}>
-                    <X className="size-3.5 mr-2" />
-                    Đặt lại cột
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setOpenAddColumn(true)}>
-                    <Plus className="size-3.5 mr-2" />
-                    Thêm cột mới
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Co giãn dữ liệu bảng</DropdownMenuLabel>
-                  <DropdownMenuCheckboxItem
-                    checked={tableResizeMode === "fit"}
-                    onCheckedChange={(checked) => {
-                      if (checked) setTableResizeMode("fit");
-                    }}
-                  >
-                    Tự động vừa thiết bị
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={tableResizeMode === "custom"}
-                    onCheckedChange={(checked) => {
-                      if (checked) setTableResizeMode("custom");
-                    }}
-                  >
-                    Kéo giãn nâng cao
-                  </DropdownMenuCheckboxItem>
-                  {customColumns.length > 0 && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuLabel>Xóa cột tùy chỉnh</DropdownMenuLabel>
-                      {customColumns.map((column) => (
-                        <DropdownMenuItem
-                          key={column.id}
-                          className="text-red-600 focus:text-red-600"
-                          onClick={() => setColumns((prev) => prev.filter((item) => item.id !== column.id))}
-                        >
-                          <X className="size-3.5 mr-2" />
-                          Xóa &quot;{column.label}&quot;
-                        </DropdownMenuItem>
-                      ))}
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <button
-                type="button"
-                className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50 disabled:text-slate-300 disabled:hover:bg-transparent"
-                disabled={selectedCustomerIds.size === 0}
-                onClick={() => {
-                  setActiveHistoryCustomerId(selectedCustomers[0]?.id ?? null);
-                  setOpenHistory(true);
-                }}
-              >
-                <History className="size-3.5" />
-                Lịch sử
-              </button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-                    <Download className="size-3.5" />
-                    Xuất file
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64">
-                  <DropdownMenuLabel>Chọn định dạng xuất</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {[
-                    { label: "PDF", hint: "Bản in và báo cáo khách hàng", icon: FileText, format: "pdf" },
-                    { label: "Excel", hint: "Đối soát, lọc và xử lý dữ liệu", icon: FileSpreadsheet, format: "excel" },
-                    { label: "CSV", hint: "Nhập dữ liệu sang hệ thống khác", icon: FileType, format: "csv" },
-                  ].map(({ label, hint, icon: Icon, format }) => (
-                    <DropdownMenuItem key={label} className="items-start gap-3 py-2.5" onClick={() => handleExport(format as ExportFormat, getDefaultExportFileName())}>
-                      <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
-                        {label === "PDF" ? <FileDown className="size-4" /> : <Icon className="size-4" />}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-xs font-medium text-slate-800">Xuất {label}</span>
-                        <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">{hint}</span>
-                      </span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <button
-                type="button"
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                onClick={openCreateForm}
-              >
-                Thêm khách
-                <ChevronDown className="size-3.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* ── Filter Pills ── */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-3">
-            <button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-              <Star className="size-3.5" />
-              {selectedRank}
-              <ChevronDown className="size-3.5" />
-            </button>
-            <button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-              <Clock className="size-3.5" />
-              {rangeLabel}
-              <ChevronDown className="size-3.5" />
-            </button>
-            <button type="button" className="inline-flex h-7 items-center gap-1.5 px-2 text-xs text-slate-500 transition-colors hover:text-slate-700">
-              <Plus className="size-3.5" />
-              Thêm bộ lọc
-            </button>
-            <DashboardSelectionBar
-              checked={viewMode === "Bảng kéo" ? allKanbanCustomersSelected : allVisibleSelected}
-              disabled={viewMode === "Bảng kéo" ? kanbanCustomerIds.length === 0 : visibleCustomerIds.length === 0}
-              selectedCount={viewMode === "Bảng kéo" ? selectedKanbanCustomerCount : selectedVisibleCustomerCount}
-              totalCount={viewMode === "Bảng kéo" ? kanbanCustomerIds.length : visibleCustomerIds.length}
-              itemLabel="khách"
-              checkboxClassName={checkboxClass}
-              onToggle={viewMode === "Bảng kéo" ? toggleKanbanCustomers : toggleVisibleCustomers}
-            />
-            <div className="ml-auto hidden flex-wrap gap-1.5 2xl:flex">
-              {["Tất cả", "Kim cương", "Vàng", "Bạc", "Thường"].map((rank) => {
-                const active = selectedRank === rank;
-                const isAll = rank === "Tất cả";
-                const activeColor = isAll ? allRankColor : rankColor[rank].text;
-                const activeBgColor = isAll ? allRankBgColor : rankColor[rank].bg;
-
-                return (
-                  <button
-                    key={rank}
-                    type="button"
-                    onClick={() => {
-                      setSelectedRank(rank);
-                      setPage(1);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-all hover:bg-slate-50"
-                    style={
-                      active
-                        ? { color: activeColor, backgroundColor: activeBgColor }
-                        : { color: "#64748b", backgroundColor: "transparent" }
-                    }
-                  >
-                    <span
-                      className="inline-block size-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: active ? activeColor : "#cbd5e1" }}
-                    />
-                    {rank}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <Toolbar
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            query={query}
+            onQueryChange={(q) => { setQuery(q); setPage(1); }}
+            columns={columns}
+            onColumnsChange={setColumns}
+            tableResizeMode={tableResizeMode}
+            onTableResizeModeChange={setTableResizeMode}
+            selectedCount={selectedCustomerIds.size}
+            onOpenAddColumn={() => setOpenAddColumn(true)}
+            onOpenHistory={() => {
+              setActiveHistoryCustomerId(selectedCustomers[0]?.id ?? null);
+              setOpenHistory(true);
+            }}
+            onExport={handleExport}
+            defaultExportFileName={getDefaultExportFileName()}
+            onCreateClick={openCreateForm}
+            createLabel="Thêm khách"
+            defaultColumnIds={defaultColumns.map((c) => c.id)}
+            searchPlaceholder="Tìm tên, SĐT, địa chỉ..."
+          />
+          <FilterBar
+            rangeLabel={rangeLabel}
+            selectedValue={selectedRank}
+            onValueChange={(rank) => { setSelectedRank(rank); setPage(1); }}
+            filterOptions={customerFilterOptions}
+            filterLabel="Hạng khách hàng"
+            allSelected={viewMode === "Bảng kéo" ? allKanbanCustomersSelected : allVisibleSelected}
+            disabled={viewMode === "Bảng kéo" ? kanbanCustomerIds.length === 0 : visibleCustomerIds.length === 0}
+            selectedCount={viewMode === "Bảng kéo" ? selectedKanbanCustomerCount : selectedVisibleCustomerCount}
+            totalCount={viewMode === "Bảng kéo" ? kanbanCustomerIds.length : visibleCustomerIds.length}
+            itemLabel="khách"
+            checkboxClass={checkboxClass}
+            onToggleAll={viewMode === "Bảng kéo" ? toggleKanbanCustomers : toggleVisibleCustomers}
+          />
 
           {viewMode === "Bảng" ? (
-            <>
-              <DashboardDataTable
-                columns={columns}
-                rows={paginatedCustomers}
-                pageSize={pageSize}
-                emptyMessage="Không tìm thấy khách hàng phù hợp."
-                tableResizeMode={tableResizeMode}
-                totalVisibleWidth={totalVisibleWidth}
-                renderCell={renderCustomerCell}
-                columnDrag={{
-                  draggedColumnId,
-                  dragOverColumnId,
-                  onDragStart: handleDragStart,
-                  onDragOver: handleDragOver,
-                  onDragLeave: () => setDragOverColumnId(null),
-                  onDrop: handleDrop,
-                  onDragEnd: handleDragEnd,
-                }}
-              />
-              <DashboardTableFooter
-                page={page}
-                pageCount={pageCount}
-                pageSize={pageSize}
-                totalRows={filteredCustomers.length}
-                totalLabel={`Tổng ${totalSpend.toLocaleString("vi-VN")}đ`}
-                customPageSize={customPageSize}
-                openPageSizeMenu={openPageSizeMenu}
-                onOpenPageSizeMenuChange={setOpenPageSizeMenu}
-                onCustomPageSizeChange={setCustomPageSize}
-                onApplyCustomPageSize={applyCustomPageSize}
-                onUpdatePageSize={updatePageSize}
-                onPageChange={setPage}
-              />
-            </>
+            <TableView
+              columns={columns}
+              rows={paginatedCustomers}
+              pageSize={pageSize}
+              emptyMessage="Không tìm thấy khách hàng phù hợp."
+              tableResizeMode={tableResizeMode}
+              totalVisibleWidth={totalVisibleWidth}
+              renderCell={renderCustomerCell}
+              columnDrag={{
+                draggedColumnId,
+                dragOverColumnId,
+                onDragStart: handleDragStart,
+                onDragOver: handleDragOver,
+                onDragLeave: () => setDragOverColumnId(null),
+                onDrop: handleDrop,
+                onDragEnd: handleDragEnd,
+              }}
+              page={page}
+              pageCount={pageCount}
+              totalRows={filteredCustomers.length}
+              customPageSize={customPageSize}
+              openPageSizeMenu={openPageSizeMenu}
+              onOpenPageSizeMenuChange={setOpenPageSizeMenu}
+              onCustomPageSizeChange={setCustomPageSize}
+              onApplyCustomPageSize={applyCustomPageSize}
+              onUpdatePageSize={updatePageSize}
+              onPageChange={setPage}
+            />
           ) : viewMode === "Bảng kéo" ? (
-            <div className={`min-h-0 flex-1 bg-slate-50/30 p-5 ${
-                tableResizeMode === "fit"
-                  ? "grid grid-cols-1 gap-4 overflow-y-auto sm:grid-cols-2 xl:grid-cols-4"
-                  : "flex gap-4 overflow-x-auto"
-              }`}>
-                {rankOptions.map((rank) => {
-                  const rankCustomers = filteredCustomers.filter((customer) => customer.rank === rank);
-                  const color = rankColor[rank] || { text: "#64748b", bg: "rgba(100,116,139,0.1)" };
-
-                  return (
-                    <div
-                      key={rank}
-                      className={`flex flex-col rounded-xl border border-slate-200 bg-slate-100/50 p-3 transition-colors ${
-                        tableResizeMode === "fit" ? "w-full min-h-[300px]" : "min-w-[300px] max-w-[300px]"
-                      } ${dragOverRank === rank ? "border-slate-400 bg-slate-200/50" : ""}`}
-                      onDragOver={(event) => {
-                        event.preventDefault();
-                        if (dragOverRank !== rank) setDragOverRank(rank);
-                      }}
-                      onDragLeave={() => setDragOverRank(null)}
-                      onDrop={(event) => {
-                        event.preventDefault();
-                        if (draggedCustomerId) {
-                          setCustomers((prev) =>
-                            prev.map((customer) =>
-                              customer.id === draggedCustomerId ? { ...customer, rank } : customer,
-                            ),
-                          );
-                        }
-                        setDraggedCustomerId(null);
-                        setDragOverRank(null);
-                      }}
-                    >
-                      <div className="mb-3 flex items-center justify-between px-1">
-                        <span className="inline-flex items-center gap-1.5 font-semibold" style={{ color: color.text }}>
-                          <span className="size-2 rounded-full" style={{ backgroundColor: color.text }} />
-                          {rank}
-                        </span>
-                        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-500">
-                          {rankCustomers.length}
-                        </span>
-                      </div>
-
-                      <div className="flex h-full min-h-[100px] flex-col gap-3 overflow-y-auto px-1 pb-2">
-                        {rankCustomers.map((customer) => (
-                        <div
-                          key={customer.id}
-                          draggable
-                          onDragStart={(event) => {
-                            setDraggedCustomerId(customer.id);
-                            event.dataTransfer.effectAllowed = "move";
-                          }}
-                          onDragEnd={() => {
-                            setDraggedCustomerId(null);
-                            setDragOverRank(null);
-                          }}
-                          className={`cursor-grab rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:cursor-grabbing ${draggedCustomerId === customer.id ? "opacity-50 ring-2 ring-slate-400" : ""}`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <input
-                                type="checkbox"
-                                aria-label={`Chọn ${customer.name}`}
-                                checked={selectedCustomerIds.has(customer.id)}
-                                onMouseDown={(event) => event.stopPropagation()}
-                                onClick={(event) => event.stopPropagation()}
-                                onChange={() => toggleCustomer(customer.id)}
-                                className={`shrink-0 ${checkboxClass}`}
-                              />
-                              <Image
-                                src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
-                                alt={customer.name}
-                                width={32}
-                                height={32}
-                                className="size-8 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
-                              />
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-slate-700">{customer.name}</p>
-                                <p className="truncate text-[11px] text-slate-400">{customer.phone}</p>
-                              </div>
-                            </div>
-                            <span className="shrink-0 text-[11px] font-semibold text-slate-400">{customer.id}</span>
-                          </div>
-                          <p className="mt-2 truncate text-xs text-slate-500">{customer.email}</p>
-                          <p className="mt-1 truncate text-xs text-slate-500">{customer.totalOrders} đơn · {customer.points.toLocaleString("vi-VN")} điểm</p>
-                          <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2">
-                            <span className="truncate text-[11px] text-slate-500">{formatBirthday(customer.birthday)}</span>
-                            <span className="text-[13px] font-bold text-slate-900">{customer.totalSpend.toLocaleString("vi-VN")}đ</span>
-                          </div>
-                          <div className="mt-2 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => openEditForm(customer)}
-                              className="inline-flex h-6 items-center rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200"
-                            >
-                              Chi tiết
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-
-                      {rankCustomers.length === 0 && (
-                        <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-400">
-                          Kéo thả vào đây
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  );
-                })}
-            </div>
+            <KanbanView
+              columns={customerKanbanColumns}
+              rows={filteredCustomers}
+              groupByKey="rank"
+              draggedItemId={draggedCustomerId}
+              onDraggedItemIdChange={setDraggedCustomerId}
+              dragOverColumnId={dragOverRank}
+              onDragOverColumnIdChange={setDragOverRank}
+              onDropItem={(customerId, rank) => {
+                setCustomers((prev) =>
+                  prev.map((c) => (c.id === customerId ? { ...c, rank } : c)),
+                );
+              }}
+              renderCard={renderCustomerKanbanCard}
+              tableResizeMode={tableResizeMode}
+            />
           ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/30 p-4">
-              {paginatedCustomers.length === 0 ? (
-                <div className="grid min-h-[320px] place-items-center rounded-lg border border-dashed border-slate-200 bg-white text-sm text-slate-400">
-                  Không tìm thấy khách hàng phù hợp.
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {paginatedCustomers.map((customer) => (
-                    <div key={customer.id} className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="flex min-w-0 items-start gap-3">
-                          <input
-                            type="checkbox"
-                            aria-label={`Chọn ${customer.name}`}
-                            checked={selectedCustomerIds.has(customer.id)}
-                            onChange={() => toggleCustomer(customer.id)}
-                            className={`mt-1 shrink-0 ${checkboxClass}`}
-                          />
-                          <Image
-                            src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
-                            alt={customer.name}
-                            width={40}
-                            height={40}
-                            className="size-10 shrink-0 rounded-full object-cover"
-                          />
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-semibold text-slate-950">{customer.name}</p>
-                              <span className="text-xs font-medium text-slate-400">{customer.id}</span>
-                              <span
-                                className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium"
-                                style={{
-                                  color: rankColor[customer.rank]?.text || "#475569",
-                                  backgroundColor: rankColor[customer.rank]?.bg || "rgba(71,85,105,0.08)",
-                                }}
-                              >
-                                <span className="size-1.5 rounded-full" style={{ backgroundColor: rankColor[customer.rank]?.text || "#475569" }} />
-                                {customer.rank}
-                              </span>
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                              <span>{customer.phone}</span>
-                              <span>{customer.email}</span>
-                              <span>{customer.totalOrders} đơn · {customer.points.toLocaleString("vi-VN")} điểm</span>
-                            </div>
-                            <p className="mt-2 line-clamp-2 text-xs text-slate-400">{customer.address}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                            {customer.totalSpend.toLocaleString("vi-VN")}đ
-                          </span>
-                          <button
-                            type="button"
-                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
-                            onClick={() => openEditForm(customer)}
-                          >
-                            <Pencil className="size-3.5" />
-                            Sửa
-                          </button>
-                          <button
-                            type="button"
-                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600"
-                            onClick={(event) => deleteCustomer(customer.id, event)}
-                          >
-                            <Trash2 className="size-3.5" />
-                            Xóa
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <ListView
+              paginatedRows={paginatedCustomers}
+              emptyMessage="Không tìm thấy khách hàng phù hợp."
+              renderRow={renderCustomerListRow}
+            />
           )}
-
         </div>
       </div>
 
-      {/* ════════════ MODAL: CREATE / EDIT CUSTOMER ════════════ */}
-      {openForm && (
-        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <Card className="w-full max-w-xl rounded-2xl border-0 shadow-2xl overflow-hidden bg-white">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-200 px-6 py-4">
-              <CardTitle className="text-base font-semibold">
-                {editingCustomerId ? "Chỉnh sửa thông tin khách hàng" : "Thêm khách hàng mới"}
-              </CardTitle>
-              <button
-                type="button"
-                className="inline-flex size-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                onClick={() => setOpenForm(false)}
-              >
-                <X className="size-5" />
-              </button>
-            </CardHeader>
-            <CardContent className="grid gap-4 p-6 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Họ tên</Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Họ và tên" />
-              </div>
-              <div className="space-y-2">
-                <Label>Số điện thoại</Label>
-                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="090..." />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="khachhang@example.com" />
-              </div>
-              <div className="space-y-2">
-                <Label>Ngày sinh</Label>
-                <Input type="date" value={form.birthday} onChange={(e) => setForm({ ...form, birthday: e.target.value })} />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label>Địa chỉ mặc định</Label>
-                <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Số nhà, tên đường, quận/huyện..." />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label>Ghi chú đặc biệt</Label>
-                <Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Dị ứng hóa chất, giờ giao hàng yêu thích..." />
-              </div>
-              
-              {editingCustomerId && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Hạng khách hàng</Label>
-                    <Input value={form.rank} onChange={(e) => setForm({ ...form, rank: e.target.value })} placeholder="Thường, Bạc, Vàng, Kim cương" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Điểm tích lũy</Label>
-                    <Input type="number" value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Ngày tham gia</Label>
-                    <Input type="date" value={form.createdAt} onChange={(e) => setForm({ ...form, createdAt: e.target.value })} />
-                  </div>
-                </>
-              )}
+      <FormDialog
+        open={openForm}
+        onClose={() => setOpenForm(false)}
+        title={editingCustomerId ? "Chỉnh sửa thông tin khách hàng" : "Thêm khách hàng mới"}
+        fields={customerFormFields}
+        form={form}
+        onFormChange={(newForm) => setForm(newForm as any)}
+        onSave={saveCustomer}
+        customColumns={customColumns}
+      />
 
-              {customColumns.map((column) => (
-                <div key={column.id} className="space-y-2 md:col-span-2">
-                  <Label>{column.label}</Label>
-                  <Input
-                    value={form[column.id] || ""}
-                    onChange={(event) => setForm({ ...form, [column.id]: event.target.value })}
-                    placeholder={`Nhập ${column.label.toLowerCase()}`}
-                  />
-                </div>
-              ))}
+      <AddColumnDialog
+        open={openAddColumn}
+        onOpenChange={setOpenAddColumn}
+        newColumnName={newColumnName}
+        onNewColumnNameChange={setNewColumnName}
+        onAddColumn={addCustomColumn}
+      />
 
-              <Button className="md:col-span-2 mt-2 bg-slate-900 text-white hover:bg-slate-800 h-10 font-semibold rounded-lg transition-colors" onClick={saveCustomer}>
-                Lưu thông tin
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      <Dialog open={openAddColumn} onOpenChange={setOpenAddColumn}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Thêm cột tùy chỉnh</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="customerColumnName">Tên cột</Label>
-              <Input
-                id="customerColumnName"
-                value={newColumnName}
-                onChange={(event) => setNewColumnName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") addCustomColumn();
-                }}
-                placeholder="VD: Khu vực phụ trách"
-              />
-            </div>
+      <HistoryModal
+        open={openHistory}
+        onClose={() => setOpenHistory(false)}
+        title="Lịch sử khách hàng"
+        items={selectedCustomers}
+        activeItemId={activeHistoryCustomerId}
+        onActiveItemChange={setActiveHistoryCustomerId}
+        itemLabel="khách"
+        maxWidthClass="max-w-4xl"
+        renderSidebarItem={(customer, active) => (
+          <div className="flex min-w-0 items-center gap-2">
+            <Image
+              src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+              alt={customer.name}
+              width={28}
+              height={28}
+              className="size-7 shrink-0 rounded-full object-cover"
+            />
+            <span className="min-w-0">
+              <span className="block truncate text-xs font-semibold">{customer.name}</span>
+              <span className="block truncate text-[11px] text-slate-400">{customer.id} · {customer.rank}</span>
+            </span>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpenAddColumn(false)}>Hủy</Button>
-            <Button type="button" onClick={addCustomColumn}>Thêm cột</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {openHistory && (
-        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <Card className="flex h-[min(86vh,680px)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border-0 bg-white shadow-2xl">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-200 px-6 py-4">
-              <div>
-                <CardTitle className="text-base font-semibold">Lịch sử khách hàng</CardTitle>
-                <p className="mt-1 text-xs text-slate-500">
-                  {selectedCustomers.length} khách đang được chọn
-                </p>
+        )}
+        renderDetail={(customer) => (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-950">{customer.name}</p>
+                  <p className="mt-1 text-xs text-slate-500">{customer.phone} · {customer.email}</p>
+                  <p className="mt-2 text-xs text-slate-400">{customer.address}</p>
+                </div>
+                <span
+                  className="inline-flex w-fit items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium"
+                  style={{
+                    color: rankColor[customer.rank]?.text || "#475569",
+                    backgroundColor: rankColor[customer.rank]?.bg || "rgba(71,85,105,0.08)",
+                  }}
+                >
+                  <span className="size-1.5 rounded-full" style={{ backgroundColor: rankColor[customer.rank]?.text || "#475569" }} />
+                  {customer.rank}
+                </span>
               </div>
-              <button
-                type="button"
-                className="inline-flex size-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                onClick={() => setOpenHistory(false)}
-              >
-                <X className="size-5" />
-              </button>
-            </CardHeader>
+            </div>
 
-            <CardContent className="grid min-h-0 flex-1 gap-0 p-0 md:grid-cols-[240px_1fr]">
-              <div className="border-b border-slate-200 p-3 md:border-b-0 md:border-r">
-                <div className="flex min-h-0 gap-1.5 overflow-x-auto md:flex-col md:overflow-x-hidden md:overflow-y-auto md:pr-1">
-                  {selectedCustomers.map((customer) => {
-                    const active = activeHistoryCustomer?.id === customer.id;
-                    return (
-                      <button
-                        key={customer.id}
-                        type="button"
-                        onClick={() => setActiveHistoryCustomerId(customer.id)}
-                        className={`flex min-w-[190px] items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors md:min-w-0 ${
-                          active
-                            ? "border-slate-300 bg-slate-50 text-slate-950"
-                            : "border-transparent text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        <Image
-                          src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
-                          alt={customer.name}
-                          width={28}
-                          height={28}
-                          className="size-7 shrink-0 rounded-full object-cover"
-                        />
-                        <span className="min-w-0">
-                          <span className="block truncate text-xs font-semibold">{customer.name}</span>
-                          <span className="block truncate text-[11px] text-slate-400">{customer.id} · {customer.rank}</span>
-                        </span>
-                      </button>
-                    );
-                  })}
+            {[
+              {
+                title: "Tạo hồ sơ khách hàng",
+                detail: `Ngày tham gia ${customer.createdAt || "Chưa có"}`,
+                time: customer.createdAt || "Chưa có",
+              },
+              {
+                title: "Cập nhật tích lũy",
+                detail: `${customer.points.toLocaleString("vi-VN")} điểm · ${customer.totalOrders} đơn`,
+                time: "Gần nhất",
+              },
+              {
+                title: "Ghi chú chăm sóc",
+                detail: customer.note || "Không có ghi chú đặc biệt",
+                time: "CRM",
+              },
+            ].map((item, index) => (
+              <div key={item.title} className="relative border-l border-slate-200 pl-5">
+                <span className="absolute -left-[5px] top-1.5 size-2.5 rounded-full bg-slate-900 ring-4 ring-white" />
+                <div className="rounded-lg border border-slate-200 bg-white p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                    <span className="text-xs text-slate-400">{item.time}</span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">{item.detail}</p>
+                  {index === 1 && (
+                    <p className="mt-2 text-xs font-medium text-slate-900">
+                      Tổng chi tiêu {customer.totalSpend.toLocaleString("vi-VN")}đ
+                    </p>
+                  )}
                 </div>
               </div>
-
-              <div className="min-h-0 overflow-y-auto p-4">
-                {activeHistoryCustomer ? (
-                  <div className="space-y-4">
-                    <div className="rounded-lg border border-slate-200 bg-white p-4">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-slate-950">{activeHistoryCustomer.name}</p>
-                          <p className="mt-1 text-xs text-slate-500">{activeHistoryCustomer.phone} · {activeHistoryCustomer.email}</p>
-                          <p className="mt-2 text-xs text-slate-400">{activeHistoryCustomer.address}</p>
-                        </div>
-                        <span
-                          className="inline-flex w-fit items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium"
-                          style={{
-                            color: rankColor[activeHistoryCustomer.rank]?.text || "#475569",
-                            backgroundColor: rankColor[activeHistoryCustomer.rank]?.bg || "rgba(71,85,105,0.08)",
-                          }}
-                        >
-                          <span className="size-1.5 rounded-full" style={{ backgroundColor: rankColor[activeHistoryCustomer.rank]?.text || "#475569" }} />
-                          {activeHistoryCustomer.rank}
-                        </span>
-                      </div>
-                    </div>
-
-                    {[
-                      {
-                        title: "Tạo hồ sơ khách hàng",
-                        detail: `Ngày tham gia ${activeHistoryCustomer.createdAt || "Chưa có"}`,
-                        time: activeHistoryCustomer.createdAt || "Chưa có",
-                      },
-                      {
-                        title: "Cập nhật tích lũy",
-                        detail: `${activeHistoryCustomer.points.toLocaleString("vi-VN")} điểm · ${activeHistoryCustomer.totalOrders} đơn`,
-                        time: "Gần nhất",
-                      },
-                      {
-                        title: "Ghi chú chăm sóc",
-                        detail: activeHistoryCustomer.note || "Không có ghi chú đặc biệt",
-                        time: "CRM",
-                      },
-                    ].map((item, index) => (
-                      <div key={item.title} className="relative border-l border-slate-200 pl-5">
-                        <span className="absolute -left-[5px] top-1.5 size-2.5 rounded-full bg-slate-900 ring-4 ring-white" />
-                        <div className="rounded-lg border border-slate-200 bg-white p-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-                            <span className="text-xs text-slate-400">{item.time}</span>
-                          </div>
-                          <p className="mt-1 text-xs leading-5 text-slate-500">{item.detail}</p>
-                          {index === 1 && (
-                            <p className="mt-2 text-xs font-medium text-slate-900">
-                              Tổng chi tiêu {activeHistoryCustomer.totalSpend.toLocaleString("vi-VN")}đ
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid h-full min-h-[320px] place-items-center text-sm text-slate-400">
-                    Chọn khách hàng để xem lịch sử.
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      />
     </PageShell>
   );
 }

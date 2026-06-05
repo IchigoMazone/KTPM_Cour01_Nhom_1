@@ -78,9 +78,9 @@ export function DashboardDataTable<T>({
 
   return (
     <div className="flex-1 overflow-auto [&_div[data-slot=table-container]]:overflow-visible">
-      <Table className={`${tableResizeMode === "fit" ? "w-full table-fixed" : "w-max table-fixed"} text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100`}>
+      <Table className={`${tableResizeMode === "fit" ? "w-full table-fixed" : "w-max table-fixed"} text-xs [&_td]:h-11 [&_td]:py-0 [&_td]:align-middle [&_th]:h-11 [&_th]:py-0 [&_th]:align-middle`}>
         <TableHeader>
-          <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
+          <TableRow className="h-9 border-b border-slate-200 bg-slate-50 hover:bg-slate-50">
             {visibleColumns.map((column) => {
               const fitStyle: CSSProperties | undefined =
                 tableResizeMode === "fit"
@@ -135,7 +135,7 @@ export function DashboardDataTable<T>({
             rows.map((row, index) => (
               <TableRow
                 key={index}
-                className={rowClassName?.(row) || "group h-9 border-b border-slate-100 text-slate-700 transition-colors hover:bg-slate-50/60"}
+                className={rowClassName?.(row) || "group h-11 border-b border-slate-200 text-slate-700 transition-colors hover:bg-slate-50/60"}
                 onClick={() => onRowClick?.(row)}
               >
                 {visibleColumns.map((column) => renderCell(row, column))}
@@ -146,13 +146,21 @@ export function DashboardDataTable<T>({
           {rows.length > 0 &&
             rows.length < pageSize &&
             Array.from({ length: pageSize - rows.length }).map((_, rowIndex) => (
-              <TableRow key={`empty-${rowIndex}`} className="border-b border-slate-100">
-                <TableCell className="pl-4">
-                  <input type="checkbox" disabled className="size-4 rounded border-slate-200 opacity-0" />
-                </TableCell>
-                {Array.from({ length: Math.max(visibleColumns.length - 1, 0) }).map((__, cellIndex) => (
-                  <TableCell key={cellIndex}>&nbsp;</TableCell>
-                ))}
+              <TableRow key={`empty-${rowIndex}`} className="h-11 border-b border-slate-200">
+                {selectAll ? (
+                  <>
+                    <TableCell className="pl-4">
+                      <input type="checkbox" disabled className="size-4 rounded border-slate-200 opacity-0" />
+                    </TableCell>
+                    {Array.from({ length: Math.max(visibleColumns.length - 1, 0) }).map((__, cellIndex) => (
+                      <TableCell key={cellIndex}>&nbsp;</TableCell>
+                    ))}
+                  </>
+                ) : (
+                  Array.from({ length: visibleColumns.length }).map((__, cellIndex) => (
+                    <TableCell key={cellIndex}>&nbsp;</TableCell>
+                  ))
+                )}
               </TableRow>
             ))}
         </TableBody>

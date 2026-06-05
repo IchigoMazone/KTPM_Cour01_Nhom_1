@@ -17,9 +17,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TableCell } from "@/components/ui/table";
-import { PageShell, ViewModeTabs } from "../_components/dashboard-primitives";
+import { PageShell } from "../_components/dashboard-primitives";
+import { Toolbar } from "../_components/toolbar";
+import { FilterBar, type FilterOption } from "../_components/filter-bar";
+import { TableView } from "../_components/table-view";
+import { KanbanView, type KanbanColumn } from "../_components/kanban-view";
+import { ListView } from "../_components/list-view";
+import { AddColumnDialog } from "../_components/add-column-dialog";
 import {
   DashboardDataTable,
+  DashboardSelectionBar,
   DashboardTableFooter,
   type DashboardTableColumn,
 } from "@/src/components/common/dashboard-data-table";
@@ -42,8 +49,8 @@ type Ticket = {
   note: string;
 };
 
-const pageSize = 10;
-const columns: DashboardTableColumn[] = [
+const initialPageSize = 10;
+const defaultColumns: DashboardTableColumn[] = [
   { id: "id", label: "Mã", width: 104, visible: true },
   { id: "type", label: "Loại", width: 112, visible: true },
   { id: "customer", label: "Khách hàng", width: 150, visible: true },
@@ -116,16 +123,27 @@ function MetricCard({ title, value, hint, color }: { title: string; value: strin
 
 export default function SupportPage() {
   const [tickets, setTickets] = useState(seedTickets);
+  const [columns, setColumns] = useState<DashboardTableColumn[]>(defaultColumns);
   const [query, setQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<TicketStatus | "Tất cả">("Tất cả");
+  const [viewMode, setViewMode] = useState<"Bảng" | "Bảng kéo" | "Danh sách">("Bảng");
+  const [tableResizeMode, setTableResizeMode] = useState<"fit" | "custom">("fit");
+  const [draggedTicketId, setDraggedTicketId] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPageSize);
   const [openForm, setOpenForm] = useState(false);
   const [editingTicketId, setEditingTicketId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [openPageSizeMenu, setOpenPageSizeMenu] = useState(false);
   const [customPageSize, setCustomPageSize] = useState("");
+  const [openAddColumn, setOpenAddColumn] = useState(false);
+  const [newColumnName, setNewColumnName] = useState("");
+  const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
   const range = useDashboardTimeRangeStore((state) => state.range);
   const rangeLabel = formatRange(normalizeRange(range));
+  const checkboxClass =
+    "relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all duration-150 checked:border-emerald-300 checked:bg-emerald-300 after:absolute after:left-1/2 after:top-1/2 after:hidden after:h-[9px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-[58%] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block";
 
   const filteredTickets = useMemo(() => {
     return tickets.filter((ticket) => {
@@ -138,7 +156,129 @@ export default function SupportPage() {
 
   const pageCount = Math.ceil(filteredTickets.length / pageSize);
   const paginatedTickets = filteredTickets.slice((page - 1) * pageSize, page * pageSize);
-  const totalVisibleWidth = columns.reduce((sum, column) => sum + (column.width || 150), 0);
+  const totalVisibleWidth = columns.filter((column) => column.visible !== false).reduce((sum, column) => sum + (column.width || 150), 0);
+  const visibleTicketIds = useMemo(
+    () => (viewMode === "Bảng kéo" ? filteredTickets : paginatedTickets).map((ticket) => ticket.id),
+    [filteredTickets, paginatedTickets, viewMode]
+  );
+  const allVisibleTicketsSelected = visibleTicketIds.length > 0 && visibleTicketIds.every((id) => selectedTicketIds.has(id));
+  const selectedVisibleTicketCount = visibleTicketIds.filter((id) => selectedTicketIds.has(id)).length;
+
+  const toggleVisibleTickets = () => {
+    setSelectedTicketIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleTicketsSelected) {
+        visibleTicketIds.forEach((id) => next.delete(id));
+      } else {
+        visibleTicketIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const toggleTicket = (id: string) => {
+    setSelectedTicketIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const updatePageSize = (size: number) => {
+    const nextSize = Math.max(1, Math.min(500, Math.floor(size)));
+    setPageSize(nextSize);
+    setPage(1);
+    setOpenPageSizeMenu(false);
+  };
+
+  const applyCustomPageSize = () => {
+    const nextSize = Number(customPageSize);
+    if (!Number.isFinite(nextSize) || nextSize <= 0) return;
+    updatePageSize(nextSize);
+    setCustomPageSize("");
+  };
+
+  const filterOptions = useMemo<FilterOption[]>(
+    () => statuses.map((status) => ({
+      id: status,
+      label: status,
+      color: status === "Tất cả" ? "#64748b" : statusColor[status].text,
+      bgColor: status === "Tất cả" ? "rgba(100,116,139,0.09)" : statusColor[status].bg,
+    })),
+    []
+  );
+
+  const kanbanColumns = useMemo<KanbanColumn[]>(
+    () => statuses.filter((status) => status !== "Tất cả").map((status) => ({
+      id: status,
+      label: status,
+      color: statusColor[status],
+    })),
+    []
+  );
+
+  const handleExport = (format: "pdf" | "excel" | "csv", fileName: string) => {
+    const headers = columns.filter((column) => column.visible !== false && column.id !== "actions").map((column) => column.label);
+    const values = filteredTickets.map((ticket) =>
+      columns.filter((column) => column.visible !== false && column.id !== "actions").map((column) => String((ticket as Record<string, unknown>)[column.id] ?? ""))
+    );
+    const baseFileName = fileName || `ho-tro-${new Date().toISOString().slice(0, 10)}`;
+
+    if (format === "csv") {
+      const csv = "\uFEFF" + [headers, ...values].map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${baseFileName}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const tableHead = headers.map((header) => `<th>${header}</th>`).join("");
+    const tableBody = values.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("");
+    if (format === "excel") {
+      const blob = new Blob([`<html><meta charset="utf-8" /><body><table border="1"><thead><tr>${tableHead}</tr></thead><tbody>${tableBody}</tbody></table></body></html>`], { type: "application/vnd.ms-excel" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${baseFileName}.xls`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`<html><body><h2>Hỗ trợ</h2><table border="1"><thead><tr>${tableHead}</tr></thead><tbody>${tableBody}</tbody></table></body></html>`);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const addCustomColumn = () => {
+    const label = newColumnName.trim();
+    if (!label) return;
+    const newColumn: DashboardTableColumn = {
+      id: `custom_${Date.now()}`,
+      label,
+      width: 150,
+      visible: true,
+    };
+    setColumns((prev) => {
+      const next = [...prev];
+      const actionIndex = next.findIndex((column) => column.id === "actions");
+      next.splice(actionIndex === -1 ? next.length : actionIndex, 0, newColumn);
+      return next;
+    });
+    setNewColumnName("");
+    setOpenAddColumn(false);
+  };
 
   const openCreateForm = () => {
     setEditingTicketId(null);
@@ -177,7 +317,14 @@ export default function SupportPage() {
   };
 
   const renderTicketCell = (ticket: Ticket, column: DashboardTableColumn) => {
-    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{ticket.id}</TableCell>;
+    if (column.id === "id") return (
+      <TableCell key={column.id} className="pl-4 font-medium text-slate-900">
+        <div className="flex items-center gap-2">
+          <input type="checkbox" aria-label={`Chọn ticket ${ticket.id}`} checked={selectedTicketIds.has(ticket.id)} onChange={() => toggleTicket(ticket.id)} className={`shrink-0 ${checkboxClass}`} />
+          <span>{ticket.id}</span>
+        </div>
+      </TableCell>
+    );
     if (column.id === "type") return <TableCell key={column.id}>{ticket.type}</TableCell>;
     if (column.id === "customer") return <TableCell key={column.id} className="font-medium text-slate-900">{ticket.customer}</TableCell>;
     if (column.id === "phone") return <TableCell key={column.id}><a href={`tel:${ticket.phone}`} className="text-slate-500 hover:text-slate-800">{ticket.phone}</a></TableCell>;
@@ -187,7 +334,7 @@ export default function SupportPage() {
     if (column.id === "status") return <TableCell key={column.id}><StatusPill label={ticket.status} /></TableCell>;
     if (column.id === "createdAt") return <TableCell key={column.id} className="text-slate-500">{ticket.createdAt}</TableCell>;
     if (column.id === "note") return <TableCell key={column.id} className="truncate text-slate-500" title={ticket.note}>{ticket.note}</TableCell>;
-    return (
+    if (column.id === "actions") return (
       <TableCell key={column.id} className="px-4">
         <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 hover:bg-slate-50" onClick={() => openEditForm(ticket)}>
           <Pencil className="size-3.5" />
@@ -195,7 +342,84 @@ export default function SupportPage() {
         </button>
       </TableCell>
     );
+    return <TableCell key={column.id} className="text-slate-400 italic">Chưa có</TableCell>;
   };
+
+  const renderTicketKanbanCard = (ticket: Ticket) => (
+    <div
+      key={ticket.id}
+      draggable
+      onDragStart={(event) => {
+        setDraggedTicketId(ticket.id);
+        event.dataTransfer.effectAllowed = "move";
+      }}
+      onDragEnd={() => {
+        setDraggedTicketId(null);
+        setDragOverStatus(null);
+      }}
+      className={`cursor-grab rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:cursor-grabbing ${draggedTicketId === ticket.id ? "opacity-50 ring-2 ring-slate-400" : ""}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <input
+            type="checkbox"
+            aria-label={`Chọn ${ticket.id}`}
+            checked={selectedTicketIds.has(ticket.id)}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+            onChange={() => toggleTicket(ticket.id)}
+            className={`shrink-0 ${checkboxClass}`}
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-slate-700">{ticket.customer}</p>
+            <p className="truncate text-[11px] text-slate-400">{ticket.id} · {ticket.type}</p>
+          </div>
+        </div>
+        <span className="font-medium text-xs" style={{ color: priorityColor[ticket.priority] }}>{ticket.priority}</span>
+      </div>
+      <p className="mt-2 line-clamp-2 text-xs text-slate-500">{ticket.note}</p>
+      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2">
+        <span className="truncate text-[11px] text-slate-400">{ticket.owner}</span>
+        <button type="button" className="inline-flex h-6 items-center rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200" onClick={() => openEditForm(ticket)}>
+          Chi tiết
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderTicketListRow = (ticket: Ticket) => (
+    <div key={ticket.id} className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <input
+            type="checkbox"
+            aria-label={`Chọn ${ticket.id}`}
+            checked={selectedTicketIds.has(ticket.id)}
+            onChange={() => toggleTicket(ticket.id)}
+            className={`mt-1 shrink-0 ${checkboxClass}`}
+          />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-semibold text-slate-950">{ticket.customer}</p>
+              <span className="text-xs font-medium text-slate-400">{ticket.id}</span>
+              <StatusPill label={ticket.status} />
+              <span className="font-medium text-xs" style={{ color: priorityColor[ticket.priority] }}>{ticket.priority}</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+              <span>{ticket.phone}</span>
+              <span>{ticket.orderId}</span>
+              <span>{ticket.owner}</span>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">{ticket.note}</p>
+          </div>
+        </div>
+        <button type="button" className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openEditForm(ticket)}>
+          <Pencil className="size-3.5" />
+          Sửa
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <PageShell fullHeight>
@@ -207,55 +431,99 @@ export default function SupportPage() {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
-        <div className="flex flex-col gap-3 border-b border-slate-200 px-5 pt-1 pb-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap items-center gap-1">
-            <ViewModeTabs value="Bảng" onChange={() => {}} />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[220px] flex-1 xl:w-64 xl:flex-none">
-              <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" />
-              <Input className="h-8 rounded-md border-slate-200 bg-white pl-8 text-xs text-slate-700 shadow-none placeholder:text-slate-500 focus-visible:ring-slate-200" placeholder="Tìm khách, mã đơn, nội dung..." value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} />
-            </div>
-            <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"><FileDown className="size-3.5" />Xuất file</button>
-            <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50" onClick={openCreateForm}>
-              Thêm ticket
-              <ChevronDown className="size-3.5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-3">
-          <button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50"><CalendarClock className="size-3.5" />{rangeLabel}<ChevronDown className="size-3.5" /></button>
-          {statuses.map((item) => {
-            const active = selectedStatus === item;
-            return <button key={item} type="button" onClick={() => { setSelectedStatus(item); setPage(1); }} className={`inline-flex h-7 items-center rounded-full px-2.5 text-xs font-medium transition-colors ${active ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>{item}</button>;
-          })}
-          <button type="button" className="inline-flex h-7 items-center gap-1.5 px-2 text-xs text-slate-500 transition-colors hover:text-slate-700"><Plus className="size-3.5" />Thêm bộ lọc</button>
-        </div>
-
-        <DashboardDataTable
+        <Toolbar
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          query={query}
+          onQueryChange={(value) => {
+            setQuery(value);
+            setPage(1);
+          }}
           columns={columns}
-          rows={paginatedTickets}
-          pageSize={pageSize}
-          emptyMessage="Không tìm thấy ticket phù hợp."
-          totalVisibleWidth={totalVisibleWidth}
-          renderCell={renderTicketCell}
+          onColumnsChange={setColumns}
+          tableResizeMode={tableResizeMode}
+          onTableResizeModeChange={setTableResizeMode}
+          selectedCount={selectedTicketIds.size}
+          onOpenAddColumn={() => setOpenAddColumn(true)}
+          onOpenHistory={() => {}}
+          onExport={handleExport}
+          defaultExportFileName={`ho-tro-${new Date().toISOString().slice(0, 10)}`}
+          onCreateClick={openCreateForm}
+          createLabel="Thêm ticket"
+          defaultColumnIds={defaultColumns.map((column) => column.id)}
+          searchPlaceholder="Tìm khách, mã đơn, nội dung..."
+          showHistoryButton={false}
         />
-        <DashboardTableFooter
-          page={page}
-          pageCount={pageCount}
-          pageSize={pageSize}
-          totalRows={filteredTickets.length}
-          customPageSize={customPageSize}
-          openPageSizeMenu={openPageSizeMenu}
-          onOpenPageSizeMenuChange={setOpenPageSizeMenu}
-          onCustomPageSizeChange={setCustomPageSize}
-          onApplyCustomPageSize={() => setCustomPageSize("")}
-          onUpdatePageSize={() => setOpenPageSizeMenu(false)}
-          onPageChange={setPage}
+
+        <FilterBar
+          rangeLabel={rangeLabel}
+          selectedValue={selectedStatus}
+          onValueChange={(value) => {
+            setSelectedStatus(value as TicketStatus | "Tất cả");
+            setPage(1);
+          }}
+          filterOptions={filterOptions}
+          filterLabel="Trạng thái ticket"
+          allSelected={allVisibleTicketsSelected}
+          disabled={visibleTicketIds.length === 0}
+          selectedCount={selectedVisibleTicketCount}
+          totalCount={visibleTicketIds.length}
+          itemLabel="ticket"
+          checkboxClass={checkboxClass}
+          onToggleAll={toggleVisibleTickets}
         />
+
+        {viewMode === "Bảng" ? (
+          <TableView
+            columns={columns}
+            rows={paginatedTickets}
+            pageSize={pageSize}
+            emptyMessage="Không tìm thấy ticket phù hợp."
+            tableResizeMode={tableResizeMode}
+            totalVisibleWidth={totalVisibleWidth}
+            renderCell={renderTicketCell}
+            page={page}
+            pageCount={pageCount}
+            totalRows={filteredTickets.length}
+            customPageSize={customPageSize}
+            openPageSizeMenu={openPageSizeMenu}
+            onOpenPageSizeMenuChange={setOpenPageSizeMenu}
+            onCustomPageSizeChange={setCustomPageSize}
+            onApplyCustomPageSize={applyCustomPageSize}
+            onUpdatePageSize={updatePageSize}
+            onPageChange={setPage}
+          />
+        ) : viewMode === "Bảng kéo" ? (
+          <KanbanView
+            columns={kanbanColumns}
+            rows={filteredTickets}
+            groupByKey="status"
+            draggedItemId={draggedTicketId}
+            onDraggedItemIdChange={setDraggedTicketId}
+            dragOverColumnId={dragOverStatus}
+            onDragOverColumnIdChange={setDragOverStatus}
+            onDropItem={(id, status) => {
+              setTickets((prev) => prev.map((ticket) => ticket.id === id ? { ...ticket, status: status as TicketStatus } : ticket));
+            }}
+            renderCard={renderTicketKanbanCard}
+            tableResizeMode={tableResizeMode}
+          />
+        ) : (
+          <ListView
+            paginatedRows={paginatedTickets}
+            emptyMessage="Không tìm thấy ticket phù hợp."
+            renderRow={renderTicketListRow}
+          />
+        )}
       </div>
+
+      <AddColumnDialog
+        open={openAddColumn}
+        onOpenChange={setOpenAddColumn}
+        newColumnName={newColumnName}
+        onNewColumnNameChange={setNewColumnName}
+        onAddColumn={addCustomColumn}
+      />
 
       {openForm && (
         <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">

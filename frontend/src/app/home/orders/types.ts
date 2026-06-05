@@ -25,3 +25,10 @@ export type Order = {
 };
 
 export type ColumnId = string;
+
+export type ColumnDef = {
+  id: string;
+  label: string;
+  width: number;
+  visible: boolean;
+};

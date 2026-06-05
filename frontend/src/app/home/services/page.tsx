@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   CalendarClock,
   ChevronDown,
@@ -24,8 +24,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TableCell } from "@/components/ui/table";
 import { PageShell, ViewModeTabs } from "../_components/dashboard-primitives";
+import { Toolbar } from "../_components/toolbar";
+import { FilterBar, type FilterOption } from "../_components/filter-bar";
+import { TableView } from "../_components/table-view";
+import { KanbanView, type KanbanColumn } from "../_components/kanban-view";
+import { ListView } from "../_components/list-view";
+import { AddColumnDialog } from "../_components/add-column-dialog";
 import {
   DashboardDataTable,
+  DashboardSelectionBar,
   DashboardTableFooter,
   type DashboardTableColumn,
 } from "@/src/components/common/dashboard-data-table";
@@ -79,6 +86,7 @@ type Promotion = {
 const serviceStatuses: Array<ServiceStatus | "Tất cả"> = ["Tất cả", "Đang hoạt động", "Tạm ngừng"];
 const financeTypes: Array<FinanceType | "Tất cả"> = ["Tất cả", "Doanh thu", "Công nợ", "Chi phí", "Hoàn tiền"];
 const promotionStatuses: Array<PromotionStatus | "Tất cả"> = ["Tất cả", "Đang chạy", "Sắp hết hạn", "Tạm dừng"];
+const financeStatuses: FinanceStatus[] = ["Đã thu", "Chờ thu", "Đã chi", "Quá hạn"];
 
 const seedServices: Service[] = [
   { id: "DV-101", name: "Giặt thường", category: "Giặt theo kg", unit: "kg", price: 15000, turnaround: "Trong ngày", status: "Đang hoạt động", promotion: "Không", note: "Áo quần hằng ngày" },
@@ -106,7 +114,7 @@ const seedPromotions: Promotion[] = [
   { id: "MG-305", code: "RAINY20", name: "Ngày mưa", type: "Số tiền", value: "20.000đ", startDate: "2026-05-20", endDate: "2026-05-31", usage: "Đã khóa", status: "Tạm dừng", note: "Tạm dừng do vượt ngân sách" },
 ];
 
-const pageSize = 10;
+const initialPageSize = 10;
 const serviceColumns: DashboardTableColumn[] = [
   { id: "id", label: "Mã dịch vụ", width: 132, visible: true },
   { id: "name", label: "Tên dịch vụ", width: 184, visible: true },
@@ -252,11 +260,19 @@ export default function ServicesFinancePage() {
   const [services, setServices] = useState<Service[]>(seedServices);
   const [financeRecords, setFinanceRecords] = useState<FinanceRecord[]>(seedFinanceRecords);
   const [promotions, setPromotions] = useState<Promotion[]>(seedPromotions);
+  const [columnsService, setColumnsService] = useState<DashboardTableColumn[]>(serviceColumns);
+  const [columnsFinance, setColumnsFinance] = useState<DashboardTableColumn[]>(financeColumns);
+  const [columnsPromotion, setColumnsPromotion] = useState<DashboardTableColumn[]>(promotionColumns);
   const [query, setQuery] = useState("");
   const [selectedServiceStatus, setSelectedServiceStatus] = useState<ServiceStatus | "Tất cả">("Tất cả");
   const [selectedFinanceType, setSelectedFinanceType] = useState<FinanceType | "Tất cả">("Tất cả");
   const [selectedPromotionStatus, setSelectedPromotionStatus] = useState<PromotionStatus | "Tất cả">("Tất cả");
+  const [viewMode, setViewMode] = useState<"Bảng" | "Bảng kéo" | "Danh sách">("Bảng");
+  const [tableResizeMode, setTableResizeMode] = useState<"fit" | "custom">("fit");
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPageSize);
   const [openServiceForm, setOpenServiceForm] = useState(false);
   const [openFinanceForm, setOpenFinanceForm] = useState(false);
   const [openPromotionForm, setOpenPromotionForm] = useState(false);
@@ -268,8 +284,15 @@ export default function ServicesFinancePage() {
   const [promotionForm, setPromotionForm] = useState(emptyPromotionForm);
   const [openPageSizeMenu, setOpenPageSizeMenu] = useState(false);
   const [customPageSize, setCustomPageSize] = useState("");
+  const [openAddColumn, setOpenAddColumn] = useState(false);
+  const [newColumnName, setNewColumnName] = useState("");
+  const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
+  const [selectedFinanceIds, setSelectedFinanceIds] = useState<Set<string>>(new Set());
+  const [selectedPromotionIds, setSelectedPromotionIds] = useState<Set<string>>(new Set());
   const range = useDashboardTimeRangeStore((state) => state.range);
   const rangeLabel = formatRange(normalizeRange(range));
+  const checkboxClass =
+    "relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all duration-150 checked:border-emerald-300 checked:bg-emerald-300 after:absolute after:left-1/2 after:top-1/2 after:hidden after:h-[9px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-[58%] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block";
 
   const filteredServices = useMemo(() => {
     return services.filter((service) => {
@@ -303,12 +326,182 @@ export default function ServicesFinancePage() {
   const paginatedServices = filteredServices.slice((page - 1) * pageSize, page * pageSize);
   const paginatedFinance = filteredFinanceRecords.slice((page - 1) * pageSize, page * pageSize);
   const paginatedPromotions = filteredPromotions.slice((page - 1) * pageSize, page * pageSize);
-  const activeColumns = tab === "Dịch vụ" ? serviceColumns : tab === "Tài chính" ? financeColumns : promotionColumns;
+  const activeColumns = tab === "Dịch vụ" ? columnsService : tab === "Tài chính" ? columnsFinance : columnsPromotion;
+  const setActiveColumns = tab === "Dịch vụ" ? setColumnsService : tab === "Tài chính" ? setColumnsFinance : setColumnsPromotion;
+  const defaultActiveColumns = tab === "Dịch vụ" ? serviceColumns : tab === "Tài chính" ? financeColumns : promotionColumns;
   const activePaginatedRows = tab === "Dịch vụ" ? paginatedServices : tab === "Tài chính" ? paginatedFinance : paginatedPromotions;
-  const totalVisibleWidth = activeColumns.reduce((sum, column) => sum + (column.width || 150), 0);
+  const totalVisibleWidth = activeColumns.filter((column) => column.visible !== false).reduce((sum, column) => sum + (column.width || 150), 0);
+  const totalAmount = useMemo(() => filteredFinanceRecords.reduce((sum, item) => sum + item.amount, 0), [filteredFinanceRecords]);
   const revenue = financeRecords.filter((item) => item.type === "Doanh thu" && item.status === "Đã thu").reduce((sum, item) => sum + item.amount, 0);
   const receivable = financeRecords.filter((item) => item.type === "Công nợ").reduce((sum, item) => sum + item.amount, 0);
   const expense = financeRecords.filter((item) => item.type === "Chi phí" || item.type === "Hoàn tiền").reduce((sum, item) => sum + item.amount, 0);
+  const activeVisibleIds = (viewMode === "Bảng kéo" ? activeRows : activePaginatedRows).map((item) => item.id);
+  const activeSelectedIds = tab === "Dịch vụ" ? selectedServiceIds : tab === "Tài chính" ? selectedFinanceIds : selectedPromotionIds;
+  const allVisibleSelected = activeVisibleIds.length > 0 && activeVisibleIds.every((id) => activeSelectedIds.has(id));
+  const selectedVisibleCount = activeVisibleIds.filter((id) => activeSelectedIds.has(id)).length;
+
+  const toggleActiveVisibleRows = () => {
+    const updateSelected = (setSelected: Dispatch<SetStateAction<Set<string>>>) => {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (allVisibleSelected) {
+          activeVisibleIds.forEach((id) => next.delete(id));
+        } else {
+          activeVisibleIds.forEach((id) => next.add(id));
+        }
+        return next;
+      });
+    };
+
+    if (tab === "Dịch vụ") updateSelected(setSelectedServiceIds);
+    else if (tab === "Tài chính") updateSelected(setSelectedFinanceIds);
+    else updateSelected(setSelectedPromotionIds);
+  };
+
+  const toggleActiveRow = (id: string) => {
+    const updateSelected = (setSelected: Dispatch<SetStateAction<Set<string>>>) => {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    };
+
+    if (tab === "Dịch vụ") updateSelected(setSelectedServiceIds);
+    else if (tab === "Tài chính") updateSelected(setSelectedFinanceIds);
+    else updateSelected(setSelectedPromotionIds);
+  };
+
+  const updatePageSize = (size: number) => {
+    const nextSize = Math.max(1, Math.min(500, Math.floor(size)));
+    setPageSize(nextSize);
+    setPage(1);
+    setOpenPageSizeMenu(false);
+  };
+
+  const applyCustomPageSize = () => {
+    const nextSize = Number(customPageSize);
+    if (!Number.isFinite(nextSize) || nextSize <= 0) return;
+    updatePageSize(nextSize);
+    setCustomPageSize("");
+  };
+
+  const filterOptions = useMemo<FilterOption[]>(() => {
+    if (tab === "Dịch vụ") {
+      return serviceStatuses.map((status) => ({
+        id: status,
+        label: status,
+        color: status === "Tất cả" ? "#64748b" : statusColor[status].text,
+        bgColor: status === "Tất cả" ? "rgba(100,116,139,0.09)" : statusColor[status].bg,
+      }));
+    }
+    if (tab === "Tài chính") {
+      return financeTypes.map((type) => ({
+        id: type,
+        label: type,
+        color: type === "Tất cả" ? "#64748b" : typeColor[type],
+        bgColor: type === "Tất cả" ? "rgba(100,116,139,0.09)" : `${typeColor[type]}14`,
+      }));
+    }
+    return promotionStatuses.map((status) => ({
+      id: status,
+      label: status,
+      color: status === "Tất cả" ? "#64748b" : statusColor[status].text,
+      bgColor: status === "Tất cả" ? "rgba(100,116,139,0.09)" : statusColor[status].bg,
+    }));
+  }, [tab]);
+
+  const kanbanColumns = useMemo<KanbanColumn[]>(() => {
+    if (tab === "Dịch vụ") {
+      return serviceStatuses.filter((status) => status !== "Tất cả").map((status) => ({
+        id: status,
+        label: status,
+        color: statusColor[status],
+      }));
+    }
+    if (tab === "Tài chính") {
+      return financeStatuses.map((status) => ({
+        id: status,
+        label: status,
+        color: statusColor[status],
+      }));
+    }
+    return promotionStatuses.filter((status) => status !== "Tất cả").map((status) => ({
+      id: status,
+      label: status,
+      color: statusColor[status],
+    }));
+  }, [tab]);
+
+  const getDefaultExportFileName = () => {
+    const scope = tab === "Dịch vụ" ? "dich-vu" : tab === "Tài chính" ? "tai-chinh" : "ma-giam-gia";
+    return `${scope}-${new Date().toISOString().slice(0, 10)}`;
+  };
+
+  const handleExport = (format: "pdf" | "excel" | "csv", fileName: string) => {
+    const rows = activeRows;
+    if (rows.length === 0) return;
+    const headers = activeColumns.filter((column) => column.visible !== false && column.id !== "actions").map((column) => column.label);
+    const values = rows.map((row) =>
+      activeColumns.filter((column) => column.visible !== false && column.id !== "actions").map((column) => String((row as Record<string, unknown>)[column.id] ?? ""))
+    );
+    const baseFileName = fileName || getDefaultExportFileName();
+
+    if (format === "csv") {
+      const csv = "\uFEFF" + [headers, ...values].map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${baseFileName}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const tableHead = headers.map((header) => `<th>${header}</th>`).join("");
+    const tableBody = values.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("");
+    if (format === "excel") {
+      const blob = new Blob([`<html><meta charset="utf-8" /><body><table border="1"><thead><tr>${tableHead}</tr></thead><tbody>${tableBody}</tbody></table></body></html>`], { type: "application/vnd.ms-excel" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${baseFileName}.xls`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`<html><body><h2>${tab}</h2><table border="1"><thead><tr>${tableHead}</tr></thead><tbody>${tableBody}</tbody></table></body></html>`);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const addCustomColumn = () => {
+    const label = newColumnName.trim();
+    if (!label) return;
+    const newColumn: DashboardTableColumn = {
+      id: `custom_${Date.now()}`,
+      label,
+      width: 150,
+      visible: true,
+    };
+    setActiveColumns((prev) => {
+      const next = [...prev];
+      const actionIndex = next.findIndex((column) => column.id === "actions");
+      next.splice(actionIndex === -1 ? next.length : actionIndex, 0, newColumn);
+      return next;
+    });
+    setNewColumnName("");
+    setOpenAddColumn(false);
+  };
 
   const openCreateServiceForm = () => {
     setEditingServiceId(null);
@@ -355,7 +548,14 @@ export default function ServicesFinancePage() {
   };
 
   const renderServiceCell = (service: Service, column: DashboardTableColumn) => {
-    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{service.id}</TableCell>;
+    if (column.id === "id") return (
+      <TableCell key={column.id} className="pl-4 font-medium text-slate-900">
+        <div className="flex items-center gap-2">
+          <input type="checkbox" aria-label={`Chọn dịch vụ ${service.id}`} checked={selectedServiceIds.has(service.id)} onChange={() => toggleActiveRow(service.id)} className={`shrink-0 ${checkboxClass}`} />
+          <span>{service.id}</span>
+        </div>
+      </TableCell>
+    );
     if (column.id === "name") return <TableCell key={column.id} className="font-medium text-slate-900">{service.name}</TableCell>;
     if (column.id === "price") return <TableCell key={column.id} className="font-medium text-slate-900">{formatCurrency(service.price)}</TableCell>;
     if (column.id === "status") return <TableCell key={column.id}><StatusPill label={service.status} /></TableCell>;
@@ -466,7 +666,14 @@ export default function ServicesFinancePage() {
   };
 
   const renderFinanceCell = (record: FinanceRecord, column: DashboardTableColumn) => {
-    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{record.id}</TableCell>;
+    if (column.id === "id") return (
+      <TableCell key={column.id} className="pl-4 font-medium text-slate-900">
+        <div className="flex items-center gap-2">
+          <input type="checkbox" aria-label={`Chọn giao dịch ${record.id}`} checked={selectedFinanceIds.has(record.id)} onChange={() => toggleActiveRow(record.id)} className={`shrink-0 ${checkboxClass}`} />
+          <span>{record.id}</span>
+        </div>
+      </TableCell>
+    );
     if (column.id === "type") {
       return (
         <TableCell key={column.id}>
@@ -494,7 +701,14 @@ export default function ServicesFinancePage() {
   };
 
   const renderPromotionCell = (promotion: Promotion, column: DashboardTableColumn) => {
-    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{promotion.id}</TableCell>;
+    if (column.id === "id") return (
+      <TableCell key={column.id} className="pl-4 font-medium text-slate-900">
+        <div className="flex items-center gap-2">
+          <input type="checkbox" aria-label={`Chọn mã giảm giá ${promotion.id}`} checked={selectedPromotionIds.has(promotion.id)} onChange={() => toggleActiveRow(promotion.id)} className={`shrink-0 ${checkboxClass}`} />
+          <span>{promotion.id}</span>
+        </div>
+      </TableCell>
+    );
     if (column.id === "code") return <TableCell key={column.id} className="font-semibold text-slate-900">{promotion.code}</TableCell>;
     if (column.id === "name") return <TableCell key={column.id} className="font-medium text-slate-900">{promotion.name}</TableCell>;
     if (column.id === "status") return <TableCell key={column.id}><StatusPill label={promotion.status} /></TableCell>;
@@ -518,6 +732,122 @@ export default function ServicesFinancePage() {
     return renderPromotionCell(row as Promotion, column);
   };
 
+  const getRowTitle = (row: Service | FinanceRecord | Promotion) => {
+    if (tab === "Dịch vụ") return (row as Service).name;
+    if (tab === "Tài chính") return (row as FinanceRecord).customer;
+    return (row as Promotion).name;
+  };
+
+  const getRowSubtitle = (row: Service | FinanceRecord | Promotion) => {
+    if (tab === "Dịch vụ") {
+      const service = row as Service;
+      return `${service.category} · ${formatCurrency(service.price)}`;
+    }
+    if (tab === "Tài chính") {
+      const record = row as FinanceRecord;
+      return `${record.type} · ${formatCurrency(record.amount)} · ${record.orderId}`;
+    }
+    const promotion = row as Promotion;
+    return `${promotion.code} · ${promotion.value} · ${promotion.usage}`;
+  };
+
+  const getRowStatus = (row: Service | FinanceRecord | Promotion) => {
+    if (tab === "Dịch vụ") return (row as Service).status;
+    if (tab === "Tài chính") return (row as FinanceRecord).status;
+    return (row as Promotion).status;
+  };
+
+  const renderKanbanCard = (row: Service | FinanceRecord | Promotion) => {
+    const status = getRowStatus(row);
+    return (
+      <div
+        key={row.id}
+        draggable
+        onDragStart={(event) => {
+          setDraggedItemId(row.id);
+          event.dataTransfer.effectAllowed = "move";
+        }}
+        onDragEnd={() => {
+          setDraggedItemId(null);
+          setDragOverStatus(null);
+        }}
+        className={`cursor-grab rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:cursor-grabbing ${draggedItemId === row.id ? "opacity-50 ring-2 ring-slate-400" : ""}`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <input
+              type="checkbox"
+              aria-label={`Chọn ${row.id}`}
+              checked={activeSelectedIds.has(row.id)}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
+              onChange={() => toggleActiveRow(row.id)}
+              className={`shrink-0 ${checkboxClass}`}
+            />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-slate-700">{getRowTitle(row)}</p>
+              <p className="truncate text-[11px] text-slate-400">{row.id}</p>
+            </div>
+          </div>
+          <StatusPill label={status} />
+        </div>
+        <p className="mt-2 line-clamp-2 text-xs text-slate-500">{getRowSubtitle(row)}</p>
+        <div className="mt-3 flex justify-end border-t border-slate-100 pt-2">
+          <button
+            type="button"
+            className="inline-flex h-6 items-center rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200"
+            onClick={() => {
+              if (tab === "Dịch vụ") openEditServiceForm(row as Service);
+              else if (tab === "Tài chính") openEditFinanceForm(row as FinanceRecord);
+              else openEditPromotionForm(row as Promotion);
+            }}
+          >
+            Chi tiết
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderListRow = (row: Service | FinanceRecord | Promotion) => {
+    const status = getRowStatus(row);
+    return (
+      <div key={row.id} className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <input
+              type="checkbox"
+              aria-label={`Chọn ${row.id}`}
+              checked={activeSelectedIds.has(row.id)}
+              onChange={() => toggleActiveRow(row.id)}
+              className={`mt-1 shrink-0 ${checkboxClass}`}
+            />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-slate-950">{getRowTitle(row)}</p>
+                <span className="text-xs font-medium text-slate-400">{row.id}</span>
+                <StatusPill label={status} />
+              </div>
+              <p className="mt-2 text-xs text-slate-500">{getRowSubtitle(row)}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+            onClick={() => {
+              if (tab === "Dịch vụ") openEditServiceForm(row as Service);
+              else if (tab === "Tài chính") openEditFinanceForm(row as FinanceRecord);
+              else openEditPromotionForm(row as Promotion);
+            }}
+          >
+            <Pencil className="size-3.5" />
+            Sửa
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <PageShell fullHeight>
       <div className="grid shrink-0 gap-3 md:grid-cols-4">
@@ -528,119 +858,127 @@ export default function ServicesFinancePage() {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
-        <div className="flex flex-col gap-3 border-b border-slate-200 px-5 pt-1 pb-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex items-center gap-1">
-            {(["Dịch vụ", "Tài chính", "Mã giảm giá"] as const).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => {
-                  setTab(item);
-                  setPage(1);
-                  setQuery("");
-                }}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${
-                  tab === item ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-              >
-                {item === "Dịch vụ" ? <Tags className="size-3.5" /> : item === "Mã giảm giá" ? <Gift className="size-3.5" /> : <Wallet className="size-3.5" />}
-                {item}
-              </button>
-            ))}
-            <span className="mx-2 h-4 w-px bg-slate-200" />
-            <ViewModeTabs value="Bảng" onChange={() => {}} />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[220px] flex-1 xl:w-64 xl:flex-none">
-              <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" />
-              <Input
-                className="h-8 rounded-md border-slate-200 bg-white pl-8 text-xs text-slate-700 shadow-none placeholder:text-slate-500 focus-visible:ring-slate-200"
-                placeholder={tab === "Dịch vụ" ? "Tìm dịch vụ, nhóm, mã ưu đãi..." : tab === "Mã giảm giá" ? "Tìm mã, tên chương trình..." : "Tìm khách, mã đơn, phương thức..."}
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setPage(1);
-                }}
-              />
+        <Toolbar
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          leftContent={
+            <div className="flex flex-wrap items-center gap-1">
+              {(["Dịch vụ", "Tài chính", "Mã giảm giá"] as const).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    setTab(item);
+                    setPage(1);
+                    setQuery("");
+                  }}
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${
+                    tab === item ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  {item === "Dịch vụ" ? <Tags className="size-3.5" /> : item === "Mã giảm giá" ? <Gift className="size-3.5" /> : <Wallet className="size-3.5" />}
+                  {item}
+                </button>
+              ))}
+              <span className="mx-2 hidden h-4 w-px bg-slate-200 sm:block" />
+              <ViewModeTabs value={viewMode} onChange={setViewMode} />
             </div>
-            <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-              <EyeOff className="size-3.5" />
-              Ẩn cột
-            </button>
-            <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-              <Settings className="size-3.5" />
-              Tùy chỉnh
-            </button>
-            <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-              <FileDown className="size-3.5" />
-              Xuất file
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
-              onClick={tab === "Dịch vụ" ? openCreateServiceForm : tab === "Mã giảm giá" ? openCreatePromotionForm : openCreateFinanceForm}
-            >
-              {tab === "Dịch vụ" ? "Thêm dịch vụ" : tab === "Mã giảm giá" ? "Thêm mã giảm giá" : "Thêm giao dịch"}
-              <ChevronDown className="size-3.5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-3">
-          <button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-            <CalendarClock className="size-3.5" />
-            {rangeLabel}
-            <ChevronDown className="size-3.5" />
-          </button>
-          {(tab === "Dịch vụ" ? serviceStatuses : tab === "Mã giảm giá" ? promotionStatuses : financeTypes).map((item) => {
-            const active = tab === "Dịch vụ" ? selectedServiceStatus === item : tab === "Mã giảm giá" ? selectedPromotionStatus === item : selectedFinanceType === item;
-            return (
-              <button
-                key={item}
-                type="button"
-                onClick={() => {
-                  if (tab === "Dịch vụ") setSelectedServiceStatus(item as ServiceStatus | "Tất cả");
-                  else if (tab === "Mã giảm giá") setSelectedPromotionStatus(item as PromotionStatus | "Tất cả");
-                  else setSelectedFinanceType(item as FinanceType | "Tất cả");
-                  setPage(1);
-                }}
-                className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition-colors ${
-                  active ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                {item}
-              </button>
-            );
-          })}
-          <button type="button" className="inline-flex h-7 items-center gap-1.5 px-2 text-xs text-slate-500 transition-colors hover:text-slate-700">
-            <Plus className="size-3.5" />
-            Thêm bộ lọc
-          </button>
-        </div>
-
-        <DashboardDataTable
+          }
+          query={query}
+          onQueryChange={(value) => {
+            setQuery(value);
+            setPage(1);
+          }}
           columns={activeColumns}
-          rows={activePaginatedRows}
-          pageSize={pageSize}
-          emptyMessage={tab === "Dịch vụ" ? "Không tìm thấy dịch vụ phù hợp." : tab === "Mã giảm giá" ? "Không tìm thấy mã giảm giá phù hợp." : "Không tìm thấy giao dịch phù hợp."}
-          totalVisibleWidth={totalVisibleWidth}
-          renderCell={renderActiveCell}
+          onColumnsChange={setActiveColumns}
+          tableResizeMode={tableResizeMode}
+          onTableResizeModeChange={setTableResizeMode}
+          selectedCount={activeSelectedIds.size}
+          onOpenAddColumn={() => setOpenAddColumn(true)}
+          onOpenHistory={() => {}}
+          onExport={handleExport}
+          defaultExportFileName={getDefaultExportFileName()}
+          onCreateClick={tab === "Dịch vụ" ? openCreateServiceForm : tab === "Mã giảm giá" ? openCreatePromotionForm : openCreateFinanceForm}
+          createLabel={tab === "Dịch vụ" ? "Thêm dịch vụ" : tab === "Mã giảm giá" ? "Thêm mã giảm giá" : "Thêm giao dịch"}
+          defaultColumnIds={defaultActiveColumns.map((column) => column.id)}
+          searchPlaceholder={tab === "Dịch vụ" ? "Tìm dịch vụ, nhóm, mã ưu đãi..." : tab === "Mã giảm giá" ? "Tìm mã, tên chương trình..." : "Tìm khách, mã đơn, phương thức..."}
+          showHistoryButton={false}
         />
-        <DashboardTableFooter
-          page={page}
-          pageCount={pageCount}
-          pageSize={pageSize}
-          totalRows={activeRows.length}
-          customPageSize={customPageSize}
-          openPageSizeMenu={openPageSizeMenu}
-          onOpenPageSizeMenuChange={setOpenPageSizeMenu}
-          onCustomPageSizeChange={setCustomPageSize}
-          onApplyCustomPageSize={() => setCustomPageSize("")}
-          onUpdatePageSize={() => setOpenPageSizeMenu(false)}
-          onPageChange={setPage}
+
+        <FilterBar
+          rangeLabel={rangeLabel}
+          selectedValue={tab === "Dịch vụ" ? selectedServiceStatus : tab === "Tài chính" ? selectedFinanceType : selectedPromotionStatus}
+          onValueChange={(value) => {
+            if (tab === "Dịch vụ") setSelectedServiceStatus(value as ServiceStatus | "Tất cả");
+            else if (tab === "Tài chính") setSelectedFinanceType(value as FinanceType | "Tất cả");
+            else setSelectedPromotionStatus(value as PromotionStatus | "Tất cả");
+            setPage(1);
+          }}
+          filterOptions={filterOptions}
+          filterLabel={tab === "Tài chính" ? "Loại giao dịch" : "Trạng thái"}
+          allSelected={allVisibleSelected}
+          disabled={activeVisibleIds.length === 0}
+          selectedCount={selectedVisibleCount}
+          totalCount={activeVisibleIds.length}
+          itemLabel={tab === "Dịch vụ" ? "dịch vụ" : tab === "Tài chính" ? "giao dịch" : "mã giảm giá"}
+          checkboxClass={checkboxClass}
+          onToggleAll={toggleActiveVisibleRows}
         />
+
+        {viewMode === "Bảng" ? (
+          <TableView
+            columns={activeColumns}
+            rows={activePaginatedRows}
+            pageSize={pageSize}
+            emptyMessage={tab === "Dịch vụ" ? "Không tìm thấy dịch vụ phù hợp." : tab === "Mã giảm giá" ? "Không tìm thấy mã giảm giá phù hợp." : "Không tìm thấy giao dịch phù hợp."}
+            tableResizeMode={tableResizeMode}
+            totalVisibleWidth={totalVisibleWidth}
+            renderCell={renderActiveCell}
+            page={page}
+            pageCount={pageCount}
+            totalRows={activeRows.length}
+            totalLabel={tab === "Tài chính" ? `Tổng số tiền: ${totalAmount.toLocaleString("vi-VN")}đ` : undefined}
+            customPageSize={customPageSize}
+            openPageSizeMenu={openPageSizeMenu}
+            onOpenPageSizeMenuChange={setOpenPageSizeMenu}
+            onCustomPageSizeChange={setCustomPageSize}
+            onApplyCustomPageSize={applyCustomPageSize}
+            onUpdatePageSize={updatePageSize}
+            onPageChange={setPage}
+          />
+        ) : viewMode === "Bảng kéo" ? (
+          <KanbanView
+            columns={kanbanColumns}
+            rows={activeRows}
+            groupByKey="status"
+            draggedItemId={draggedItemId}
+            onDraggedItemIdChange={setDraggedItemId}
+            dragOverColumnId={dragOverStatus}
+            onDragOverColumnIdChange={setDragOverStatus}
+            onDropItem={(id, status) => {
+              if (tab === "Dịch vụ") setServices((prev) => prev.map((item) => item.id === id ? { ...item, status: status as ServiceStatus } : item));
+              else if (tab === "Tài chính") setFinanceRecords((prev) => prev.map((item) => item.id === id ? { ...item, status: status as FinanceStatus } : item));
+              else setPromotions((prev) => prev.map((item) => item.id === id ? { ...item, status: status as PromotionStatus } : item));
+            }}
+            renderCard={renderKanbanCard}
+            tableResizeMode={tableResizeMode}
+          />
+        ) : (
+          <ListView
+            paginatedRows={activePaginatedRows}
+            emptyMessage={tab === "Dịch vụ" ? "Không tìm thấy dịch vụ phù hợp." : tab === "Mã giảm giá" ? "Không tìm thấy mã giảm giá phù hợp." : "Không tìm thấy giao dịch phù hợp."}
+            renderRow={renderListRow}
+          />
+        )}
       </div>
+
+      <AddColumnDialog
+        open={openAddColumn}
+        onOpenChange={setOpenAddColumn}
+        newColumnName={newColumnName}
+        onNewColumnNameChange={setNewColumnName}
+        onAddColumn={addCustomColumn}
+      />
 
       {openServiceForm && (
         <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
