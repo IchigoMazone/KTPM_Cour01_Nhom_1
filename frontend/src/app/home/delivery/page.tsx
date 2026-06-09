@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type DragEvent } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -146,6 +146,16 @@ const tripStatusColor: Record<TripStatus, { text: string; bg: string }> = {
   "Chờ giao": { text: "#7c3aed", bg: "rgba(124,58,237,0.09)" },
 };
 
+const tripStatusOptions: TripStatus[] = ["Chờ lấy", "Đang giao", "Đã lấy", "Chờ giao"];
+const tripStatusDotColors = Object.fromEntries(
+  Object.entries(tripStatusColor).map(([status, color]) => [status, color.text])
+);
+
+const tripTypeDotColors: Record<Trip["type"], string> = {
+  "Lấy đồ": "#2563eb",
+  "Trả đồ": "#059669",
+};
+
 const driverStatusColor: Record<DriverStatus, { text: string; bg: string }> = {
   "Đang giao":    { text: "#2563eb", bg: "rgba(37,99,235,0.09)" },
   "Rảnh 30 phút": { text: "#059669", bg: "rgba(5,150,105,0.09)" },
@@ -170,6 +180,7 @@ const defaultTripColumns = [
   { id: "time", label: "Giờ hẹn", width: 110, visible: true },
   { id: "type", label: "Loại chuyến", width: 112, visible: true },
   { id: "customer", label: "Khách hàng", width: 180, visible: true },
+  { id: "phone", label: "Số điện thoại", width: 140, visible: true },
   { id: "address", label: "Địa chỉ", width: 200, visible: true },
   { id: "driver", label: "Tài xế phụ trách", width: 132, visible: true },
   { id: "status", label: "Trạng thái", width: 126, visible: true },
@@ -228,17 +239,6 @@ const emptyDriverForm = {
   note: "",
 };
 
-const tripFormFields: FormField[] = [
-  { id: "customer", label: "Khách hàng", type: "text", placeholder: "Họ tên khách" },
-  { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
-  { id: "time", label: "Giờ hẹn", type: "text", placeholder: "08:30" },
-  { id: "driver", label: "Tài xế giao nhận", type: "text", placeholder: "Anh Minh / Chị Lan..." },
-  { id: "address", label: "Địa chỉ", type: "text", placeholder: "Địa chỉ giao/nhận hàng" },
-  { id: "type", label: "Loại chuyến", type: "select", options: ["Lấy đồ", "Trả đồ"] },
-  { id: "status", label: "Trạng thái", type: "select", options: ["Chờ lấy", "Đang giao", "Đã lấy", "Chờ giao"] },
-  { id: "note", label: "Ghi chú", type: "textarea", placeholder: "Ghi chú đóng gói, thời gian đặc biệt..." },
-];
-
 const driverFormFields: FormField[] = [
   { id: "name", label: "Tài xế", type: "text", placeholder: "Tên tài xế" },
   { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
@@ -295,6 +295,12 @@ export default function DeliveryDashboardPage() {
     tab === "Tài xế" ? columnsDriver : 
     tab === "Lộ trình" ? columnsRoute : columnsOtp;
 
+  const activeDefaultColumnIds =
+    tab === "Chuyến đi" ? defaultTripColumns.map((column) => column.id) :
+    tab === "Tài xế" ? defaultDriverColumns.map((column) => column.id) :
+    tab === "Lộ trình" ? defaultRouteColumns.map((column) => column.id) :
+    defaultOtpColumns.map((column) => column.id);
+
   const setColumnsActive = 
     tab === "Chuyến đi" ? setColumnsTrip : 
     tab === "Tài xế" ? setColumnsDriver : 
@@ -313,6 +319,8 @@ export default function DeliveryDashboardPage() {
   const [customPageSize, setCustomPageSize] = useState("");
   const [openAddColumn, setOpenAddColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState("");
+  const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
   const deliveryEnabled = useDashboardSettingsStore((state) => state.deliveryEnabled);
   const range = useDashboardTimeRangeStore((state) => state.range);
@@ -597,6 +605,31 @@ export default function DeliveryDashboardPage() {
     [columnsDriver]
   );
 
+  const orderedTripFormFields = useMemo<FormField[]>(() => {
+    const fieldByColumnId: Record<string, FormField> = {
+      time: { id: "time", label: "Giờ hẹn", type: "time" },
+      type: { id: "type", label: "Loại chuyến", type: "select", options: ["Lấy đồ", "Trả đồ"], optionDotColors: tripTypeDotColors },
+      customer: { id: "customer", label: "Tên khách", type: "text", placeholder: "Tên khách" },
+      phone: { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
+      address: { id: "address", label: "Địa chỉ", type: "text", placeholder: "Địa chỉ giao/nhận hàng" },
+      driver: { id: "driver", label: "Tài xế giao nhận", type: "text", placeholder: "Anh Minh / Chị Lan..." },
+      status: { id: "status", label: "Trạng thái", type: "custom_status" },
+      note: { id: "note", label: "Ghi chú", type: "textarea", placeholder: "Ghi chú đóng gói, thời gian đặc biệt..." },
+    };
+
+    const fields = columnsTrip
+      .filter((column) => column.visible && column.id !== "id" && column.id !== "actions")
+      .map((column) => {
+        return fieldByColumnId[column.id] || {
+          id: column.id,
+          label: column.label,
+          type: "text",
+          placeholder: `Nhập ${column.label.toLowerCase()}`,
+        } satisfies FormField;
+      });
+    return fields;
+  }, [columnsTrip]);
+
   const openCreateTrip = () => {
     setEditingTripId(null);
     const customFieldsDefaults = Object.fromEntries(customColumnsTrip.map(col => [col.id, ""]));
@@ -818,6 +851,45 @@ export default function DeliveryDashboardPage() {
     setOpenAddColumn(false);
   };
 
+  const handleColumnDragStart = (event: DragEvent<HTMLTableCellElement>, id: string) => {
+    setDraggedColumnId(id);
+    event.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleColumnDragOver = (event: DragEvent<HTMLTableCellElement>, id: string) => {
+    event.preventDefault();
+    if (id !== draggedColumnId) setDragOverColumnId(id);
+  };
+
+  const handleColumnDragLeave = () => setDragOverColumnId(null);
+
+  const handleColumnDrop = (event: DragEvent<HTMLTableCellElement>, id: string) => {
+    event.preventDefault();
+    if (!draggedColumnId || draggedColumnId === id) {
+      setDragOverColumnId(null);
+      return;
+    }
+
+    setColumnsActive((prev: any) => {
+      const draggedIndex = prev.findIndex((column: any) => column.id === draggedColumnId);
+      const dropIndex = prev.findIndex((column: any) => column.id === id);
+      if (draggedIndex === -1 || dropIndex === -1) return prev;
+
+      const next = [...prev];
+      const [draggedColumn] = next.splice(draggedIndex, 1);
+      next.splice(dropIndex, 0, draggedColumn);
+      return next;
+    });
+
+    setDraggedColumnId(null);
+    setDragOverColumnId(null);
+  };
+
+  const handleColumnDragEnd = () => {
+    setDraggedColumnId(null);
+    setDragOverColumnId(null);
+  };
+
   const renderTripCell = (trip: Trip, column: any) => {
     if (column.id === "id") return (
       <TableCell key={column.id} className="pl-4 font-medium text-slate-900">
@@ -833,7 +905,16 @@ export default function DeliveryDashboardPage() {
         </div>
       </TableCell>
     );
-    if (column.id === "type") return <TableCell key={column.id}><span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${trip.type === "Lấy đồ" ? "border-blue-100 bg-blue-50 text-blue-700" : "border-emerald-100 bg-emerald-50 text-emerald-700"}`}>{trip.type}</span></TableCell>;
+    if (column.id === "type") {
+      return (
+        <TableCell key={column.id}>
+          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${trip.type === "Lấy đồ" ? "border-blue-100 bg-blue-50 text-blue-700" : "border-emerald-100 bg-emerald-50 text-emerald-700"}`}>
+            <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: tripTypeDotColors[trip.type] }} />
+            {trip.type}
+          </span>
+        </TableCell>
+      );
+    }
     if (column.id === "customer") {
       return (
         <TableCell key={column.id}>
@@ -844,13 +925,22 @@ export default function DeliveryDashboardPage() {
         </TableCell>
       );
     }
+    if (column.id === "phone") {
+      return (
+        <TableCell key={column.id}>
+          <a href={`tel:${trip.phone}`} className="text-slate-500 hover:text-slate-800">
+            {trip.phone}
+          </a>
+        </TableCell>
+      );
+    }
     if (column.id === "driver") return <TableCell key={column.id}><div className="flex items-center gap-1.5"><div className="size-1.5 shrink-0 rounded-full bg-indigo-500" /><span className="font-semibold text-slate-700">{trip.driver}</span></div></TableCell>;
     if (column.id === "status") {
       const color = tripStatusColor[trip.status] || { text: "#64748b", bg: "rgba(100,116,139,0.1)" };
       return (
         <TableCell key={column.id}>
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium" style={{ color: color.text, backgroundColor: color.bg }}>
-            <span className="size-1.5 rounded-full" style={{ backgroundColor: color.text }} />
+          <span className="inline-flex max-w-full items-center gap-1.5 truncate rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium" style={{ color: color.text, backgroundColor: color.bg }}>
+            <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color.text }} />
             {trip.status}
           </span>
         </TableCell>
@@ -1488,7 +1578,7 @@ export default function DeliveryDashboardPage() {
               createLabel={
                 tab === "Chuyến đi" ? "Thêm chuyến" : "Thêm tài xế"
               }
-              defaultColumnIds={activeColumns.map(c => c.id)}
+              defaultColumnIds={activeDefaultColumnIds}
               searchPlaceholder={
                 tab === "Chuyến đi" ? "Tìm chuyến, khách, tài xế..." :
                 tab === "Tài xế" ? "Tìm tên, SĐT tài xế..." :
@@ -1632,6 +1722,7 @@ export default function DeliveryDashboardPage() {
             ) : (
               <TableView
                 columns={activeColumns.filter(c => c.visible)}
+                onColumnsChange={setColumnsActive as any}
                 rows={activePaginatedRows}
                 pageSize={pageSize}
                 emptyMessage={
@@ -1643,6 +1734,15 @@ export default function DeliveryDashboardPage() {
                 tableResizeMode={tableResizeMode}
                 totalVisibleWidth={totalVisibleWidth}
                 renderCell={renderCell}
+                columnDrag={{
+                  draggedColumnId,
+                  dragOverColumnId,
+                  onDragStart: handleColumnDragStart,
+                  onDragOver: handleColumnDragOver,
+                  onDragLeave: handleColumnDragLeave,
+                  onDrop: handleColumnDrop,
+                  onDragEnd: handleColumnDragEnd,
+                }}
                 page={page}
                 pageCount={pageCount}
                 totalRows={activeRows.length}
@@ -1663,11 +1763,12 @@ export default function DeliveryDashboardPage() {
         open={openTripForm}
         onClose={() => setOpenTripForm(false)}
         title={editingTripId ? `Chỉnh sửa chuyến ${editingTripId}` : "Thêm chuyến giao nhận mới"}
-        fields={tripFormFields}
+        fields={orderedTripFormFields}
         form={tripForm}
         onFormChange={setTripForm}
         onSave={saveTrip}
-        customColumns={customColumnsTrip}
+        statusOptions={tripStatusOptions}
+        statusDotColors={tripStatusDotColors}
       />
 
       <FormDialog

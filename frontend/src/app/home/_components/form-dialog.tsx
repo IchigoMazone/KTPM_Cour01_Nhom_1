@@ -42,6 +42,7 @@ export interface FormField {
   type: "text" | "number" | "date" | "time" | "custom_staff" | "custom_status" | "textarea" | "select";
   placeholder?: string;
   options?: string[];
+  optionDotColors?: Record<string, string>;
   className?: string;
   readOnly?: boolean;
 }
@@ -84,9 +85,9 @@ export function FormDialog({
   currentStaffAvatar,
   statusOptions = [],
   statusDotColors = {},
-  showCloseButton = true,
-  showCloseButtonAtBottom = false,
-  gridClassName = "grid gap-4",
+  showCloseButton = false,
+  showCloseButtonAtBottom = true,
+  gridClassName = "grid gap-4 md:grid-cols-2",
   customColumnsBeforeFieldId,
 }: FormDialogProps) {
   const hourOptions = useMemo(() => Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0")), []);
@@ -157,8 +158,8 @@ export function FormDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent showCloseButton={false} className="flex h-[min(86vh,680px)] w-[min(86vw,680px)] max-w-[min(86vw,680px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[680px]">
-        <DialogHeader className="flex-row items-center justify-between gap-3 border-b border-slate-200 px-6 py-4">
-          <DialogTitle className="text-lg font-semibold">
+        <DialogHeader className="flex-row items-center justify-between gap-3 border-b border-slate-200 px-6 py-4 min-h-[61px]">
+          <DialogTitle className="text-lg font-semibold leading-7 text-slate-950">
             {title}
           </DialogTitle>
           {showCloseButton && (
@@ -173,72 +174,56 @@ export function FormDialog({
           <div className={gridClassName}>
             {allFields.map((field) => {
               if (field.type === "text") {
-                const isCustomer = field.id === "customer";
                 return (
                   <div key={field.id} className={`space-y-2 ${field.className || ""}`}>
                     <Label>{field.label}</Label>
-                    {isCustomer ? (
-                      <div className="relative">
-                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 size-6 rounded-full overflow-hidden ring-1 ring-slate-200">
-                          <Image
-                            src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
-                            alt=""
-                            width={24}
-                            height={24}
-                            className="size-full object-cover"
-                          />
-                        </div>
-                        <Input
-                          value={form[field.id] || ""}
-                          onChange={(event) => onFormChange({ ...form, [field.id]: event.target.value })}
-                          placeholder={field.placeholder}
-                          readOnly={field.readOnly}
-                          disabled={field.readOnly}
-                          className={`pl-10 ${field.readOnly ? "bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200" : ""}`}
-                        />
-                      </div>
-                    ) : (
-                      <Input
-                        value={form[field.id] || ""}
-                        onChange={(event) => onFormChange({ ...form, [field.id]: event.target.value })}
-                        placeholder={field.placeholder}
-                        readOnly={field.readOnly}
-                        disabled={field.readOnly}
-                        className={field.readOnly ? "bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200" : ""}
-                      />
-                    )}
+                    <Input
+                      value={form[field.id] || ""}
+                      onChange={(event) => onFormChange({ ...form, [field.id]: event.target.value })}
+                      placeholder={field.placeholder}
+                      readOnly={field.readOnly}
+                      disabled={field.readOnly}
+                      className={field.readOnly ? "bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200" : ""}
+                    />
                   </div>
                 );
               }
 
               if (field.type === "textarea") {
                 return (
-                  <div key={field.id} className="space-y-2 md:col-span-2">
+                  <div key={field.id} className={`space-y-2 md:col-span-2 ${field.className || ""}`}>
                     <Label>{field.label}</Label>
                     <Textarea
                       value={form[field.id] || ""}
                       onChange={(event) => onFormChange({ ...form, [field.id]: event.target.value })}
                       placeholder={field.placeholder}
+                      className="h-24 min-h-24 resize-none rounded-lg border-input bg-transparent px-2.5 py-2 text-sm text-slate-700 shadow-none"
                     />
                   </div>
                 );
               }
 
               if (field.type === "select") {
+                const currentValue = form[field.id] || "";
                 return (
                   <div key={field.id} className={`space-y-2 ${field.className || ""}`}>
                     <Label>{field.label}</Label>
                     <Select
-                      value={form[field.id] || ""}
+                      value={currentValue}
                       onValueChange={(value) => onFormChange({ ...form, [field.id]: value })}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder={field.placeholder || "Chọn..."} />
                       </SelectTrigger>
-                      <SelectContent className="z-[2100]">
+                      <SelectContent align="start" position="popper" className="z-[2100]">
                         {field.options?.map((opt) => (
                           <SelectItem key={opt} value={opt}>
-                            {opt}
+                            <span className="flex items-center gap-2">
+                              {field.optionDotColors?.[opt] && (
+                                <span className="size-2 rounded-full" style={{ backgroundColor: field.optionDotColors[opt] }} />
+                              )}
+                              {opt}
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -274,7 +259,7 @@ export function FormDialog({
                     <Label>{field.label}</Label>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button type="button" variant="outline" className="w-full justify-start text-left font-normal">
+                        <Button type="button" variant="outline" className="h-8 w-full justify-start rounded-lg text-left font-normal">
                           <CalendarClock className="size-4 text-muted-foreground" />
                           {dateVal ? formatExportDate(dateVal) : "Chọn ngày"}
                         </Button>
@@ -297,7 +282,7 @@ export function FormDialog({
               if (field.type === "time") {
                 const timeVal = form[field.id] || "";
                 return (
-                  <div key={field.id} className="space-y-2">
+                  <div key={field.id} className={`space-y-2 ${field.className || ""}`}>
                     <Label>{field.label}</Label>
                     <div className="grid grid-cols-[76px_76px_auto] items-center gap-2">
                       <Select value={getDeliveryTimeParts(timeVal).hour} onValueChange={(value) => updateDeliveryTimePart(field.id, "hour", value)}>
@@ -323,6 +308,7 @@ export function FormDialog({
                       <Button
                         type="button"
                         variant={/^\d{2}:\d{2}$/.test(timeVal) ? "outline" : "default"}
+                        className="h-8 rounded-lg"
                         onClick={() => onFormChange({ ...form, [field.id]: "Chưa hẹn" })}
                       >
                         Chưa hẹn
@@ -337,7 +323,7 @@ export function FormDialog({
                 const storedAvatar = typeof window !== "undefined" ? (localStorage.getItem("accountImageUrl") || localStorage.getItem("avatarUrl")) : null;
                 const avatarSrc = currentStaffAvatar || storedAvatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif";
                 return (
-                  <div key={field.id} className="space-y-2">
+                  <div key={field.id} className={`space-y-2 ${field.className || ""}`}>
                     <Label>{field.label}</Label>
                     <div className="flex h-8 items-center gap-2 rounded-lg border border-input bg-muted/30 px-2.5 text-sm text-slate-700">
                       <Image
@@ -356,13 +342,13 @@ export function FormDialog({
               if (field.type === "custom_status") {
                 const currentStatus = form[field.id] || statusOptions[0] || "Chưa chọn";
                 return (
-                  <div key={field.id} className="space-y-2 md:col-span-2">
+                  <div key={field.id} className={`space-y-2 ${field.className || ""}`}>
                     <Label>{field.label}</Label>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-none transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+                          className="flex h-8 w-full items-center justify-between rounded-lg border border-input bg-transparent px-2.5 py-1 text-base text-slate-700 transition-colors outline-none hover:bg-slate-50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
                         >
                           <span className="flex min-w-0 items-center gap-2">
                             <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusDotColors[currentStatus] || "#cbd5e1" }} />
