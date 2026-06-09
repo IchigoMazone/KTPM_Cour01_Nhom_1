@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, type DragEvent } from "react";
+import { useMemo, useState, useEffect, type DragEvent } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   ImagePlus,
@@ -8,12 +9,27 @@ import {
   Send,
   ChevronLeft,
   CheckCheck,
-  MoreVertical,
   Paperclip,
+  ChevronDown,
+  ChevronUp,
+  Smile,
+  Link,
+  Bold,
+  Sparkles,
+  Search,
+  PanelRight,
 } from "lucide-react";
+import { seedOrders } from "../orders/data";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -33,10 +49,10 @@ import { type DashboardTableColumn } from "@/src/components/common/dashboard-dat
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 
-type TicketStatus = "Chưa xử lý" | "Đang xử lý" | "Đã giải quyết";
-type Priority = "Cao" | "Trung bình" | "Thấp";
+export type TicketStatus = "Chưa xử lý" | "Đang xử lý" | "Đã giải quyết";
+export type Priority = "Cao" | "Trung bình" | "Thấp";
 
-type Ticket = {
+export type Ticket = {
   id: string;
   type: string;
   customer: string;
@@ -51,7 +67,7 @@ type Ticket = {
   note: string;
 };
 
-type SupportMessage = {
+export type SupportMessage = {
   id: string;
   ticketId: string;
   sender: "customer" | "staff";
@@ -59,6 +75,12 @@ type SupportMessage = {
   avatar?: string;
   content: string;
   imageUrl?: string;
+  fileAttachment?: {
+    name: string;
+    size: string;
+    type: string;
+    url: string;
+  };
   createdAt: string;
 };
 
@@ -89,7 +111,7 @@ function mergeDefaultColumns(source: DashboardTableColumn[]) {
   return next;
 }
 
-const seedTickets: Ticket[] = [
+export const seedTickets: Ticket[] = [
   { id: "HT-501", type: "Mất đồ", customer: "Nguyễn Văn A", phone: "0903123456", orderId: "DH-1022", priority: "Cao", owner: "Quản lý", ownerAvatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", status: "Đang xử lý", washDate: "2026-05-29", createdAt: "2026-05-29", note: "Thiếu 1 tất đen" },
   { id: "HT-502", type: "Giao trễ", customer: "Trần Thị B", phone: "0912456789", orderId: "DH-1031", priority: "Trung bình", owner: "Tài xế C", ownerAvatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", status: "Chưa xử lý", washDate: "2026-05-29", createdAt: "2026-05-29", note: "Trễ 45 phút so với lịch hẹn" },
   { id: "HT-503", type: "Hỏng đồ", customer: "Phạm Lan", phone: "0938123456", orderId: "DH-1036", priority: "Cao", owner: "Admin", ownerAvatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", status: "Đã giải quyết", washDate: "2026-05-28", createdAt: "2026-05-28", note: "Đền bù theo chính sách" },
@@ -109,13 +131,13 @@ const emptyForm = {
   note: "",
 };
 
-const statusColor: Record<TicketStatus, { text: string; bg: string }> = {
+export const statusColor: Record<TicketStatus, { text: string; bg: string }> = {
   "Chưa xử lý": { text: "#2563eb", bg: "rgba(37,99,235,0.09)" },
   "Đang xử lý": { text: "#d97706", bg: "rgba(217,119,6,0.09)" },
   "Đã giải quyết": { text: "#059669", bg: "rgba(5,150,105,0.09)" },
 };
 
-const priorityColor: Record<Priority, { text: string; bg: string }> = {
+export const priorityColor: Record<Priority, { text: string; bg: string }> = {
   "Cao": { text: "#dc2626", bg: "rgba(220,38,38,0.09)" },
   "Trung bình": { text: "#d97706", bg: "rgba(217,119,6,0.09)" },
   "Thấp": { text: "#2563eb", bg: "rgba(37,99,235,0.09)" },
@@ -148,7 +170,7 @@ function StatusPill({ label }: { label: TicketStatus }) {
   );
 }
 
-function formatReadableDate(dateStr?: string) {
+export function formatReadableDate(dateStr?: string) {
   if (!dateStr) return "-";
   if (dateStr.includes("/")) return dateStr;
   const [y, m, d] = dateStr.split("-");
@@ -171,8 +193,75 @@ function MetricCard({ title, value, hint, color }: { title: string; value: strin
   );
 }
 
+function getInitials(name: string) {
+  if (!name) return "KH";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function getInitialsBg(name: string) {
+  if (!name) return "bg-purple-100 text-purple-700 border-purple-200";
+  const sum = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const colors = [
+    "bg-indigo-100 text-indigo-700 border-indigo-200",
+    "bg-purple-100 text-purple-700 border-purple-200",
+    "bg-pink-100 text-pink-700 border-pink-200",
+    "bg-blue-100 text-blue-700 border-blue-200",
+    "bg-cyan-100 text-cyan-700 border-cyan-200",
+    "bg-teal-100 text-teal-700 border-teal-200",
+    "bg-emerald-100 text-emerald-700 border-emerald-200",
+    "bg-amber-100 text-amber-700 border-amber-200",
+    "bg-orange-100 text-orange-700 border-orange-200",
+  ];
+  return colors[sum % colors.length];
+}
+
+export function formatMessageTime(timeStr?: string) {
+  if (!timeStr) return "Vừa xong";
+  try {
+    if (timeStr.includes(" ") || timeStr.includes(",")) {
+      const timePart = timeStr.split(/\s+/).find((part) => /^\d{2}:\d{2}/.test(part));
+      if (timePart) {
+        const parts = timePart.split(":");
+        if (parts[0] && parts[1]) {
+          return `${parts[0].padStart(2, "0")}:${parts[1].slice(0, 2)}`;
+        }
+      }
+    }
+    if (timeStr.length === 10 && timeStr.includes("-")) {
+      return "08:00";
+    }
+  } catch (e) {
+    // ignore
+  }
+  return timeStr;
+}
+
+export const quickReplies = [
+  "Chào anh/chị, em có thể giúp gì cho anh/chị ạ?",
+  "Live chat hỗ trợ hoạt động từ 8h00 - 22h00 hàng ngày.",
+  "Dạ bên em xin lỗi vì sự cố này, shop đang kiểm tra lại đơn giặt và sẽ phản hồi lại ngay ạ.",
+  "Đơn hàng của anh/chị đã hoàn thành và đang được chuẩn bị giao.",
+  "Vui lòng click vào link này để xem chính sách bồi thường và hoàn trả của cửa hàng.",
+  "Nếu anh/chị còn câu hỏi nào khác, xin vui lòng nhắn lại để em hỗ trợ thêm ạ."
+];
+
 export default function SupportPage() {
-  const [tickets, setTickets] = useState(seedTickets);
+  const router = useRouter();
+  const [tickets, setTickets] = useState<Ticket[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("support_tickets");
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    return seedTickets;
+  });
   const [currentUser] = useState(() => {
     if (typeof window !== "undefined") {
       const username = localStorage.getItem("username");
@@ -209,11 +298,20 @@ export default function SupportPage() {
   const [openAddColumn, setOpenAddColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState("");
   const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
-  const [activeChatTicketId, setActiveChatTicketId] = useState<string | null>(null);
-  const [chatDraft, setChatDraft] = useState("");
-  const [chatImagePreview, setChatImagePreview] = useState<string | null>(null);
-  const [ticketMessages, setTicketMessages] = useState<Record<string, SupportMessage[]>>(() =>
-    Object.fromEntries(
+  const [expandOngoing, setExpandOngoing] = useState(true);
+  const [expandClosed, setExpandClosed] = useState(true);
+  const [ticketMessages, setTicketMessages] = useState<Record<string, SupportMessage[]>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("support_messages");
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    return Object.fromEntries(
       seedTickets.map((ticket) => [
         ticket.id,
         [
@@ -227,8 +325,16 @@ export default function SupportPage() {
           },
         ],
       ]),
-    ),
-  );
+    );
+  });
+
+  useEffect(() => {
+    localStorage.setItem("support_tickets", JSON.stringify(tickets));
+  }, [tickets]);
+
+  useEffect(() => {
+    localStorage.setItem("support_messages", JSON.stringify(ticketMessages));
+  }, [ticketMessages]);
   const activeColumns = useMemo(() => mergeDefaultColumns(columns), [columns]);
   const ticketFormFields = useMemo<FormField[]>(() => {
     const fieldByColumnId: Record<string, FormField> = {
@@ -284,8 +390,6 @@ export default function SupportPage() {
   );
   const allVisibleTicketsSelected = visibleTicketIds.length > 0 && visibleTicketIds.every((id) => selectedTicketIds.has(id));
   const selectedVisibleTicketCount = visibleTicketIds.filter((id) => selectedTicketIds.has(id)).length;
-  const activeChatTicket = activeChatTicketId ? tickets.find((ticket) => ticket.id === activeChatTicketId) ?? null : null;
-  const activeChatMessages = activeChatTicketId ? ticketMessages[activeChatTicketId] ?? [] : [];
   const customColumns = useMemo(
     () => activeColumns.filter((column) => !defaultColumns.some((defaultColumn) => defaultColumn.id === column.id)),
     [activeColumns]
@@ -503,60 +607,7 @@ export default function SupportPage() {
   };
 
   const openReplyPage = (ticket: Ticket) => {
-    setActiveChatTicketId(ticket.id);
-    setChatDraft("");
-    setChatImagePreview(null);
-    setTickets((prev) =>
-      prev.map((item) =>
-        item.id === ticket.id
-          ? {
-            ...item,
-            owner: currentUser,
-            ownerAvatar: currentUserAvatar,
-            status: item.status === "Chưa xử lý" ? "Đang xử lý" : item.status,
-          }
-          : item,
-      ),
-    );
-  };
-
-  const sendMessage = () => {
-    if (!activeChatTicketId || (!chatDraft.trim() && !chatImagePreview)) return;
-    const now = new Date();
-    const message: SupportMessage = {
-      id: `${activeChatTicketId}-${now.getTime()}`,
-      ticketId: activeChatTicketId,
-      sender: "staff",
-      senderName: currentUser,
-      avatar: currentUserAvatar,
-      content: chatDraft.trim(),
-      imageUrl: chatImagePreview || undefined,
-      createdAt: now.toLocaleString("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    };
-    setTicketMessages((prev) => ({
-      ...prev,
-      [activeChatTicketId]: [...(prev[activeChatTicketId] ?? []), message],
-    }));
-    setTickets((prev) =>
-      prev.map((ticket) =>
-        ticket.id === activeChatTicketId
-          ? {
-            ...ticket,
-            owner: currentUser,
-            ownerAvatar: currentUserAvatar,
-            status: ticket.status === "Chưa xử lý" ? "Đang xử lý" : ticket.status,
-          }
-          : ticket,
-      ),
-    );
-    setChatDraft("");
-    setChatImagePreview(null);
+    router.push(`/home/support/${ticket.id}`);
   };
 
   const saveTicket = () => {
@@ -820,218 +871,6 @@ export default function SupportPage() {
       </div>
     </div>
   );
-
-  if (activeChatTicket) {
-    return (
-      <PageShell fullHeight>
-        <div className="min-h-0 flex-1 overflow-hidden bg-white flex flex-col">
-
-          {/* Left Column: Chat Conversation */}
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
-
-            {/* Chat Header */}
-            <div className="border-b border-slate-100 bg-white px-4 py-3 shrink-0 flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <button
-                  onClick={() => setActiveChatTicketId(null)}
-                  className="mr-1 rounded-full p-1 text-slate-400 hover:bg-slate-100 lg:hidden"
-                  title="Quay lại"
-                >
-                  <ChevronLeft className="size-5" />
-                </button>
-                <Avatar className="size-9 border border-slate-100 shadow-sm shrink-0">
-                  <AvatarImage src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={activeChatTicket.customer} />
-                  <AvatarFallback>{activeChatTicket.customer.slice(0, 1)}</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 text-left">
-                  <p className="truncate text-sm font-semibold text-slate-900 leading-tight">{activeChatTicket.customer}</p>
-                  <p className="text-[11px] font-medium text-slate-400 mt-0.5">
-                    {activeChatTicket.id} · {activeChatTicket.type}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-2">
-                <button
-                  onClick={() => {
-                    setTickets(prev => prev.map(t => t.id === activeChatTicket.id ? { ...t, status: "Đã giải quyết" } : t));
-                    setActiveChatTicketId(null);
-                  }}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                >
-                  Đóng Ticket
-                </button>
-                <button className="flex size-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700">
-                  <MoreVertical className="size-4.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Conversation Messages */}
-            <div className="min-h-0 flex-1 bg-white overflow-hidden">
-              <ScrollArea className="h-full">
-                <div className="space-y-6 px-5 py-6">
-                  {activeChatMessages.map((message) => {
-                    const isStaff = message.sender === "staff";
-                    return (
-                      <div key={message.id} className={`flex items-start gap-3 ${isStaff ? "justify-end" : "justify-start"}`}>
-                        {!isStaff && (
-                          <Avatar className="size-8 mt-1 border border-slate-100 shadow-sm shrink-0">
-                            <AvatarImage src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={message.senderName} />
-                            <AvatarFallback>{message.senderName.slice(0, 1)}</AvatarFallback>
-                          </Avatar>
-                        )}
-                        <div className={`flex max-w-[70%] flex-col gap-1 ${isStaff ? "items-end" : "items-start"}`}>
-                          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold mb-0.5">
-                            <span>{message.senderName}</span>
-                            <span>·</span>
-                            <span>{formatReadableDate(message.createdAt)}</span>
-                            {isStaff && <span className="font-bold text-[#0ebd85]">You</span>}
-                          </div>
-                          <div className={`rounded-xl px-4 py-3 text-sm leading-5 shadow-2xs ${isStaff
-                            ? "bg-[#edfbf4] text-slate-800 rounded-tr-none border border-emerald-50/50"
-                            : "bg-[#f1f3f4] text-slate-800 rounded-tl-none"
-                            }`}>
-                            {message.imageUrl && (
-                              <div className="mb-2 overflow-hidden rounded-lg">
-                                <Image
-                                  src={message.imageUrl}
-                                  alt="Ảnh đính kèm"
-                                  width={360}
-                                  height={240}
-                                  unoptimized
-                                  className="max-h-64 w-full object-cover"
-                                />
-                              </div>
-                            )}
-                            {message.content && <p className="whitespace-pre-wrap">{message.content}</p>}
-                          </div>
-
-                          {/* Time and checkmarks under message */}
-                          <div className="flex items-center gap-1 px-1 mt-0.5">
-                            <span className="text-[10px] text-slate-400">10:30 am</span>
-                            <CheckCheck className="size-3 text-slate-400" />
-                          </div>
-                        </div>
-                        {isStaff && (
-                          <Avatar className="size-8 mt-1 border border-slate-100 shadow-sm shrink-0">
-                            <AvatarImage src={message.avatar || currentUserAvatar} alt={message.senderName} />
-                            <AvatarFallback>{message.senderName.slice(0, 1)}</AvatarFallback>
-                          </Avatar>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            </div>
-
-
-
-
-            {/* Chat Input Footer */}
-            <div className="border-t border-slate-105 bg-white p-4 shrink-0">
-              {chatImagePreview && (
-                <div className="mb-3 flex w-fit items-start gap-2 rounded-lg border bg-background p-2">
-                  <Image
-                    src={chatImagePreview}
-                    alt="Ảnh chuẩn bị gửi"
-                    width={96}
-                    height={72}
-                    unoptimized
-                    className="h-16 w-24 rounded-md object-cover"
-                  />
-                  <Button variant="ghost" size="sm" onClick={() => setChatImagePreview(null)}>
-                    Xóa
-                  </Button>
-                </div>
-              )}
-
-              <div className="flex flex-col gap-3">
-                <textarea
-                  value={chatDraft}
-                  onChange={(event) => setChatDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      sendMessage();
-                    }
-                  }}
-                  placeholder="Write a message..."
-                  className="w-full resize-none bg-transparent text-sm text-slate-750 placeholder-slate-400 focus:outline-none min-h-[50px] max-h-24 py-1"
-                />
-
-                <div className="flex items-center justify-between border-t border-slate-50 pt-2.5">
-                  <div className="flex items-center gap-1.5 text-slate-400">
-
-                    {/* File Attachment */}
-                    <label className="flex items-center gap-1 shrink-0 cursor-pointer rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-100">
-                      <Paperclip className="size-3.5" />
-                      <span>File</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          if (!file) return;
-                          setChatImagePreview(URL.createObjectURL(file));
-                          event.target.value = "";
-                        }}
-                      />
-                    </label>
-
-                    {/* Image Shortcut */}
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <label className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg hover:bg-slate-50 hover:text-slate-600 transition-colors">
-                            <ImagePlus className="size-4" />
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                if (!file) return;
-                                setChatImagePreview(URL.createObjectURL(file));
-                                event.target.value = "";
-                              }}
-                            />
-                          </label>
-                        </TooltipTrigger>
-                        <TooltipContent>Gửi ảnh</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    <button type="button" className="flex size-7 items-center justify-center rounded-lg hover:bg-slate-50 hover:text-slate-600 transition-colors" title="AI Assist">
-                      <span className="text-xs">✨</span>
-                    </button>
-                    <button type="button" className="flex size-7 items-center justify-center rounded-lg hover:bg-slate-50 hover:text-slate-600 transition-colors" title="Emojis">
-                      <span className="text-xs">😊</span>
-                    </button>
-                  </div>
-
-                  {/* Send Button Green */}
-                  <button
-                    type="button"
-                    onClick={sendMessage}
-                    disabled={!chatDraft.trim() && !chatImagePreview}
-                    className="flex items-center gap-1.5 rounded-lg bg-[#0ebd85] px-4 py-2 text-xs font-bold text-white transition-all hover:bg-[#0ca977] hover:scale-[1.02] active:scale-[0.98] disabled:bg-slate-100 disabled:text-slate-400 disabled:scale-100 shadow-2xs"
-                  >
-                    <span>Send</span>
-                    <Send className="size-3" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-
-        </div>
-      </PageShell>
-    );
-  }
 
   return (
     <PageShell fullHeight>

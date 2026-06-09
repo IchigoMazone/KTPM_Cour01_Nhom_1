@@ -37,6 +37,7 @@ type Tab = "Nhân viên" | "Kho vật tư" | "Thiết bị giặt sấy";
 type Staff = {
   id: string;
   name: string;
+  avatar?: string;
   role: string;
   shift: string;
   shiftDate: string;
@@ -143,10 +144,15 @@ const staffRoleOptions = [
   "Kho",
 ];
 
+const defaultAvatarUrl = "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif";
+const getSafeAvatarUrl = (avatar?: string) =>
+  avatar?.includes("images.unsplash.com") ? defaultAvatarUrl : avatar || defaultAvatarUrl;
+
 const seedStaff: Staff[] = [
   {
     id: "NV-101",
     name: "Nguyễn Văn A",
+    avatar: defaultAvatarUrl,
     role: "Giặt",
     shift: "Sáng",
     shiftDate: "2026-06-09",
@@ -161,6 +167,7 @@ const seedStaff: Staff[] = [
   {
     id: "NV-102",
     name: "Trần Thị B",
+    avatar: defaultAvatarUrl,
     role: "Gấp/Là",
     shift: "Chiều",
     shiftDate: "2026-06-09",
@@ -175,6 +182,7 @@ const seedStaff: Staff[] = [
   {
     id: "NV-103",
     name: "Lê Hoàng C",
+    avatar: defaultAvatarUrl,
     role: "Giao nhận",
     shift: "Tối",
     shiftDate: "2026-06-09",
@@ -189,6 +197,7 @@ const seedStaff: Staff[] = [
   {
     id: "NV-104",
     name: "Phạm Duy D",
+    avatar: defaultAvatarUrl,
     role: "Thu ngân",
     shift: "Sáng",
     shiftDate: "2026-06-10",
@@ -203,6 +212,7 @@ const seedStaff: Staff[] = [
   {
     id: "NV-105",
     name: "Hoàng Minh Tâm",
+    avatar: defaultAvatarUrl,
     role: "Kiểm đồ",
     shift: "Chiều",
     shiftDate: "2026-06-10",
@@ -217,6 +227,7 @@ const seedStaff: Staff[] = [
   {
     id: "NV-106",
     name: "Vũ Thanh Mai",
+    avatar: defaultAvatarUrl,
     role: "Kho",
     shift: "Sáng",
     shiftDate: "2026-06-10",
@@ -360,6 +371,7 @@ const seedMachines: WashingMachineItem[] = [
 
 const emptyStaffForm = {
   name: "",
+  avatar: "",
   role: "Giặt",
   shift: "Sáng",
   shiftDate: "",
@@ -1014,6 +1026,7 @@ export default function StaffOperationsPage() {
     if (!staffForm.name.trim()) return;
     const payload: Omit<Staff, "id"> = {
       name: staffForm.name,
+      avatar: staffForm.avatar || (editingStaffId ? staff.find(s => s.id === editingStaffId)?.avatar : undefined) || defaultAvatarUrl,
       phone: staffForm.phone,
       role: staffForm.role,
       shift: staffForm.shift,
@@ -1412,9 +1425,7 @@ export default function StaffOperationsPage() {
         </TableCell>
       );
     if (column.id === "name") {
-      const avatarUrl =
-        item.avatar ||
-        "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif";
+      const avatarUrl = getSafeAvatarUrl(item.avatar);
       return (
         <TableCell key={column.id} className="font-medium text-slate-900">
           <div className="flex items-center gap-2.5">
@@ -1735,10 +1746,7 @@ export default function StaffOperationsPage() {
               className={`shrink-0 ${checkboxClass}`}
             />
             <Image
-              src={
-                item.avatar ||
-                "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
-              }
+              src={getSafeAvatarUrl(item.avatar)}
               alt={item.name}
               width={32}
               height={32}
@@ -1934,10 +1942,7 @@ export default function StaffOperationsPage() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <Image
-                  src={
-                    item.avatar ||
-                    "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
-                  }
+                  src={getSafeAvatarUrl(item.avatar)}
                   alt={item.name}
                   width={24}
                   height={24}

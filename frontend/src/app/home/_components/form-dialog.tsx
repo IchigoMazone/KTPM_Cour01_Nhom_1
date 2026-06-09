@@ -348,7 +348,7 @@ export function FormDialog({
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="flex h-8 w-full items-center justify-between rounded-lg border border-input bg-transparent px-2.5 py-1 text-base text-slate-700 transition-colors outline-none hover:bg-slate-50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
+                          className="flex h-9 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 transition-colors outline-none hover:bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#8b5cf6]"
                         >
                           <span className="flex min-w-0 items-center gap-2">
                             <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusDotColors[currentStatus] || "#cbd5e1" }} />
