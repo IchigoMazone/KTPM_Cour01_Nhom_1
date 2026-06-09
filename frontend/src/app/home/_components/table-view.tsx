@@ -22,6 +22,7 @@ interface TableViewProps<T> {
     onDrop: (e: React.DragEvent<HTMLTableCellElement>, id: string) => void;
     onDragEnd: () => void;
   };
+  onColumnsChange?: any;
   page: number;
   pageCount: number;
   totalRows: number;
@@ -44,6 +45,7 @@ export function TableView<T>({
   totalVisibleWidth,
   renderCell,
   columnDrag,
+  onColumnsChange,
   page,
   pageCount,
   totalRows,
@@ -67,6 +69,7 @@ export function TableView<T>({
         totalVisibleWidth={totalVisibleWidth}
         renderCell={renderCell}
         columnDrag={columnDrag}
+        onColumnsChange={onColumnsChange}
       />
       <DashboardTableFooter
         page={page}

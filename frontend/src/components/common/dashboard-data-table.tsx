@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode, RefObject } from "react";
+import type { CSSProperties, DragEvent, ReactNode, RefObject } from "react";
 import { ChevronDown, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,12 +50,13 @@ type DashboardDataTableProps<T> = {
   columnDrag?: {
     draggedColumnId: string | null;
     dragOverColumnId: string | null;
-    onDragStart: (event: React.DragEvent<HTMLTableCellElement>, id: string) => void;
-    onDragOver: (event: React.DragEvent<HTMLTableCellElement>, id: string) => void;
+    onDragStart: (event: DragEvent<HTMLTableCellElement>, id: string) => void;
+    onDragOver: (event: DragEvent<HTMLTableCellElement>, id: string) => void;
     onDragLeave: () => void;
-    onDrop: (event: React.DragEvent<HTMLTableCellElement>, id: string) => void;
+    onDrop: (event: DragEvent<HTMLTableCellElement>, id: string) => void;
     onDragEnd: () => void;
   };
+  onColumnsChange?: any;
 };
 
 export function DashboardDataTable<T>({
@@ -70,11 +71,13 @@ export function DashboardDataTable<T>({
   renderCell,
   selectAll,
   columnDrag,
+  onColumnsChange,
 }: DashboardDataTableProps<T>) {
   const visibleColumns = columns.filter((column) => column.visible !== false);
   const widthTotal =
     totalVisibleWidth || visibleColumns.reduce((sum, column) => sum + (column.width || 150), 0);
   const showSelectAllInColumn = selectAll?.columnId || visibleColumns[0]?.id;
+
 
   return (
     <div className="flex-1 overflow-auto [&_div[data-slot=table-container]]:overflow-visible">
@@ -86,6 +89,7 @@ export function DashboardDataTable<T>({
                 tableResizeMode === "fit"
                   ? { width: `${((column.width || 120) / widthTotal) * 100}%` }
                   : undefined;
+              const canDragColumn = Boolean(columnDrag);
 
               return (
                 <ResizableTableHead
@@ -93,13 +97,27 @@ export function DashboardDataTable<T>({
                   width={tableResizeMode === "fit" ? undefined : column.width}
                   autoWidth={tableResizeMode === "fit"}
                   style={fitStyle}
-                  className={`text-xs font-medium text-slate-600 ${column.id === "actions" ? "text-left" : ""} ${columnDrag?.dragOverColumnId === column.id ? "bg-slate-200/50" : ""} ${columnDrag?.draggedColumnId === column.id ? "opacity-50" : ""}`}
-                  draggable={tableResizeMode === "custom"}
-                  onDragStart={(event) => columnDrag?.onDragStart(event, column.id)}
-                  onDragOver={(event) => columnDrag?.onDragOver(event, column.id)}
-                  onDragLeave={columnDrag?.onDragLeave}
-                  onDrop={(event) => columnDrag?.onDrop(event, column.id)}
-                  onDragEnd={columnDrag?.onDragEnd}
+                  className={`text-xs font-medium text-slate-600 group/head ${column.id === "actions" ? "text-left" : ""} ${columnDrag?.dragOverColumnId === column.id ? "bg-slate-200/50" : ""} ${columnDrag?.draggedColumnId === column.id ? "opacity-50" : ""}`}
+                  draggable={canDragColumn}
+                  onDragStart={(event) => {
+                    if (!canDragColumn) return;
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", column.id);
+                    columnDrag?.onDragStart(event, column.id);
+                  }}
+                  onDragOver={(event) => {
+                    if (!canDragColumn) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    columnDrag?.onDragOver(event, column.id);
+                  }}
+                  onDragLeave={canDragColumn ? columnDrag?.onDragLeave : undefined}
+                  onDrop={(event) => {
+                    if (!canDragColumn) return;
+                    event.preventDefault();
+                    columnDrag?.onDrop(event, column.id);
+                  }}
+                  onDragEnd={canDragColumn ? columnDrag?.onDragEnd : undefined}
                 >
                   {selectAll && column.id === showSelectAllInColumn ? (
                     <span className="inline-flex items-center gap-2">
@@ -115,7 +133,7 @@ export function DashboardDataTable<T>({
                       {column.label}
                     </span>
                   ) : (
-                    column.label
+                    <span>{column.label}</span>
                   )}
                 </ResizableTableHead>
               );
@@ -238,7 +256,7 @@ export function DashboardTableFooter({
   onPageChange,
 }: DashboardTableFooterProps) {
   return (
-    <div className="border-t border-slate-200 px-5 pt-3 pb-1">
+    <div className="shrink-0 border-t border-slate-200 bg-white px-5 pt-3 pb-1">
       <div className="flex flex-col gap-3 text-xs text-slate-700 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <span>Số dòng mỗi trang</span>

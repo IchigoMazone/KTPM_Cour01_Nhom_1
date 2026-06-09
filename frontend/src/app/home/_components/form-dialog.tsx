@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { CalendarClock, X } from "lucide-react";
+import { CalendarClock, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +27,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { fromOrderDate, toInputDate } from "@/src/utils/dashboard-time";
 import { useMemo } from "react";
 
@@ -37,7 +43,14 @@ export interface FormField {
   placeholder?: string;
   options?: string[];
   className?: string;
+  readOnly?: boolean;
 }
+
+type FormCustomColumn = {
+  id: string;
+  label: string;
+  visible?: boolean;
+};
 
 interface FormDialogProps {
   open: boolean;
@@ -47,10 +60,15 @@ interface FormDialogProps {
   form: Record<string, string>;
   onFormChange: (form: Record<string, string>) => void;
   onSave: () => void;
-  customColumns?: any[];
+  customColumns?: FormCustomColumn[];
   currentStaffName?: string;
+  currentStaffAvatar?: string;
   statusOptions?: string[];
   statusDotColors?: Record<string, string>;
+  showCloseButton?: boolean;
+  showCloseButtonAtBottom?: boolean;
+  gridClassName?: string;
+  customColumnsBeforeFieldId?: string;
 }
 
 export function FormDialog({
@@ -63,8 +81,13 @@ export function FormDialog({
   onSave,
   customColumns,
   currentStaffName,
+  currentStaffAvatar,
   statusOptions = [],
   statusDotColors = {},
+  showCloseButton = true,
+  showCloseButtonAtBottom = false,
+  gridClassName = "grid gap-4",
+  customColumnsBeforeFieldId,
 }: FormDialogProps) {
   const hourOptions = useMemo(() => Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0")), []);
   const minuteOptions = useMemo(() => Array.from({ length: 60 }, (_, m) => String(m).padStart(2, "0")), []);
@@ -86,9 +109,17 @@ export function FormDialog({
   };
 
   const getDateValue = (value: string) => {
-    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
-    const date = fromOrderDate(value);
-    return Number.isNaN(date.getTime()) ? undefined : date;
+    if (!value) return undefined;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const date = fromOrderDate(value);
+      return Number.isNaN(date.getTime()) ? undefined : date;
+    }
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+      const [d, m, y] = value.split("/").map(Number);
+      const date = new Date(y, m - 1, d);
+      return Number.isNaN(date.getTime()) ? undefined : date;
+    }
+    return undefined;
   };
 
   const formatExportDate = (date: Date) => {
@@ -100,20 +131,28 @@ export function FormDialog({
 
   const allFields = useMemo(() => {
     const base = [...fields];
-    if (customColumns) {
-      customColumns.forEach((column) => {
-        if (column.visible) {
-          base.push({
-            id: column.id,
-            label: column.label,
-            type: "text",
-            placeholder: `Nhập ${column.label.toLowerCase()}`,
-          });
-        }
-      });
+    const customFields: FormField[] = (customColumns || [])
+      .filter((column) => column.visible)
+      .map((column) => ({
+        id: column.id,
+        label: column.label,
+        type: "text",
+        placeholder: `Nhập ${column.label.toLowerCase()}`,
+      }));
+
+    if (customFields.length > 0) {
+      const insertIndex = customColumnsBeforeFieldId
+        ? base.findIndex((field) => field.id === customColumnsBeforeFieldId)
+        : -1;
+
+      if (insertIndex >= 0) {
+        base.splice(insertIndex, 0, ...customFields);
+      } else {
+        base.push(...customFields);
+      }
     }
     return base;
-  }, [fields, customColumns]);
+  }, [fields, customColumns, customColumnsBeforeFieldId]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -122,25 +161,52 @@ export function FormDialog({
           <DialogTitle className="text-lg font-semibold">
             {title}
           </DialogTitle>
-          <DialogClose asChild>
-            <Button variant="ghost" size="icon-sm" className="shrink-0">
-              <X className="size-4" />
-              <span className="sr-only">Đóng</span>
-            </Button>
-          </DialogClose>
+          {showCloseButton && (
+            <DialogClose asChild>
+              <Button variant="ghost" className="h-8 shrink-0 px-3 text-sm font-medium text-slate-600 hover:text-slate-900">
+                Đóng
+              </Button>
+            </DialogClose>
+          )}
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-6">
-          <div className="grid gap-4">
+          <div className={gridClassName}>
             {allFields.map((field) => {
               if (field.type === "text") {
+                const isCustomer = field.id === "customer";
                 return (
-                  <div key={field.id} className="space-y-2">
+                  <div key={field.id} className={`space-y-2 ${field.className || ""}`}>
                     <Label>{field.label}</Label>
-                    <Input
-                      value={form[field.id] || ""}
-                      onChange={(event) => onFormChange({ ...form, [field.id]: event.target.value })}
-                      placeholder={field.placeholder}
-                    />
+                    {isCustomer ? (
+                      <div className="relative">
+                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 size-6 rounded-full overflow-hidden ring-1 ring-slate-200">
+                          <Image
+                            src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+                            alt=""
+                            width={24}
+                            height={24}
+                            className="size-full object-cover"
+                          />
+                        </div>
+                        <Input
+                          value={form[field.id] || ""}
+                          onChange={(event) => onFormChange({ ...form, [field.id]: event.target.value })}
+                          placeholder={field.placeholder}
+                          readOnly={field.readOnly}
+                          disabled={field.readOnly}
+                          className={`pl-10 ${field.readOnly ? "bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200" : ""}`}
+                        />
+                      </div>
+                    ) : (
+                      <Input
+                        value={form[field.id] || ""}
+                        onChange={(event) => onFormChange({ ...form, [field.id]: event.target.value })}
+                        placeholder={field.placeholder}
+                        readOnly={field.readOnly}
+                        disabled={field.readOnly}
+                        className={field.readOnly ? "bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200" : ""}
+                      />
+                    )}
                   </div>
                 );
               }
@@ -160,7 +226,7 @@ export function FormDialog({
 
               if (field.type === "select") {
                 return (
-                  <div key={field.id} className="space-y-2">
+                  <div key={field.id} className={`space-y-2 ${field.className || ""}`}>
                     <Label>{field.label}</Label>
                     <Select
                       value={form[field.id] || ""}
@@ -183,7 +249,7 @@ export function FormDialog({
 
               if (field.type === "number") {
                 return (
-                  <div key={field.id} className="space-y-2">
+                  <div key={field.id} className={`space-y-2 ${field.className || ""}`}>
                     <Label>{field.label}</Label>
                     <div className="relative">
                       <Input
@@ -204,7 +270,7 @@ export function FormDialog({
               if (field.type === "date") {
                 const dateVal = getDateValue(form[field.id] || "");
                 return (
-                  <div key={field.id} className="space-y-2">
+                  <div key={field.id} className={`space-y-2 ${field.className || ""}`}>
                     <Label>{field.label}</Label>
                     <Popover>
                       <PopoverTrigger asChild>
@@ -268,12 +334,14 @@ export function FormDialog({
 
               if (field.type === "custom_staff") {
                 const staffName = currentStaffName || form[field.id] || "Chưa gán";
+                const storedAvatar = typeof window !== "undefined" ? (localStorage.getItem("accountImageUrl") || localStorage.getItem("avatarUrl")) : null;
+                const avatarSrc = currentStaffAvatar || storedAvatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif";
                 return (
                   <div key={field.id} className="space-y-2">
                     <Label>{field.label}</Label>
                     <div className="flex h-8 items-center gap-2 rounded-lg border border-input bg-muted/30 px-2.5 text-sm text-slate-700">
                       <Image
-                        src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+                        src={avatarSrc}
                         alt={staffName}
                         width={24}
                         height={24}
@@ -286,28 +354,36 @@ export function FormDialog({
               }
 
               if (field.type === "custom_status") {
+                const currentStatus = form[field.id] || statusOptions[0] || "Chưa chọn";
                 return (
                   <div key={field.id} className="space-y-2 md:col-span-2">
                     <Label>{field.label}</Label>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {statusOptions.map((status) => (
-                        <Button
-                          key={status}
-                          variant={form[field.id] === status ? "default" : "outline"}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
                           type="button"
-                          onClick={() => onFormChange({ ...form, [field.id]: status })}
-                          className="h-9 justify-center"
+                          className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-none transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
                         >
-                          <span
-                            className="size-2 rounded-full"
-                            style={{
-                              backgroundColor: form[field.id] === status ? "currentColor" : statusDotColors[status] || "#cbd5e1",
-                            }}
-                          />
-                          {status}
-                        </Button>
-                      ))}
-                    </div>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusDotColors[currentStatus] || "#cbd5e1" }} />
+                            <span className="truncate">{currentStatus}</span>
+                          </span>
+                          <ChevronDown className="size-4 shrink-0 text-slate-400" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="z-[2100] w-[--radix-dropdown-menu-trigger-width]">
+                        {statusOptions.map((status) => (
+                          <DropdownMenuItem
+                            key={status}
+                            className="gap-2"
+                            onClick={() => onFormChange({ ...form, [field.id]: status })}
+                          >
+                            <span className="size-2 rounded-full" style={{ backgroundColor: statusDotColors[status] || "#cbd5e1" }} />
+                            {status}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 );
               }
@@ -316,7 +392,14 @@ export function FormDialog({
             })}
           </div>
         </div>
-        <DialogFooter className="m-0 border-t border-slate-200 bg-white px-6 py-4">
+        <DialogFooter className="m-0 border-t border-slate-200 bg-white px-6 py-4 flex flex-row items-center justify-end gap-2">
+          {showCloseButtonAtBottom && (
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="w-full justify-center text-center sm:w-auto" onClick={onClose}>
+                Đóng
+              </Button>
+            </DialogClose>
+          )}
           <Button className="w-full justify-center bg-slate-900 text-center text-white hover:bg-slate-800 sm:w-auto" onClick={onSave}>
             Lưu thông tin
           </Button>

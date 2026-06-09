@@ -9,15 +9,12 @@ import { TableView } from "../_components/table-view";
 import { KanbanView } from "../_components/kanban-view";
 import { ListView } from "../_components/list-view";
 import { FormDialog, type FormField } from "../_components/form-dialog";
-import { HistoryModal } from "../_components/history-modal";
 import { AddColumnDialog } from "../_components/add-column-dialog";
 import {
   Search,
   Star,
   Plus,
   ChevronDown,
-  Pencil,
-  Trash2,
   Clock,
   Download,
   EyeOff,
@@ -136,9 +133,11 @@ const defaultColumns: CustomerColumn[] = [
   { id: "points", label: "Điểm", width: 76, visible: true },
   { id: "rank", label: "Hạng", width: 92, visible: true },
   { id: "birthday", label: "Ngày sinh", width: 92, visible: true },
+  { id: "createdAt", label: "Ngày tạo tài khoản", width: 128, visible: true },
   { id: "note", label: "Ghi chú", width: 150, visible: true },
   { id: "actions", label: "Thao tác", width: 150, visible: true },
 ];
+const defaultColumnIdSet = new Set(defaultColumns.map((column) => column.id));
 const rankOptions = ["Kim cương", "Vàng", "Bạc", "Thường"];
 
 const formatBirthday = (dateStr?: string) => {
@@ -177,34 +176,29 @@ export default function CustomersPage() {
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
   const [draggedCustomerId, setDraggedCustomerId] = useState<string | null>(null);
   const [dragOverRank, setDragOverRank] = useState<string | null>(null);
-  const [openHistory, setOpenHistory] = useState(false);
-  const [activeHistoryCustomerId, setActiveHistoryCustomerId] = useState<string | null>(null);
   const [openPageSizeMenu, setOpenPageSizeMenu] = useState(false);
   const [customPageSize, setCustomPageSize] = useState("");
   const [openAddColumn, setOpenAddColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState("");
   const [openForm, setOpenForm] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [form, setForm] = useState<typeof emptyForm & Record<string, string>>(emptyForm);
 
   const customerFormFields = useMemo<FormField[]>(() => {
-    const baseFields: FormField[] = [
+    return [
       { id: "name", label: "Họ tên", type: "text", placeholder: "Họ và tên" },
       { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
       { id: "email", label: "Email", type: "text", placeholder: "khachhang@example.com" },
       { id: "birthday", label: "Ngày sinh", type: "date" },
-      { id: "address", label: "Địa chỉ mặc định", type: "text", placeholder: "Số nhà, tên đường, quận/huyện..." },
-      { id: "note", label: "Ghi chú đặc biệt", type: "text", placeholder: "Dị ứng hóa chất, giờ giao hàng yêu thích..." },
+      { id: "address", label: "Địa chỉ mặc định", type: "text", placeholder: "Số nhà, tên đường, quận/huyện...", className: "md:col-span-2" },
+      { id: "rank", label: "Hạng khách hàng", type: "select", options: rankOptions, placeholder: "Chọn hạng" },
+      { id: "points", label: "Điểm tích lũy", type: "number" },
+      { id: "createdAt", label: "Ngày tạo tài khoản", type: "date" },
+      { id: "note", label: "Ghi chú đặc biệt", type: "textarea", placeholder: "Dị ứng hóa chất, giờ giao hàng yêu thích..." },
     ];
-    if (editingCustomerId) {
-      baseFields.push(
-        { id: "rank", label: "Hạng khách hàng", type: "text", placeholder: "Thường, Bạc, Vàng, Kim cương" },
-        { id: "points", label: "Điểm tích lũy", type: "number" },
-        { id: "createdAt", label: "Ngày tham gia", type: "date" }
-      );
-    }
-    return baseFields;
-  }, [editingCustomerId]);
+  }, []);
 
   const range = useDashboardTimeRangeStore((state) => state.range);
   const rangeLabel = formatRange(normalizeRange(range));
@@ -228,10 +222,7 @@ export default function CustomersPage() {
     filteredCustomers.length > 0 ? Math.round(totalSpend / filteredCustomers.length) : 0;
   const visibleColumns = columns.filter((column) => column.visible);
   const exportColumns = visibleColumns.filter((column) => column.id !== "actions");
-  const customColumns = useMemo(
-    () => columns.filter((column) => !defaultColumns.some((defaultColumn) => defaultColumn.id === column.id)),
-    [columns],
-  );
+  const customColumns = columns.filter((column) => !defaultColumnIdSet.has(column.id));
   const totalVisibleWidth = visibleColumns.reduce((sum, column) => sum + (column.width || 150), 0);
   const visibleCustomerIds = useMemo(
     () => paginatedCustomers.map((customer) => customer.id),
@@ -245,10 +236,6 @@ export default function CustomersPage() {
     () => customers.filter((customer) => selectedCustomerIds.has(customer.id)),
     [customers, selectedCustomerIds],
   );
-  const activeHistoryCustomer =
-    selectedCustomers.find((customer) => customer.id === activeHistoryCustomerId) ??
-    selectedCustomers[0] ??
-    null;
   const allVisibleSelected =
     visibleCustomerIds.length > 0 && visibleCustomerIds.every((id) => selectedCustomerIds.has(id));
   const allKanbanCustomersSelected =
@@ -561,18 +548,27 @@ export default function CustomersPage() {
     setOpenForm(true);
   };
 
-  const deleteCustomer = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCustomers((prev) => prev.filter((c) => c.id !== id));
+  const requestDeleteCustomer = (customer: Customer, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setDeleteTarget(customer);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteCustomer = () => {
+    if (!deleteTarget) return;
+
+    setCustomers((prev) => prev.filter((c) => c.id !== deleteTarget.id));
     setSelectedCustomerIds((prev) => {
       const next = new Set(prev);
-      next.delete(id);
+      next.delete(deleteTarget.id);
       return next;
     });
-    if (selectedCustomer.id === id) {
-      const remaining = customers.filter((c) => c.id !== id);
+    if (selectedCustomer.id === deleteTarget.id) {
+      const remaining = customers.filter((c) => c.id !== deleteTarget.id);
       if (remaining.length > 0) setSelectedCustomer(remaining[0]);
     }
+    setDeleteConfirmOpen(false);
+    setDeleteTarget(null);
     setPage(1);
   };
 
@@ -701,6 +697,10 @@ export default function CustomersPage() {
       return <TableCell key={column.id} className="text-slate-500">{formatBirthday(customer.birthday)}</TableCell>;
     }
 
+    if (column.id === "createdAt") {
+      return <TableCell key={column.id} className="text-slate-500">{formatBirthday(customer.createdAt)}</TableCell>;
+    }
+
     if (column.id === "note") {
       return (
         <TableCell key={column.id} className="max-w-0 truncate overflow-hidden text-slate-500" title={customer.note || "-"}>
@@ -719,16 +719,14 @@ export default function CustomersPage() {
             onClick={(event) => openEditForm(customer, event)}
             title="Chỉnh sửa"
           >
-            <Pencil className="size-3.5" />
             Sửa
           </button>
           <button
             type="button"
-            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600"
-            onClick={(event) => deleteCustomer(customer.id, event)}
+            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+            onClick={(event) => requestDeleteCustomer(customer, event)}
             title="Xóa"
           >
-            <Trash2 className="size-3.5" />
             Xóa
           </button>
         </div>
@@ -881,15 +879,13 @@ export default function CustomersPage() {
               className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
               onClick={() => openEditForm(customer)}
             >
-              <Pencil className="size-3.5" />
               Sửa
             </button>
             <button
               type="button"
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600"
-              onClick={(event) => deleteCustomer(customer.id, event)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+              onClick={(event) => requestDeleteCustomer(customer, event)}
             >
-              <Trash2 className="size-3.5" />
               Xóa
             </button>
           </div>
@@ -920,16 +916,13 @@ export default function CustomersPage() {
             onTableResizeModeChange={setTableResizeMode}
             selectedCount={selectedCustomerIds.size}
             onOpenAddColumn={() => setOpenAddColumn(true)}
-            onOpenHistory={() => {
-              setActiveHistoryCustomerId(selectedCustomers[0]?.id ?? null);
-              setOpenHistory(true);
-            }}
             onExport={handleExport}
             defaultExportFileName={getDefaultExportFileName()}
             onCreateClick={openCreateForm}
             createLabel="Thêm khách"
             defaultColumnIds={defaultColumns.map((c) => c.id)}
             searchPlaceholder="Tìm tên, SĐT, địa chỉ..."
+            showHistoryButton={false}
           />
           <FilterBar
             rangeLabel={rangeLabel}
@@ -1008,9 +1001,13 @@ export default function CustomersPage() {
         title={editingCustomerId ? "Chỉnh sửa thông tin khách hàng" : "Thêm khách hàng mới"}
         fields={customerFormFields}
         form={form}
-        onFormChange={(newForm) => setForm(newForm as any)}
+        onFormChange={(newForm) => setForm({ ...emptyForm, ...newForm })}
         onSave={saveCustomer}
         customColumns={customColumns}
+        customColumnsBeforeFieldId="createdAt"
+        gridClassName="grid gap-4 md:grid-cols-2"
+        showCloseButton={false}
+        showCloseButtonAtBottom
       />
 
       <AddColumnDialog
@@ -1021,88 +1018,36 @@ export default function CustomersPage() {
         onAddColumn={addCustomColumn}
       />
 
-      <HistoryModal
-        open={openHistory}
-        onClose={() => setOpenHistory(false)}
-        title="Lịch sử khách hàng"
-        items={selectedCustomers}
-        activeItemId={activeHistoryCustomerId}
-        onActiveItemChange={setActiveHistoryCustomerId}
-        itemLabel="khách"
-        maxWidthClass="max-w-4xl"
-        renderSidebarItem={(customer, active) => (
-          <div className="flex min-w-0 items-center gap-2">
-            <Image
-              src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
-              alt={customer.name}
-              width={28}
-              height={28}
-              className="size-7 shrink-0 rounded-full object-cover"
-            />
-            <span className="min-w-0">
-              <span className="block truncate text-xs font-semibold">{customer.name}</span>
-              <span className="block truncate text-[11px] text-slate-400">{customer.id} · {customer.rank}</span>
-            </span>
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent showCloseButton={false} className="rounded-xl border border-slate-200 bg-white p-6 shadow-xl sm:max-w-[400px]">
+          <DialogHeader className="border-b border-slate-100 pb-3">
+            <DialogTitle className="text-base font-semibold text-slate-900">Xác nhận xóa</DialogTitle>
+          </DialogHeader>
+          <div className="py-5 text-sm leading-6 text-slate-600">
+            Bạn có chắc chắn muốn xóa khách hàng {deleteTarget ? `"${deleteTarget.name}"` : "này"} không? Hành động này không thể hoàn tác.
           </div>
-        )}
-        renderDetail={(customer) => (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <p className="font-semibold text-slate-950">{customer.name}</p>
-                  <p className="mt-1 text-xs text-slate-500">{customer.phone} · {customer.email}</p>
-                  <p className="mt-2 text-xs text-slate-400">{customer.address}</p>
-                </div>
-                <span
-                  className="inline-flex w-fit items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium"
-                  style={{
-                    color: rankColor[customer.rank]?.text || "#475569",
-                    backgroundColor: rankColor[customer.rank]?.bg || "rgba(71,85,105,0.08)",
-                  }}
-                >
-                  <span className="size-1.5 rounded-full" style={{ backgroundColor: rankColor[customer.rank]?.text || "#475569" }} />
-                  {customer.rank}
-                </span>
-              </div>
-            </div>
+          <DialogFooter className="flex flex-row items-center justify-end gap-2 border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              className="inline-flex h-9 w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                setDeleteTarget(null);
+              }}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-9 w-full items-center justify-center rounded-lg bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
+              onClick={confirmDeleteCustomer}
+            >
+              Xác nhận xóa
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-            {[
-              {
-                title: "Tạo hồ sơ khách hàng",
-                detail: `Ngày tham gia ${customer.createdAt || "Chưa có"}`,
-                time: customer.createdAt || "Chưa có",
-              },
-              {
-                title: "Cập nhật tích lũy",
-                detail: `${customer.points.toLocaleString("vi-VN")} điểm · ${customer.totalOrders} đơn`,
-                time: "Gần nhất",
-              },
-              {
-                title: "Ghi chú chăm sóc",
-                detail: customer.note || "Không có ghi chú đặc biệt",
-                time: "CRM",
-              },
-            ].map((item, index) => (
-              <div key={item.title} className="relative border-l border-slate-200 pl-5">
-                <span className="absolute -left-[5px] top-1.5 size-2.5 rounded-full bg-slate-900 ring-4 ring-white" />
-                <div className="rounded-lg border border-slate-200 bg-white p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-                    <span className="text-xs text-slate-400">{item.time}</span>
-                  </div>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">{item.detail}</p>
-                  {index === 1 && (
-                    <p className="mt-2 text-xs font-medium text-slate-900">
-                      Tổng chi tiêu {customer.totalSpend.toLocaleString("vi-VN")}đ
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      />
     </PageShell>
   );
 }

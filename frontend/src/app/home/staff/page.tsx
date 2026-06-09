@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Users, Clock, Package, TrendingUp, Pencil } from "lucide-react";
+import { useMemo, useState, type DragEvent } from "react";
+import { Users, Package, TrendingUp, CircleDollarSign } from "lucide-react";
+import Image from "next/image";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { TableCell } from "@/components/ui/table";
 import { PageShell, ViewModeTabs } from "../_components/dashboard-primitives";
 import { MetricCard } from "../_components/metric-card";
@@ -12,13 +14,12 @@ import { FormDialog, type FormField } from "../_components/form-dialog";
 import { AddColumnDialog } from "../_components/add-column-dialog";
 import { KanbanView } from "../_components/kanban-view";
 import { ListView } from "../_components/list-view";
-import { HistoryModal } from "../_components/history-modal";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 
 type StaffStatus = "Hoạt động" | "Nghỉ phép" | "Tạm nghỉ";
 type SupplyStatus = "Ổn định" | "Sắp hết" | "Cần mua";
-type Tab = "Nhân viên" | "Ca làm" | "Kho vật tư";
+type Tab = "Nhân viên" | "Kho vật tư";
 
 type Staff = {
   id: string;
@@ -33,16 +34,6 @@ type Staff = {
   createdAt?: string;
   updatedAt?: string;
   [key: string]: any;
-};
-
-type Shift = {
-  id: string;
-  day: string;
-  morning: string;
-  afternoon: string;
-  evening: string;
-  workload: string;
-  status: "Đủ người" | "Thiếu người";
 };
 
 type Supply = {
@@ -74,16 +65,6 @@ const defaultStaffColumns = [
   { id: "actions", label: "Thao tác", width: 108, visible: true },
 ];
 
-const defaultShiftColumns = [
-  { id: "id", label: "Mã ca", width: 116, visible: true },
-  { id: "day", label: "Ngày", width: 104, visible: true },
-  { id: "morning", label: "Ca sáng", width: 190, visible: true },
-  { id: "afternoon", label: "Ca chiều", width: 190, visible: true },
-  { id: "evening", label: "Ca tối", width: 190, visible: true },
-  { id: "workload", label: "Tải việc", width: 160, visible: true },
-  { id: "status", label: "Trạng thái", width: 112, visible: true },
-];
-
 const defaultSupplyColumns = [
   { id: "id", label: "Mã VT", width: 104, visible: true },
   { id: "name", label: "Vật tư", width: 156, visible: true },
@@ -107,20 +88,12 @@ const seedStaff: Staff[] = [
   { id: "NV-106", name: "Vũ Thanh Mai", role: "Kho", shift: "Sáng", phone: "0909555666", productivity: "16 phiếu", rating: "4.5/5", status: "Tạm nghỉ", note: "Đào tạo lại quy trình nhập kho", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
 ];
 
-const seedShifts: Shift[] = [
-  { id: "CA-201", day: "Thứ 2", morning: "A, D, Mai", afternoon: "B, Tâm", evening: "C", workload: "128 đơn dự kiến", status: "Đủ người" },
-  { id: "CA-202", day: "Thứ 3", morning: "A, Mai", afternoon: "B, D", evening: "C, Tâm", workload: "112 đơn dự kiến", status: "Đủ người" },
-  { id: "CA-203", day: "Thứ 4", morning: "A, B", afternoon: "D, Tâm", evening: "C", workload: "136 đơn dự kiến", status: "Thiếu người" },
-  { id: "CA-204", day: "Thứ 5", morning: "D, Mai", afternoon: "A, B", evening: "C", workload: "104 đơn dự kiến", status: "Đủ người" },
-  { id: "CA-205", day: "Thứ 6", morning: "A, Tâm", afternoon: "B, Mai", evening: "C, D", workload: "154 đơn dự kiến", status: "Thiếu người" },
-];
-
 const seedSupplies: Supply[] = [
-  { id: "VT-301", name: "Hóa chất giặt", category: "Hóa chất", stock: "25 kg", threshold: "10 kg", supplier: "EcoWash", lastImport: "12/05/2026", cost: 1800000, status: "Ổn định", note: "Dùng cho máy giặt 01, 02", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "VT-302", name: "Nước xả", category: "Hóa chất", stock: "6 lít", threshold: "8 lít", supplier: "CleanPro", lastImport: "16/05/2026", cost: 720000, status: "Sắp hết", note: "Cần mua trong 2 ngày", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "VT-303", name: "Túi đựng", category: "Bao bì", stock: "120 cái", threshold: "50 cái", supplier: "Kho tổng", lastImport: "15/05/2026", cost: 460000, status: "Ổn định", note: "Túi size M/L", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "VT-304", name: "Móc áo", category: "Phụ kiện", stock: "75 cái", threshold: "100 cái", supplier: "Nhựa Minh An", lastImport: "10/05/2026", cost: 1250000, status: "Cần mua", note: "Ưu tiên móc áo vest", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "VT-305", name: "Tem mã đơn", category: "Bao bì", stock: "3 cuộn", threshold: "2 cuộn", supplier: "In nhanh Q1", lastImport: "08/05/2026", cost: 360000, status: "Ổn định", note: "Dùng cho tiếp nhận", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
+  { id: "VT-301", name: "Hóa chất giặt", category: "Hóa chất", stock: "25 kg", threshold: "10 kg", supplier: "EcoWash", lastImport: "2026-05-12", cost: 1800000, status: "Ổn định", note: "Dùng cho máy giặt 01, 02", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
+  { id: "VT-302", name: "Nước xả", category: "Hóa chất", stock: "6 lít", threshold: "8 lít", supplier: "CleanPro", lastImport: "2026-05-16", cost: 720000, status: "Sắp hết", note: "Cần mua trong 2 ngày", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
+  { id: "VT-303", name: "Túi đựng", category: "Bao bì", stock: "120 cái", threshold: "50 cái", supplier: "Kho tổng", lastImport: "2026-05-15", cost: 460000, status: "Ổn định", note: "Túi size M/L", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
+  { id: "VT-304", name: "Móc áo", category: "Phụ kiện", stock: "75 cái", threshold: "100 cái", supplier: "Nhựa Minh An", lastImport: "2026-05-10", cost: 1250000, status: "Cần mua", note: "Ưu tiên móc áo vest", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
+  { id: "VT-305", name: "Tem mã đơn", category: "Bao bì", stock: "3 cuộn", threshold: "2 cuộn", supplier: "In nhanh Q1", lastImport: "2026-05-08", cost: 360000, status: "Ổn định", note: "Dùng cho tiếp nhận", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
 ];
 
 const emptyStaffForm = {
@@ -161,24 +134,32 @@ function formatCurrency(value: number) {
   return `${value.toLocaleString("vi-VN")}đ`;
 }
 
+function formatReadableDate(dateStr?: string) {
+  if (!dateStr) return "-";
+  if (dateStr.includes("/")) return dateStr;
+  const [y, m, d] = dateStr.split("-");
+  if (!y || !m || !d) return dateStr;
+  return `${d}/${m}/${y}`;
+}
+
 const staffFormFields: FormField[] = [
   { id: "name", label: "Họ tên", type: "text", placeholder: "Tên nhân viên" },
   { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
-  { id: "role", label: "Vai trò", type: "text", placeholder: "Giặt / Gấp/Là / Giao nhận..." },
-  { id: "shift", label: "Ca chính", type: "text", placeholder: "Sáng / Chiều / Tối" },
-  { id: "productivity", label: "Năng suất", type: "text", placeholder: "32 đơn" },
-  { id: "rating", label: "Đánh giá", type: "text", placeholder: "4.8/5" },
+  { id: "role", label: "Vai trò", type: "select", options: ["Giặt", "Gấp/Là", "Giao nhận", "Thu ngân", "Kiểm đồ", "Kho"], placeholder: "Chọn vai trò..." },
+  { id: "shift", label: "Ca chính", type: "select", options: ["Sáng", "Chiều", "Tối"], placeholder: "Chọn ca chính..." },
+  { id: "productivity", label: "Năng suất", type: "text", placeholder: "Chưa có đơn", readOnly: true },
+  { id: "rating", label: "Đánh giá", type: "text", placeholder: "Chưa có đánh giá", readOnly: true },
   { id: "status", label: "Trạng thái", type: "select", options: ["Hoạt động", "Nghỉ phép", "Tạm nghỉ"] },
   { id: "note", label: "Ghi chú vận hành", type: "textarea", placeholder: "Khu vực phụ trách, kỹ năng, lịch nghỉ..." },
 ];
 
 const supplyFormFields: FormField[] = [
   { id: "name", label: "Tên vật tư", type: "text", placeholder: "Nước xả" },
-  { id: "category", label: "Nhóm", type: "text", placeholder: "Hóa chất / Bao bì / Phụ kiện" },
+  { id: "category", label: "Nhóm", type: "select", options: ["Hóa chất", "Bao bì", "Phụ kiện", "Thiết bị"], placeholder: "Chọn nhóm vật tư..." },
   { id: "stock", label: "Tồn kho", type: "text", placeholder: "20 lít" },
   { id: "threshold", label: "Ngưỡng cảnh báo", type: "text", placeholder: "8 lít" },
   { id: "supplier", label: "Nhà cung cấp", type: "text", placeholder: "EcoWash / CleanPro..." },
-  { id: "lastImport", label: "Ngày nhập", type: "text", placeholder: "31/05/2026" },
+  { id: "lastImport", label: "Ngày nhập", type: "date" },
   { id: "cost", label: "Chi phí nhập", type: "number" },
   { id: "status", label: "Cảnh báo", type: "select", options: ["Ổn định", "Sắp hết", "Cần mua"] },
   { id: "note", label: "Ghi chú", type: "textarea", placeholder: "Kế hoạch mua, khu vực lưu kho..." },
@@ -196,6 +177,9 @@ export default function StaffOperationsPage() {
   const [selectedSupplyIds, setSelectedSupplyIds] = useState<Set<string>>(new Set());
   const [openHistory, setOpenHistory] = useState(false);
   const [activeHistoryItemId, setActiveHistoryItemId] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingStaffId, setDeletingStaffId] = useState<string | null>(null);
+  const [deletingSupplyId, setDeletingSupplyId] = useState<string | null>(null);
 
   const [draggedStaffId, setDraggedStaffId] = useState<string | null>(null);
   const [dragOverStaffStatus, setDragOverStaffStatus] = useState<string | null>(null);
@@ -209,11 +193,13 @@ export default function StaffOperationsPage() {
   const [pageSize, setPageSize] = useState(10);
 
   const [columnsStaff, setColumnsStaff] = useState(defaultStaffColumns);
-  const [columnsShift, setColumnsShift] = useState(defaultShiftColumns);
   const [columnsSupply, setColumnsSupply] = useState(defaultSupplyColumns);
 
-  const activeColumns = tab === "Nhân viên" ? columnsStaff : tab === "Ca làm" ? columnsShift : columnsSupply;
-  const setColumnsActive = tab === "Nhân viên" ? setColumnsStaff : tab === "Ca làm" ? setColumnsShift : setColumnsSupply;
+  const activeColumns = tab === "Nhân viên" ? columnsStaff : columnsSupply;
+  const setColumnsActive = tab === "Nhân viên" ? setColumnsStaff : setColumnsSupply;
+
+  const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
   const [tableResizeMode, setTableResizeMode] = useState<"fit" | "custom">("fit");
   const [openStaffForm, setOpenStaffForm] = useState(false);
@@ -239,10 +225,6 @@ export default function StaffOperationsPage() {
     });
   }, [query, selectedStaffStatus, staff]);
 
-  const filteredShifts = useMemo(() => {
-    return seedShifts.filter((item) => `${item.day} ${item.morning} ${item.afternoon} ${item.evening} ${item.workload}`.toLowerCase().includes(query.toLowerCase()));
-  }, [query]);
-
   const filteredSupplies = useMemo(() => {
     return supplies.filter((item) => {
       const source = `${item.id} ${item.name} ${item.category} ${item.supplier} ${item.note}`;
@@ -252,13 +234,12 @@ export default function StaffOperationsPage() {
     });
   }, [query, selectedSupplyStatus, supplies]);
 
-  const activeRows = tab === "Nhân viên" ? filteredStaff : tab === "Ca làm" ? filteredShifts : filteredSupplies;
+  const activeRows = tab === "Nhân viên" ? filteredStaff : filteredSupplies;
   const pageCount = Math.ceil(activeRows.length / pageSize);
   const paginatedStaff = filteredStaff.slice((page - 1) * pageSize, page * pageSize);
-  const paginatedShifts = filteredShifts.slice((page - 1) * pageSize, page * pageSize);
   const paginatedSupplies = filteredSupplies.slice((page - 1) * pageSize, page * pageSize);
 
-  const activePaginatedRows = tab === "Nhân viên" ? paginatedStaff : tab === "Ca làm" ? paginatedShifts : paginatedSupplies;
+  const activePaginatedRows = tab === "Nhân viên" ? paginatedStaff : paginatedSupplies;
   const totalVisibleWidth = activeColumns.filter(c => c.visible).reduce((sum, column) => sum + (column.width || 150), 0);
 
   const visibleStaffIds = useMemo(() => paginatedStaff.map((s) => s.id), [paginatedStaff]);
@@ -441,8 +422,83 @@ export default function StaffOperationsPage() {
     setOpenSupplyForm(false);
   };
 
+  const startDeleteStaff = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeletingStaffId(id);
+    setDeletingSupplyId(null);
+    setDeleteConfirmOpen(true);
+  };
+
+  const startDeleteSupply = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeletingSupplyId(id);
+    setDeletingStaffId(null);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (deletingStaffId) {
+      setStaff((prev) => prev.filter((item) => item.id !== deletingStaffId));
+      setSelectedStaffIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deletingStaffId);
+        return next;
+      });
+      setDeletingStaffId(null);
+    } else if (deletingSupplyId) {
+      setSupplies((prev) => prev.filter((item) => item.id !== deletingSupplyId));
+      setSelectedSupplyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deletingSupplyId);
+        return next;
+      });
+      setDeletingSupplyId(null);
+    }
+    setDeleteConfirmOpen(false);
+  };
+
+  const handleDragStart = (event: DragEvent<HTMLTableCellElement>, id: string) => {
+    setDraggedColumnId(id);
+    event.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLTableCellElement>, id: string) => {
+    event.preventDefault();
+    if (id !== draggedColumnId) setDragOverColumnId(id);
+  };
+
+  const handleDragLeave = () => setDragOverColumnId(null);
+
+  const handleDrop = (event: DragEvent<HTMLTableCellElement>, id: string) => {
+    event.preventDefault();
+    if (!draggedColumnId || draggedColumnId === id) {
+      setDragOverColumnId(null);
+      return;
+    }
+
+    setColumnsActive((prev: any) => {
+      const draggedIndex = prev.findIndex((column: any) => column.id === draggedColumnId);
+      const dropIndex = prev.findIndex((column: any) => column.id === id);
+      if (draggedIndex === -1 || dropIndex === -1) return prev;
+
+      const next = [...prev];
+      const temp = next[draggedIndex];
+      next[draggedIndex] = next[dropIndex];
+      next[dropIndex] = temp;
+      return next;
+    });
+
+    setDraggedColumnId(null);
+    setDragOverColumnId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedColumnId(null);
+    setDragOverColumnId(null);
+  };
+
   const getDefaultExportFileName = () => {
-    const scope = tab === "Nhân viên" ? "nhan-vien" : tab === "Ca làm" ? "ca-lam" : "kho-vat-tu";
+    const scope = tab === "Nhân viên" ? "nhan-vien" : "kho-vat-tu";
     return `${scope}-${new Date().toISOString().slice(0, 10)}`;
   };
 
@@ -565,7 +621,23 @@ export default function StaffOperationsPage() {
         </div>
       </TableCell>
     );
-    if (column.id === "name") return <TableCell key={column.id} className="font-medium text-slate-900">{item.name}</TableCell>;
+    if (column.id === "name") {
+      const avatarUrl = item.avatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif";
+      return (
+        <TableCell key={column.id} className="font-medium text-slate-900">
+          <div className="flex items-center gap-2.5">
+            <Image
+              src={avatarUrl}
+              alt={item.name}
+              width={24}
+              height={24}
+              className="size-6 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
+            />
+            <span className="truncate">{item.name}</span>
+          </div>
+        </TableCell>
+      );
+    }
     if (column.id === "phone") {
       return (
         <TableCell key={column.id}>
@@ -590,31 +662,27 @@ export default function StaffOperationsPage() {
     if (column.id === "actions") {
       return (
         <TableCell key={column.id} className="px-4">
-          <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 hover:bg-slate-50" onClick={() => openEditStaff(item)}>
-            <Pencil className="size-3.5" />
-            Sửa
-          </button>
+          <div className="flex items-center justify-start gap-1.5">
+            <button
+              type="button"
+              className="inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+              onClick={() => openEditStaff(item)}
+            >
+              Sửa
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600 hover:border-red-100"
+              onClick={(e) => startDeleteStaff(item.id, e)}
+            >
+              Xóa
+            </button>
+          </div>
         </TableCell>
       );
     }
     const customValue = item[column.id];
     return <TableCell key={column.id} className={customValue ? "text-slate-600" : "text-slate-400 italic"}>{customValue || "Chưa có"}</TableCell>;
-  };
-
-  const renderShiftCell = (item: Shift, column: any) => {
-    if (column.id === "id") return <TableCell key={column.id} className="pl-4 font-medium text-slate-900">{item.id}</TableCell>;
-    if (column.id === "status") {
-      const color = statusColor[item.status];
-      return (
-        <TableCell key={column.id}>
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium" style={{ color: color.text, backgroundColor: color.bg }}>
-            <span className="size-1.5 rounded-full" style={{ backgroundColor: color.text }} />
-            {item.status}
-          </span>
-        </TableCell>
-      );
-    }
-    return <TableCell key={column.id}>{String(item[column.id as keyof Shift] ?? "")}</TableCell>;
   };
 
   const renderSupplyCell = (item: Supply, column: any) => {
@@ -634,6 +702,7 @@ export default function StaffOperationsPage() {
     );
     if (column.id === "name") return <TableCell key={column.id} className="font-medium text-slate-900">{item.name}</TableCell>;
     if (column.id === "cost") return <TableCell key={column.id} className="font-medium text-slate-900">{formatCurrency(item.cost)}</TableCell>;
+    if (column.id === "lastImport") return <TableCell key={column.id} className="text-slate-600">{formatReadableDate(item.lastImport)}</TableCell>;
     if (column.id === "status") {
       const color = statusColor[item.status];
       return (
@@ -649,10 +718,22 @@ export default function StaffOperationsPage() {
     if (column.id === "actions") {
       return (
         <TableCell key={column.id} className="px-4">
-          <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 hover:bg-slate-50" onClick={() => openEditSupply(item)}>
-            <Pencil className="size-3.5" />
-            Sửa
-          </button>
+          <div className="flex items-center justify-start gap-1.5">
+            <button
+              type="button"
+              className="inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+              onClick={() => openEditSupply(item)}
+            >
+              Sửa
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600 hover:border-red-100"
+              onClick={(e) => startDeleteSupply(item.id, e)}
+            >
+              Xóa
+            </button>
+          </div>
         </TableCell>
       );
     }
@@ -698,6 +779,13 @@ export default function StaffOperationsPage() {
               onChange={() => toggleStaffOne(item.id)}
               className={`shrink-0 ${checkboxClass}`}
             />
+            <Image
+              src={item.avatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"}
+              alt={item.name}
+              width={32}
+              height={32}
+              className="size-8 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
+            />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-slate-700">{item.name}</p>
               <p className="truncate text-[11px] text-slate-400">{item.phone}</p>
@@ -708,13 +796,20 @@ export default function StaffOperationsPage() {
         <p className="mt-2 text-xs text-slate-500 font-medium">Vai trò: {item.role} · Ca: {item.shift}</p>
         <p className="mt-1 text-xs text-slate-500">Năng suất: {item.productivity} · Đánh giá: {item.rating}</p>
         <p className="mt-1 line-clamp-2 text-xs text-slate-400">{item.note}</p>
-        <div className="mt-3 flex justify-end border-t border-slate-100 pt-2">
+        <div className="mt-3 flex justify-end gap-1.5 border-t border-slate-100 pt-2">
           <button
             type="button"
             onClick={() => openEditStaff(item)}
             className="inline-flex h-6 items-center rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200"
           >
             Chi tiết
+          </button>
+          <button
+            type="button"
+            onClick={(e) => startDeleteStaff(item.id, e)}
+            className="inline-flex h-6 items-center rounded-md bg-red-50 px-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100/70"
+          >
+            Xóa
           </button>
         </div>
       </div>
@@ -757,13 +852,20 @@ export default function StaffOperationsPage() {
         <p className="mt-2 text-xs text-slate-500 font-medium">Tồn kho: {item.stock} / Ngưỡng: {item.threshold}</p>
         <p className="mt-1 text-xs text-slate-500">Nhà cung cấp: {item.supplier} · Chi phí: {formatCurrency(item.cost)}</p>
         <p className="mt-1 line-clamp-2 text-xs text-slate-400">{item.note}</p>
-        <div className="mt-3 flex justify-end border-t border-slate-100 pt-2">
+        <div className="mt-3 flex justify-end gap-1.5 border-t border-slate-100 pt-2">
           <button
             type="button"
             onClick={() => openEditSupply(item)}
             className="inline-flex h-6 items-center rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200"
           >
             Chi tiết
+          </button>
+          <button
+            type="button"
+            onClick={(e) => startDeleteSupply(item.id, e)}
+            className="inline-flex h-6 items-center rounded-md bg-red-50 px-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100/70"
+          >
+            Xóa
           </button>
         </div>
       </div>
@@ -784,6 +886,13 @@ export default function StaffOperationsPage() {
             />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
+                <Image
+                  src={item.avatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"}
+                  alt={item.name}
+                  width={24}
+                  height={24}
+                  className="size-6 rounded-full object-cover ring-1 ring-slate-100 shadow-sm"
+                />
                 <p className="font-semibold text-slate-950">{item.name}</p>
                 <span className="text-xs font-medium text-slate-400">{item.id}</span>
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{item.role}</span>
@@ -811,11 +920,17 @@ export default function StaffOperationsPage() {
           <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
             <button
               type="button"
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+              className="inline-flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
               onClick={() => openEditStaff(item)}
             >
-              <Pencil className="size-3.5" />
               Sửa
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600 hover:border-red-100"
+              onClick={(e) => startDeleteStaff(item.id, e)}
+            >
+              Xóa
             </button>
           </div>
         </div>
@@ -854,7 +969,7 @@ export default function StaffOperationsPage() {
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                 <span>Tồn kho: {item.stock} (Ngưỡng: {item.threshold})</span>
                 <span>Nhà cung cấp: {item.supplier}</span>
-                <span>Ngày nhập gần nhất: {item.lastImport}</span>
+                <span>Ngày nhập gần nhất: {formatReadableDate(item.lastImport)}</span>
                 <span>Chi phí: {formatCurrency(item.cost)}</span>
               </div>
               <p className="mt-2 text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">{item.note}</p>
@@ -864,11 +979,17 @@ export default function StaffOperationsPage() {
           <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
             <button
               type="button"
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+              className="inline-flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
               onClick={() => openEditSupply(item)}
             >
-              <Pencil className="size-3.5" />
               Sửa
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600 hover:border-red-100"
+              onClick={(e) => startDeleteSupply(item.id, e)}
+            >
+              Xóa
             </button>
           </div>
         </div>
@@ -878,7 +999,6 @@ export default function StaffOperationsPage() {
 
   const renderCell = (row: any, column: any) => {
     if (tab === "Nhân viên") return renderStaffCell(row, column);
-    if (tab === "Ca làm") return renderShiftCell(row, column);
     return renderSupplyCell(row, column);
   };
 
@@ -886,7 +1006,6 @@ export default function StaffOperationsPage() {
     <div className="flex flex-wrap items-center gap-1">
       {([
         ["Nhân viên", Users],
-        ["Ca làm", Clock],
         ["Kho vật tư", Package],
       ] as const).map(([item, Icon]) => (
         <button
@@ -907,12 +1026,8 @@ export default function StaffOperationsPage() {
           {item}
         </button>
       ))}
-      {(tab === "Nhân viên" || tab === "Kho vật tư") && (
-        <>
-          <span className="mx-2 hidden h-4 w-px bg-slate-200 sm:block" />
-          <ViewModeTabs value={viewMode} onChange={setViewMode} />
-        </>
-      )}
+      <span className="mx-2 hidden h-4 w-px bg-slate-200 sm:block" />
+      <ViewModeTabs value={viewMode} onChange={setViewMode} />
     </div>
   );
 
@@ -942,9 +1057,9 @@ export default function StaffOperationsPage() {
     <PageShell fullHeight>
       <div className="grid shrink-0 gap-3 md:grid-cols-4">
         <MetricCard title="Nhân viên hoạt động" value={`${staff.filter((item) => item.status === "Hoạt động").length}`} hint={`${staff.length} hồ sơ nội bộ`} icon={Users} color="#2563eb" />
-        <MetricCard title="Ca hôm nay" value="3" hint="Sáng, chiều, tối" icon={Clock} color="#7c3aed" />
         <MetricCard title="Năng suất" value="128 đơn" hint={`Theo ${rangeLabel}`} icon={TrendingUp} color="#059669" />
-        <MetricCard title="Vật tư cảnh báo" value={`${lowStock}`} hint={`Đã nhập ${formatCurrency(purchaseCost)}`} icon={Package} color="#dc2626" />
+        <MetricCard title="Vật tư cảnh báo" value={`${lowStock}`} hint="Sắp hết hoặc cần mua" icon={Package} color="#dc2626" />
+        <MetricCard title="Chi phí nhập vật tư" value={formatCurrency(purchaseCost)} hint="Tổng ngân sách đã chi" icon={CircleDollarSign} color="#d97706" />
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
@@ -953,35 +1068,19 @@ export default function StaffOperationsPage() {
           query={query}
           onQueryChange={(q) => { setQuery(q); setPage(1); }}
           columns={activeColumns}
-          onColumnsChange={setColumnsActive}
+          onColumnsChange={setColumnsActive as any}
           tableResizeMode={tableResizeMode}
           onTableResizeModeChange={setTableResizeMode}
-          selectedCount={
-            tab === "Nhân viên"
-              ? selectedStaffIds.size
-              : tab === "Kho vật tư"
-              ? selectedSupplyIds.size
-              : 0
-          }
+          selectedCount={tab === "Nhân viên" ? selectedStaffIds.size : selectedSupplyIds.size}
           onOpenAddColumn={() => setOpenAddColumn(true)}
-          onOpenHistory={() => {
-            if (tab === "Nhân viên" && selectedStaffIds.size > 0) {
-              const firstId = Array.from(selectedStaffIds)[0];
-              setActiveHistoryItemId(firstId);
-              setOpenHistory(true);
-            } else if (tab === "Kho vật tư" && selectedSupplyIds.size > 0) {
-              const firstId = Array.from(selectedSupplyIds)[0];
-              setActiveHistoryItemId(firstId);
-              setOpenHistory(true);
-            }
-          }}
+          onOpenHistory={() => {}}
           onExport={handleExport}
           defaultExportFileName={getDefaultExportFileName()}
           onCreateClick={tab === "Kho vật tư" ? openCreateSupply : openCreateStaff}
           createLabel={tab === "Kho vật tư" ? "Thêm vật tư" : "Thêm nhân viên"}
-          defaultColumnIds={(tab === "Nhân viên" ? defaultStaffColumns : tab === "Ca làm" ? defaultShiftColumns : defaultSupplyColumns).map(c => c.id)}
+          defaultColumnIds={(tab === "Nhân viên" ? defaultStaffColumns : defaultSupplyColumns).map(c => c.id)}
           searchPlaceholder={tab === "Kho vật tư" ? "Tìm vật tư, nhà cung cấp..." : "Tìm nhân viên, ca, vai trò..."}
-          showHistoryButton={tab === "Nhân viên" || tab === "Kho vật tư"}
+          showHistoryButton={false}
         />
 
         <FilterBar
@@ -994,43 +1093,33 @@ export default function StaffOperationsPage() {
           }}
           filterOptions={filterOptions}
           filterLabel="Lọc trạng thái"
-          showSelectionBar={(tab === "Nhân viên" || tab === "Kho vật tư") && (viewMode === "Bảng" || viewMode === "Bảng kéo" || viewMode === "Danh sách")}
+          showSelectionBar={viewMode === "Bảng" || viewMode === "Bảng kéo" || viewMode === "Danh sách"}
           allSelected={
             tab === "Nhân viên"
               ? (viewMode === "Bảng kéo" ? allKanbanStaffSelected : allVisibleStaffSelected)
-              : tab === "Kho vật tư"
-              ? (viewMode === "Bảng kéo" ? allKanbanSuppliesSelected : allVisibleSuppliesSelected)
-              : false
+              : (viewMode === "Bảng kéo" ? allKanbanSuppliesSelected : allVisibleSuppliesSelected)
           }
           disabled={
             tab === "Nhân viên"
               ? (viewMode === "Bảng kéo" ? kanbanStaffIds.length === 0 : visibleStaffIds.length === 0)
-              : tab === "Kho vật tư"
-              ? (viewMode === "Bảng kéo" ? kanbanSupplyIds.length === 0 : visibleSupplyIds.length === 0)
-              : true
+              : (viewMode === "Bảng kéo" ? kanbanSupplyIds.length === 0 : visibleSupplyIds.length === 0)
           }
           selectedCount={
             tab === "Nhân viên"
               ? (viewMode === "Bảng kéo" ? selectedKanbanStaffCount : selectedVisibleStaffCount)
-              : tab === "Kho vật tư"
-              ? (viewMode === "Bảng kéo" ? selectedKanbanSupplyCount : selectedVisibleSupplyCount)
-              : 0
+              : (viewMode === "Bảng kéo" ? selectedKanbanSupplyCount : selectedVisibleSupplyCount)
           }
           totalCount={
             tab === "Nhân viên"
               ? (viewMode === "Bảng kéo" ? kanbanStaffIds.length : visibleStaffIds.length)
-              : tab === "Kho vật tư"
-              ? (viewMode === "Bảng kéo" ? kanbanSupplyIds.length : visibleSupplyIds.length)
-              : 0
+              : (viewMode === "Bảng kéo" ? kanbanSupplyIds.length : visibleSupplyIds.length)
           }
-          itemLabel={tab === "Nhân viên" ? "nhân viên" : tab === "Kho vật tư" ? "vật tư" : "mục"}
+          itemLabel={tab === "Nhân viên" ? "nhân viên" : "vật tư"}
           checkboxClass={checkboxClass}
           onToggleAll={
             tab === "Nhân viên"
               ? (viewMode === "Bảng kéo" ? toggleKanbanStaff : toggleVisibleStaff)
-              : tab === "Kho vật tư"
-              ? (viewMode === "Bảng kéo" ? toggleKanbanSupplies : toggleVisibleSupplies)
-              : () => {}
+              : (viewMode === "Bảng kéo" ? toggleKanbanSupplies : toggleVisibleSupplies)
           }
         />
 
@@ -1086,12 +1175,21 @@ export default function StaffOperationsPage() {
           )
         ) : (
           <TableView
-            columns={activeColumns.filter(c => c.visible)}
+            columns={activeColumns}
+            onColumnsChange={setColumnsActive as any}
             rows={activePaginatedRows}
+            columnDrag={{
+              draggedColumnId,
+              dragOverColumnId,
+              onDragStart: handleDragStart,
+              onDragOver: handleDragOver,
+              onDragLeave: handleDragLeave,
+              onDrop: handleDrop,
+              onDragEnd: handleDragEnd,
+            }}
             pageSize={pageSize}
             emptyMessage={
-              tab === "Nhân viên" ? "Không tìm thấy nhân viên phù hợp." :
-              tab === "Ca làm" ? "Không tìm thấy ca làm phù hợp." : "Không tìm thấy vật tư phù hợp."
+              tab === "Nhân viên" ? "Không tìm thấy nhân viên phù hợp." : "Không tìm thấy vật tư phù hợp."
             }
             tableResizeMode={tableResizeMode}
             totalVisibleWidth={totalVisibleWidth}
@@ -1120,6 +1218,8 @@ export default function StaffOperationsPage() {
         onFormChange={setStaffForm}
         onSave={saveStaff}
         customColumns={customColumnsStaff}
+        showCloseButton={false}
+        showCloseButtonAtBottom={true}
       />
 
       <FormDialog
@@ -1131,6 +1231,8 @@ export default function StaffOperationsPage() {
         onFormChange={setSupplyForm}
         onSave={saveSupply}
         customColumns={customColumnsSupply}
+        showCloseButton={false}
+        showCloseButtonAtBottom={true}
       />
 
       <AddColumnDialog
@@ -1141,130 +1243,33 @@ export default function StaffOperationsPage() {
         onAddColumn={addCustomColumn}
       />
 
-      <HistoryModal
-        open={openHistory}
-        onClose={() => {
-          setOpenHistory(false);
-          setActiveHistoryItemId(null);
-        }}
-        items={(tab === "Nhân viên" ? selectedStaff : selectedSupplies) as any}
-        activeItemId={activeHistoryItemId}
-        onActiveItemChange={setActiveHistoryItemId}
-        itemLabel={tab === "Nhân viên" ? "nhân viên" : "vật tư"}
-        renderSidebarItem={(item, active) => (
-          <div className={`rounded-lg p-2.5 transition-colors ${active ? "bg-white shadow-sm ring-1 ring-slate-200/50" : "hover:bg-slate-100/50"}`}>
-            <div className="flex items-start justify-between gap-1.5">
-              <span className="truncate text-xs font-semibold text-slate-900">
-                {tab === "Nhân viên" ? (item as Staff).name : (item as Supply).name}
-              </span>
-              <span className="shrink-0 text-[10px] text-slate-400 font-mono">{item.id}</span>
-            </div>
-            <p className="mt-1 truncate text-[10px] text-slate-500">
-              {tab === "Nhân viên" ? (item as Staff).role : (item as Supply).category}
-            </p>
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent showCloseButton={false} className="sm:max-w-[400px] bg-white rounded-xl border border-slate-200 shadow-xl p-6">
+          <DialogHeader className="pb-3 border-b border-slate-100">
+            <DialogTitle className="text-base font-semibold text-slate-900">Xác nhận xóa</DialogTitle>
+          </DialogHeader>
+          <div className="py-5 text-sm text-slate-600">
+            Bạn có chắc chắn muốn xóa {deletingStaffId ? "nhân viên" : "vật tư"} này không? Hành động này không thể hoàn tác.
           </div>
-        )}
-        title={tab === "Nhân viên" ? "Lịch sử nhân viên" : "Lịch sử vật tư"}
-        renderDetail={(item: any) => {
-          if (tab === "Nhân viên") {
-            const s = item as Staff;
-            return (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b pb-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">{s.name}</h3>
-                    <p className="text-sm text-slate-500">Mã NV: {s.id}</p>
-                  </div>
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold"
-                    style={{ color: statusColor[s.status].text, backgroundColor: statusColor[s.status].bg }}
-                  >
-                    {s.status}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="font-medium text-slate-400">Số điện thoại</p>
-                    <p className="text-slate-900">{s.phone}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-400">Vai trò</p>
-                    <p className="text-slate-900">{s.role}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-400">Ca chính</p>
-                    <p className="text-slate-900">{s.shift}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-400">Năng suất</p>
-                    <p className="text-slate-900">{s.productivity}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-400">Đánh giá</p>
-                    <p className="text-slate-900">{s.rating}</p>
-                  </div>
-                </div>
-                <div className="text-sm">
-                  <p className="font-medium text-slate-400">Ghi chú</p>
-                  <p className="text-slate-900">{s.note}</p>
-                </div>
-                <div className="border-t pt-3 space-y-1 text-xs text-slate-400">
-                  <p>Ngày tạo: {s.createdAt || "Chưa có"}</p>
-                  <p>Ngày sửa đổi cuối: {s.updatedAt || "Chưa có"}</p>
-                </div>
-              </div>
-            );
-          } else {
-            const sup = item as Supply;
-            return (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b pb-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">{sup.name}</h3>
-                    <p className="text-sm text-slate-500">Mã VT: {sup.id}</p>
-                  </div>
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold"
-                    style={{ color: statusColor[sup.status].text, backgroundColor: statusColor[sup.status].bg }}
-                  >
-                    {sup.status}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="font-medium text-slate-400">Nhóm vật tư</p>
-                    <p className="text-slate-900">{sup.category}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-400">Tồn kho / Ngưỡng</p>
-                    <p className="text-slate-900">{sup.stock} / {sup.threshold}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-400">Nhà cung cấp</p>
-                    <p className="text-slate-900">{sup.supplier}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-400">Ngày nhập gần nhất</p>
-                    <p className="text-slate-900">{sup.lastImport}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-400">Chi phí nhập</p>
-                    <p className="text-slate-900">{formatCurrency(sup.cost)}</p>
-                  </div>
-                </div>
-                <div className="text-sm">
-                  <p className="font-medium text-slate-400">Ghi chú</p>
-                  <p className="text-slate-900">{sup.note}</p>
-                </div>
-                <div className="border-t pt-3 space-y-1 text-xs text-slate-400">
-                  <p>Ngày tạo: {sup.createdAt || "Chưa có"}</p>
-                  <p>Ngày sửa đổi cuối: {sup.updatedAt || "Chưa có"}</p>
-                </div>
-              </div>
-            );
-          }
-        }}
-      />
+          <DialogFooter className="flex flex-row items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 w-full sm:w-auto"
+              onClick={() => setDeleteConfirmOpen(false)}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 w-full sm:w-auto"
+              onClick={handleDeleteConfirm}
+            >
+              Xác nhận xóa
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </PageShell>
   );
 

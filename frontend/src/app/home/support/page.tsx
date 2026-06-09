@@ -1,21 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type DragEvent } from "react";
+import Image from "next/image";
 import {
-  CalendarClock,
-  ChevronDown,
-  FileDown,
+  ImagePlus,
   MessageCircle,
-  Pencil,
-  Plus,
-  Search,
-  X,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TableCell } from "@/components/ui/table";
 import { PageShell } from "../_components/dashboard-primitives";
 import { Toolbar } from "../_components/toolbar";
@@ -24,16 +23,13 @@ import { TableView } from "../_components/table-view";
 import { KanbanView, type KanbanColumn } from "../_components/kanban-view";
 import { ListView } from "../_components/list-view";
 import { AddColumnDialog } from "../_components/add-column-dialog";
-import {
-  DashboardDataTable,
-  DashboardSelectionBar,
-  DashboardTableFooter,
-  type DashboardTableColumn,
-} from "@/src/components/common/dashboard-data-table";
+import { FormDialog, type FormField } from "../_components/form-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { type DashboardTableColumn } from "@/src/components/common/dashboard-data-table";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 
-type TicketStatus = "Mới" | "Đang xử lý" | "Đã giải quyết";
+type TicketStatus = "Chưa xử lý" | "Đang xử lý" | "Đã giải quyết";
 type Priority = "Cao" | "Trung bình" | "Thấp";
 
 type Ticket = {
@@ -44,9 +40,22 @@ type Ticket = {
   orderId: string;
   priority: Priority;
   owner: string;
+  ownerAvatar?: string;
   status: TicketStatus;
+  washDate: string;
   createdAt: string;
   note: string;
+};
+
+type SupportMessage = {
+  id: string;
+  ticketId: string;
+  sender: "customer" | "staff";
+  senderName: string;
+  avatar?: string;
+  content: string;
+  imageUrl?: string;
+  createdAt: string;
 };
 
 const initialPageSize = 10;
@@ -59,17 +68,28 @@ const defaultColumns: DashboardTableColumn[] = [
   { id: "priority", label: "Ưu tiên", width: 96, visible: true },
   { id: "owner", label: "Phụ trách", width: 104, visible: true },
   { id: "status", label: "Trạng thái", width: 116, visible: true },
+  { id: "washDate", label: "Ngày giặt", width: 112, visible: true },
   { id: "createdAt", label: "Ngày tạo", width: 104, visible: true },
   { id: "note", label: "Nội dung", width: 240, visible: true },
-  { id: "actions", label: "Thao tác", width: 108, visible: true },
+  { id: "actions", label: "Thao tác", width: 152, visible: true },
 ];
-const statuses: Array<TicketStatus | "Tất cả"> = ["Tất cả", "Mới", "Đang xử lý", "Đã giải quyết"];
+const statuses: Array<TicketStatus | "Tất cả"> = ["Tất cả", "Chưa xử lý", "Đang xử lý", "Đã giải quyết"];
+
+function mergeDefaultColumns(source: DashboardTableColumn[]) {
+  const next = [...source];
+  defaultColumns.forEach((column) => {
+    if (next.some((item) => item.id === column.id)) return;
+    const actionIndex = next.findIndex((item) => item.id === "actions");
+    next.splice(actionIndex === -1 ? next.length : actionIndex, 0, column);
+  });
+  return next;
+}
 
 const seedTickets: Ticket[] = [
-  { id: "HT-501", type: "Mất đồ", customer: "Nguyễn Văn A", phone: "0903123456", orderId: "DH-1022", priority: "Cao", owner: "Quản lý", status: "Đang xử lý", createdAt: "2026-05-29", note: "Thiếu 1 tất đen" },
-  { id: "HT-502", type: "Giao trễ", customer: "Trần Thị B", phone: "0912456789", orderId: "DH-1031", priority: "Trung bình", owner: "Tài xế C", status: "Mới", createdAt: "2026-05-29", note: "Trễ 45 phút so với lịch hẹn" },
-  { id: "HT-503", type: "Hỏng đồ", customer: "Phạm Lan", phone: "0938123456", orderId: "DH-1036", priority: "Cao", owner: "Admin", status: "Đã giải quyết", createdAt: "2026-05-28", note: "Đền bù theo chính sách" },
-  { id: "HT-504", type: "Thanh toán", customer: "Shop Linen", phone: "0283999888", orderId: "DH-1061", priority: "Thấp", owner: "Thu ngân", status: "Đang xử lý", createdAt: "2026-05-27", note: "Đối soát chuyển khoản" },
+  { id: "HT-501", type: "Mất đồ", customer: "Nguyễn Văn A", phone: "0903123456", orderId: "DH-1022", priority: "Cao", owner: "Quản lý", ownerAvatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", status: "Đang xử lý", washDate: "2026-05-29", createdAt: "2026-05-29", note: "Thiếu 1 tất đen" },
+  { id: "HT-502", type: "Giao trễ", customer: "Trần Thị B", phone: "0912456789", orderId: "DH-1031", priority: "Trung bình", owner: "Tài xế C", ownerAvatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", status: "Chưa xử lý", washDate: "2026-05-29", createdAt: "2026-05-29", note: "Trễ 45 phút so với lịch hẹn" },
+  { id: "HT-503", type: "Hỏng đồ", customer: "Phạm Lan", phone: "0938123456", orderId: "DH-1036", priority: "Cao", owner: "Admin", ownerAvatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", status: "Đã giải quyết", washDate: "2026-05-28", createdAt: "2026-05-28", note: "Đền bù theo chính sách" },
+  { id: "HT-504", type: "Thanh toán", customer: "Shop Linen", phone: "0283999888", orderId: "DH-1061", priority: "Thấp", owner: "Thu ngân", ownerAvatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", status: "Đang xử lý", washDate: "2026-05-27", createdAt: "2026-05-27", note: "Đối soát chuyển khoản" },
 ];
 
 const emptyForm = {
@@ -79,22 +99,46 @@ const emptyForm = {
   orderId: "",
   priority: "Trung bình" as Priority,
   owner: "",
-  status: "Mới" as TicketStatus,
+  status: "Chưa xử lý" as TicketStatus,
+  washDate: "",
   createdAt: "",
   note: "",
 };
 
+const ticketFormFields: FormField[] = [
+  { id: "type", label: "Loại hỗ trợ", type: "select", options: ["Mất đồ", "Giao trễ", "Hỏng đồ", "Thanh toán", "Khác"] },
+  { id: "customer", label: "Khách hàng", type: "text", placeholder: "Tên khách" },
+  { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
+  { id: "orderId", label: "Mã đơn", type: "text", placeholder: "DH-1022" },
+  { id: "priority", label: "Độ ưu tiên", type: "select", options: ["Cao", "Trung bình", "Thấp"] },
+  { id: "owner", label: "Người phụ trách", type: "custom_staff" },
+  { id: "createdAt", label: "Ngày tạo", type: "date" },
+  { id: "washDate", label: "Ngày giặt", type: "date" },
+  { id: "status", label: "Trạng thái", type: "select", options: ["Chưa xử lý", "Đang xử lý", "Đã giải quyết"] },
+  { id: "note", label: "Nội dung xử lý", type: "textarea", placeholder: "Mô tả vấn đề, phương án xử lý, bồi thường..." },
+];
+
 const statusColor: Record<TicketStatus, { text: string; bg: string }> = {
-  "Mới": { text: "#2563eb", bg: "rgba(37,99,235,0.09)" },
+  "Chưa xử lý": { text: "#2563eb", bg: "rgba(37,99,235,0.09)" },
   "Đang xử lý": { text: "#d97706", bg: "rgba(217,119,6,0.09)" },
   "Đã giải quyết": { text: "#059669", bg: "rgba(5,150,105,0.09)" },
 };
 
-const priorityColor: Record<Priority, string> = {
-  "Cao": "#dc2626",
-  "Trung bình": "#d97706",
-  "Thấp": "#2563eb",
+const priorityColor: Record<Priority, { text: string; bg: string }> = {
+  "Cao": { text: "#dc2626", bg: "rgba(220,38,38,0.09)" },
+  "Trung bình": { text: "#d97706", bg: "rgba(217,119,6,0.09)" },
+  "Thấp": { text: "#2563eb", bg: "rgba(37,99,235,0.09)" },
 };
+
+function PriorityPill({ label }: { label: Priority }) {
+  const color = priorityColor[label];
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium" style={{ color: color.text, backgroundColor: color.bg }}>
+      <span className="size-1.5 rounded-full" style={{ backgroundColor: color.text }} />
+      {label}
+    </span>
+  );
+}
 
 function StatusPill({ label }: { label: TicketStatus }) {
   const color = statusColor[label];
@@ -104,6 +148,14 @@ function StatusPill({ label }: { label: TicketStatus }) {
       {label}
     </span>
   );
+}
+
+function formatReadableDate(dateStr?: string) {
+  if (!dateStr) return "-";
+  if (dateStr.includes("/")) return dateStr;
+  const [y, m, d] = dateStr.split("-");
+  if (!y || !m || !d) return dateStr;
+  return `${d}/${m}/${y}`;
 }
 
 function MetricCard({ title, value, hint, color }: { title: string; value: string; hint: string; color: string }) {
@@ -123,7 +175,26 @@ function MetricCard({ title, value, hint, color }: { title: string; value: strin
 
 export default function SupportPage() {
   const [tickets, setTickets] = useState(seedTickets);
+  const [currentUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      const username = localStorage.getItem("username");
+      const displayName = localStorage.getItem("fullName") || localStorage.getItem("fullname") || localStorage.getItem("full_name") || localStorage.getItem("accountName");
+      if (displayName && displayName !== username) return displayName;
+    }
+    return "Quản lý";
+  });
+  const [currentUserAvatar] = useState(() => {
+    if (typeof window !== "undefined") {
+      const storedAvatar = localStorage.getItem("accountImageUrl");
+      if (storedAvatar) return storedAvatar;
+    }
+    return "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif";
+  });
   const [columns, setColumns] = useState<DashboardTableColumn[]>(defaultColumns);
+  const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingTicketId, setDeletingTicketId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<TicketStatus | "Tất cả">("Tất cả");
   const [viewMode, setViewMode] = useState<"Bảng" | "Bảng kéo" | "Danh sách">("Bảng");
@@ -134,12 +205,39 @@ export default function SupportPage() {
   const [pageSize, setPageSize] = useState(initialPageSize);
   const [openForm, setOpenForm] = useState(false);
   const [editingTicketId, setEditingTicketId] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<Record<string, string>>(emptyForm);
   const [openPageSizeMenu, setOpenPageSizeMenu] = useState(false);
   const [customPageSize, setCustomPageSize] = useState("");
   const [openAddColumn, setOpenAddColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState("");
   const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
+  const [activeChatTicketId, setActiveChatTicketId] = useState<string | null>(null);
+  const [chatDraft, setChatDraft] = useState("");
+  const [chatImagePreview, setChatImagePreview] = useState<string | null>(null);
+  const [ticketMessages, setTicketMessages] = useState<Record<string, SupportMessage[]>>(() =>
+    Object.fromEntries(
+      seedTickets.map((ticket) => [
+        ticket.id,
+        [
+          {
+            id: `${ticket.id}-seed`,
+            ticketId: ticket.id,
+            sender: "customer" as const,
+            senderName: ticket.customer,
+            content: ticket.note,
+            createdAt: ticket.createdAt,
+          },
+        ],
+      ]),
+    ),
+  );
+  const activeColumns = useMemo(() => mergeDefaultColumns(columns), [columns]);
+  const updateColumns = (value: DashboardTableColumn[] | ((prev: DashboardTableColumn[]) => DashboardTableColumn[])) => {
+    setColumns((prev) => {
+      const mergedPrev = mergeDefaultColumns(prev);
+      return typeof value === "function" ? value(mergedPrev) : value;
+    });
+  };
   const range = useDashboardTimeRangeStore((state) => state.range);
   const rangeLabel = formatRange(normalizeRange(range));
   const checkboxClass =
@@ -147,7 +245,7 @@ export default function SupportPage() {
 
   const filteredTickets = useMemo(() => {
     return tickets.filter((ticket) => {
-      const source = `${ticket.id} ${ticket.type} ${ticket.customer} ${ticket.phone} ${ticket.orderId} ${ticket.owner} ${ticket.note}`;
+      const source = `${ticket.id} ${ticket.type} ${ticket.customer} ${ticket.phone} ${ticket.orderId} ${ticket.owner} ${ticket.washDate} ${ticket.createdAt} ${ticket.note}`;
       const matchQuery = source.toLowerCase().includes(query.toLowerCase());
       const matchStatus = selectedStatus === "Tất cả" || ticket.status === selectedStatus;
       return matchQuery && matchStatus;
@@ -156,13 +254,15 @@ export default function SupportPage() {
 
   const pageCount = Math.ceil(filteredTickets.length / pageSize);
   const paginatedTickets = filteredTickets.slice((page - 1) * pageSize, page * pageSize);
-  const totalVisibleWidth = columns.filter((column) => column.visible !== false).reduce((sum, column) => sum + (column.width || 150), 0);
+  const totalVisibleWidth = activeColumns.filter((column) => column.visible !== false).reduce((sum, column) => sum + (column.width || 150), 0);
   const visibleTicketIds = useMemo(
     () => (viewMode === "Bảng kéo" ? filteredTickets : paginatedTickets).map((ticket) => ticket.id),
     [filteredTickets, paginatedTickets, viewMode]
   );
   const allVisibleTicketsSelected = visibleTicketIds.length > 0 && visibleTicketIds.every((id) => selectedTicketIds.has(id));
   const selectedVisibleTicketCount = visibleTicketIds.filter((id) => selectedTicketIds.has(id)).length;
+  const activeChatTicket = activeChatTicketId ? tickets.find((ticket) => ticket.id === activeChatTicketId) ?? null : null;
+  const activeChatMessages = activeChatTicketId ? ticketMessages[activeChatTicketId] ?? [] : [];
 
   const toggleVisibleTickets = () => {
     setSelectedTicketIds((prev) => {
@@ -219,9 +319,13 @@ export default function SupportPage() {
   );
 
   const handleExport = (format: "pdf" | "excel" | "csv", fileName: string) => {
-    const headers = columns.filter((column) => column.visible !== false && column.id !== "actions").map((column) => column.label);
+    const headers = activeColumns.filter((column) => column.visible !== false && column.id !== "actions").map((column) => column.label);
     const values = filteredTickets.map((ticket) =>
-      columns.filter((column) => column.visible !== false && column.id !== "actions").map((column) => String((ticket as Record<string, unknown>)[column.id] ?? ""))
+      activeColumns.filter((column) => column.visible !== false && column.id !== "actions").map((column) => {
+        if (column.id === "washDate") return formatReadableDate(ticket.washDate);
+        if (column.id === "createdAt") return formatReadableDate(ticket.createdAt);
+        return String((ticket as Record<string, unknown>)[column.id] ?? "");
+      })
     );
     const baseFileName = fileName || `ho-tro-${new Date().toISOString().slice(0, 10)}`;
 
@@ -271,7 +375,7 @@ export default function SupportPage() {
       visible: true,
     };
     setColumns((prev) => {
-      const next = [...prev];
+      const next = mergeDefaultColumns(prev);
       const actionIndex = next.findIndex((column) => column.id === "actions");
       next.splice(actionIndex === -1 ? next.length : actionIndex, 0, newColumn);
       return next;
@@ -280,35 +384,183 @@ export default function SupportPage() {
     setOpenAddColumn(false);
   };
 
+  const handleDragStart = (event: DragEvent<HTMLTableCellElement>, id: string) => {
+    setDraggedColumnId(id);
+    event.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLTableCellElement>, id: string) => {
+    event.preventDefault();
+    if (id !== draggedColumnId) setDragOverColumnId(id);
+  };
+
+  const handleDragLeave = () => setDragOverColumnId(null);
+
+  const handleDrop = (event: DragEvent<HTMLTableCellElement>, id: string) => {
+    event.preventDefault();
+    if (!draggedColumnId || draggedColumnId === id) {
+      setDragOverColumnId(null);
+      return;
+    }
+
+    setColumns((prev) => {
+      const mergedPrev = mergeDefaultColumns(prev);
+      const draggedIndex = mergedPrev.findIndex((column) => column.id === draggedColumnId);
+      const dropIndex = mergedPrev.findIndex((column) => column.id === id);
+      if (draggedIndex === -1 || dropIndex === -1) return prev;
+
+      const next = [...mergedPrev];
+      const temp = next[draggedIndex];
+      next[draggedIndex] = next[dropIndex];
+      next[dropIndex] = temp;
+      return next;
+    });
+
+    setDraggedColumnId(null);
+    setDragOverColumnId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedColumnId(null);
+    setDragOverColumnId(null);
+  };
+
+  const startDeleteTicket = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeletingTicketId(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (deletingTicketId) {
+      setTickets((prev) => prev.filter((item) => item.id !== deletingTicketId));
+      setSelectedTicketIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deletingTicketId);
+        return next;
+      });
+      setDeletingTicketId(null);
+    }
+    setDeleteConfirmOpen(false);
+  };
+
   const openCreateForm = () => {
     setEditingTicketId(null);
-    setForm({ ...emptyForm, createdAt: new Date().toISOString().slice(0, 10) });
+    setForm({
+      ...emptyForm,
+      createdAt: new Date().toISOString().slice(0, 10),
+      owner: currentUser,
+    });
     setOpenForm(true);
   };
 
   const openEditForm = (ticket: Ticket) => {
     setEditingTicketId(ticket.id);
-    setForm(ticket);
+    setForm({
+      type: ticket.type,
+      customer: ticket.customer,
+      phone: ticket.phone,
+      orderId: ticket.orderId,
+      priority: ticket.priority,
+      owner: currentUser,
+      status: ticket.status,
+      washDate: ticket.washDate || ticket.createdAt,
+      createdAt: ticket.createdAt,
+      note: ticket.note,
+    });
     setOpenForm(true);
   };
 
-  const saveTicket = () => {
-    if (!form.type.trim() || !form.customer.trim()) return;
-    const payload: Omit<Ticket, "id"> = {
-      type: form.type,
-      customer: form.customer,
-      phone: form.phone,
-      orderId: form.orderId || "-",
-      priority: form.priority,
-      owner: form.owner || "Quản lý",
-      status: form.status,
-      createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
-      note: form.note,
+  const openReplyPage = (ticket: Ticket) => {
+    setActiveChatTicketId(ticket.id);
+    setChatDraft("");
+    setChatImagePreview(null);
+    setTickets((prev) =>
+      prev.map((item) =>
+        item.id === ticket.id
+          ? {
+              ...item,
+              owner: currentUser,
+              ownerAvatar: currentUserAvatar,
+              status: item.status === "Chưa xử lý" ? "Đang xử lý" : item.status,
+            }
+          : item,
+      ),
+    );
+  };
+
+  const sendMessage = () => {
+    if (!activeChatTicketId || (!chatDraft.trim() && !chatImagePreview)) return;
+    const now = new Date();
+    const message: SupportMessage = {
+      id: `${activeChatTicketId}-${now.getTime()}`,
+      ticketId: activeChatTicketId,
+      sender: "staff",
+      senderName: currentUser,
+      avatar: currentUserAvatar,
+      content: chatDraft.trim(),
+      imageUrl: chatImagePreview || undefined,
+      createdAt: now.toLocaleString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     };
+    setTicketMessages((prev) => ({
+      ...prev,
+      [activeChatTicketId]: [...(prev[activeChatTicketId] ?? []), message],
+    }));
+    setTickets((prev) =>
+      prev.map((ticket) =>
+        ticket.id === activeChatTicketId
+          ? {
+              ...ticket,
+              owner: currentUser,
+              ownerAvatar: currentUserAvatar,
+              status: ticket.status === "Chưa xử lý" ? "Đang xử lý" : ticket.status,
+            }
+          : ticket,
+      ),
+    );
+    setChatDraft("");
+    setChatImagePreview(null);
+  };
+
+  const saveTicket = () => {
+    if (!form.type?.trim() || !form.customer?.trim()) return;
 
     if (editingTicketId) {
+      const originalTicket = tickets.find((t) => t.id === editingTicketId);
+      const payload: Omit<Ticket, "id"> = {
+        type: form.type,
+        customer: form.customer,
+        phone: form.phone || "",
+        orderId: form.orderId || "-",
+        priority: (form.priority as Priority) || "Trung bình",
+        owner: currentUser,
+        ownerAvatar: currentUserAvatar || originalTicket?.ownerAvatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif",
+        status: (form.status as TicketStatus) || "Chưa xử lý",
+        washDate: form.washDate || form.createdAt || new Date().toISOString().slice(0, 10),
+        createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
+        note: form.note || "",
+      };
       setTickets((prev) => prev.map((ticket) => ticket.id === editingTicketId ? { ...ticket, ...payload } : ticket));
     } else {
+      const payload: Omit<Ticket, "id"> = {
+        type: form.type,
+        customer: form.customer,
+        phone: form.phone || "",
+        orderId: form.orderId || "-",
+        priority: (form.priority as Priority) || "Trung bình",
+        owner: currentUser,
+        ownerAvatar: currentUserAvatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif",
+        status: (form.status as TicketStatus) || "Chưa xử lý",
+        washDate: form.washDate || form.createdAt || new Date().toISOString().slice(0, 10),
+        createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
+        note: form.note || "",
+      };
       setTickets((prev) => [{ id: `HT-${Date.now().toString().slice(-3)}`, ...payload }, ...prev]);
     }
 
@@ -326,20 +578,72 @@ export default function SupportPage() {
       </TableCell>
     );
     if (column.id === "type") return <TableCell key={column.id}>{ticket.type}</TableCell>;
-    if (column.id === "customer") return <TableCell key={column.id} className="font-medium text-slate-900">{ticket.customer}</TableCell>;
+    if (column.id === "customer") {
+      const avatarUrl = "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif";
+      return (
+        <TableCell key={column.id} className="font-medium text-slate-900">
+          <div className="flex items-center gap-2.5">
+            <Image
+              src={avatarUrl}
+              alt={ticket.customer}
+              width={28}
+              height={28}
+              className="size-6 shrink-0 rounded-full object-cover"
+            />
+            <span className="truncate">{ticket.customer}</span>
+          </div>
+        </TableCell>
+      );
+    }
     if (column.id === "phone") return <TableCell key={column.id}><a href={`tel:${ticket.phone}`} className="text-slate-500 hover:text-slate-800">{ticket.phone}</a></TableCell>;
     if (column.id === "orderId") return <TableCell key={column.id}>{ticket.orderId}</TableCell>;
-    if (column.id === "priority") return <TableCell key={column.id}><span className="font-medium" style={{ color: priorityColor[ticket.priority] }}>{ticket.priority}</span></TableCell>;
-    if (column.id === "owner") return <TableCell key={column.id}>{ticket.owner}</TableCell>;
+    if (column.id === "priority") return <TableCell key={column.id}><PriorityPill label={ticket.priority} /></TableCell>;
+    if (column.id === "owner") {
+      const avatarUrl = ticket.ownerAvatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif";
+      return (
+        <TableCell key={column.id} className="font-medium text-slate-900">
+          <div className="flex items-center gap-2.5">
+            <Image
+              src={avatarUrl}
+              alt={ticket.owner}
+              width={24}
+              height={24}
+              className="size-6 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
+            />
+            <span className="truncate">{ticket.owner}</span>
+          </div>
+        </TableCell>
+      );
+    }
     if (column.id === "status") return <TableCell key={column.id}><StatusPill label={ticket.status} /></TableCell>;
-    if (column.id === "createdAt") return <TableCell key={column.id} className="text-slate-500">{ticket.createdAt}</TableCell>;
+    if (column.id === "washDate") return <TableCell key={column.id} className="text-slate-500">{formatReadableDate(ticket.washDate)}</TableCell>;
+    if (column.id === "createdAt") return <TableCell key={column.id} className="text-slate-500">{formatReadableDate(ticket.createdAt)}</TableCell>;
     if (column.id === "note") return <TableCell key={column.id} className="truncate text-slate-500" title={ticket.note}>{ticket.note}</TableCell>;
     if (column.id === "actions") return (
       <TableCell key={column.id} className="px-4">
-        <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 hover:bg-slate-50" onClick={() => openEditForm(ticket)}>
-          <Pencil className="size-3.5" />
-          Sửa
-        </button>
+        <div className="flex items-center justify-start gap-1.5">
+          <button
+            type="button"
+            className="inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+            onClick={() => openEditForm(ticket)}
+          >
+            Sửa
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+            onClick={() => openReplyPage(ticket)}
+          >
+            Phản hồi
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600 hover:border-red-100"
+            onClick={(e) => startDeleteTicket(ticket.id, e)}
+          >
+            Xóa
+          </button>
+        </div>
       </TableCell>
     );
     return <TableCell key={column.id} className="text-slate-400 italic">Chưa có</TableCell>;
@@ -370,19 +674,43 @@ export default function SupportPage() {
             onChange={() => toggleTicket(ticket.id)}
             className={`shrink-0 ${checkboxClass}`}
           />
+          <Image
+            src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+            alt={ticket.customer}
+            width={32}
+            height={32}
+            className="size-8 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
+          />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-slate-700">{ticket.customer}</p>
             <p className="truncate text-[11px] text-slate-400">{ticket.id} · {ticket.type}</p>
           </div>
         </div>
-        <span className="font-medium text-xs" style={{ color: priorityColor[ticket.priority] }}>{ticket.priority}</span>
+        <PriorityPill label={ticket.priority} />
       </div>
       <p className="mt-2 line-clamp-2 text-xs text-slate-500">{ticket.note}</p>
       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2">
-        <span className="truncate text-[11px] text-slate-400">{ticket.owner}</span>
-        <button type="button" className="inline-flex h-6 items-center rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200" onClick={() => openEditForm(ticket)}>
-          Chi tiết
-        </button>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Image
+            src={ticket.ownerAvatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"}
+            alt={ticket.owner}
+            width={16}
+            height={16}
+            className="size-4 shrink-0 rounded-full object-cover ring-1 ring-slate-100 shadow-sm"
+          />
+          <span className="truncate text-[11px] text-slate-400">{ticket.owner} · Giặt {formatReadableDate(ticket.washDate)}</span>
+        </div>
+        <div className="flex gap-1.5">
+          <button type="button" className="inline-flex h-6 items-center rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200" onClick={() => openEditForm(ticket)}>
+            Chi tiết
+          </button>
+          <button type="button" className="inline-flex h-6 items-center rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200" onClick={() => openReplyPage(ticket)}>
+            Phản hồi
+          </button>
+          <button type="button" className="inline-flex h-6 items-center rounded-md bg-red-50 px-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100/70" onClick={(e) => startDeleteTicket(ticket.id, e)}>
+            Xóa
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -400,26 +728,243 @@ export default function SupportPage() {
           />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
+              <Image
+                src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+                alt={ticket.customer}
+                width={24}
+                height={24}
+                className="size-6 rounded-full object-cover ring-1 ring-slate-100 shadow-sm"
+              />
               <p className="font-semibold text-slate-950">{ticket.customer}</p>
               <span className="text-xs font-medium text-slate-400">{ticket.id}</span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{ticket.type}</span>
               <StatusPill label={ticket.status} />
-              <span className="font-medium text-xs" style={{ color: priorityColor[ticket.priority] }}>{ticket.priority}</span>
+              <PriorityPill label={ticket.priority} />
             </div>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-              <span>{ticket.phone}</span>
-              <span>{ticket.orderId}</span>
-              <span>{ticket.owner}</span>
+              <span>Số điện thoại: {ticket.phone}</span>
+              <span>Mã đơn: {ticket.orderId}</span>
+              <span className="inline-flex items-center gap-1.5">
+                Phụ trách:
+                <Image
+                  src={ticket.ownerAvatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"}
+                  alt={ticket.owner}
+                  width={16}
+                  height={16}
+                  className="size-4 shrink-0 rounded-full object-cover ring-1 ring-slate-100 shadow-sm"
+                />
+                <span>{ticket.owner}</span>
+              </span>
+              <span>Ngày tạo: {formatReadableDate(ticket.createdAt)}</span>
+              <span>Ngày giặt: {formatReadableDate(ticket.washDate)}</span>
             </div>
             <p className="mt-2 text-xs text-slate-500">{ticket.note}</p>
           </div>
         </div>
-        <button type="button" className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openEditForm(ticket)}>
-          <Pencil className="size-3.5" />
-          Sửa
-        </button>
+        <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+          <button
+            type="button"
+            className="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+            onClick={() => openEditForm(ticket)}
+          >
+            Sửa
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+            onClick={() => openReplyPage(ticket)}
+          >
+            Phản hồi
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600 hover:border-red-100"
+            onClick={(e) => startDeleteTicket(ticket.id, e)}
+          >
+            Xóa
+          </button>
+        </div>
       </div>
     </div>
   );
+
+  if (activeChatTicket) {
+    return (
+      <PageShell fullHeight>
+        <div className="grid min-h-0 flex-1 gap-4 overflow-hidden bg-muted/30 p-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <Card className="min-h-0 gap-0 py-0">
+            <CardHeader className="border-b py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <Button variant="outline" size="sm" onClick={() => setActiveChatTicketId(null)}>
+                    Quay lại
+                  </Button>
+                  <Avatar size="lg">
+                    <AvatarImage src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={activeChatTicket.customer} />
+                    <AvatarFallback>{activeChatTicket.customer.slice(0, 1)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <CardTitle className="truncate">{activeChatTicket.customer}</CardTitle>
+                    <CardDescription className="truncate">
+                      {activeChatTicket.id} · {activeChatTicket.type} · Đơn {activeChatTicket.orderId}
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="hidden shrink-0 items-center gap-2 md:flex">
+                  <Badge variant="outline">{activeChatTicket.priority}</Badge>
+                  <Badge variant={activeChatTicket.status === "Đã giải quyết" ? "secondary" : "outline"}>{activeChatTicket.status}</Badge>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="min-h-0 flex-1 px-0">
+              <ScrollArea className="h-full px-4 py-5">
+                <div className="space-y-5">
+                  {activeChatMessages.map((message) => {
+                    const isStaff = message.sender === "staff";
+                    return (
+                      <div key={message.id} className={`flex gap-3 ${isStaff ? "justify-end" : "justify-start"}`}>
+                        {!isStaff && (
+                          <Avatar size="sm" className="mt-1">
+                            <AvatarImage src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={message.senderName} />
+                            <AvatarFallback>{message.senderName.slice(0, 1)}</AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div className={`flex max-w-[78%] flex-col gap-1 ${isStaff ? "items-end" : "items-start"}`}>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{message.senderName}</span>
+                            <span>{formatReadableDate(message.createdAt)}</span>
+                          </div>
+                          <div className={`rounded-lg border px-3 py-2 text-sm shadow-sm ${isStaff ? "bg-primary text-primary-foreground" : "bg-background text-foreground"}`}>
+                            {message.imageUrl && (
+                              <Image
+                                src={message.imageUrl}
+                                alt="Ảnh đính kèm"
+                                width={360}
+                                height={240}
+                                unoptimized
+                                className="mb-2 max-h-64 w-full rounded-md object-cover"
+                              />
+                            )}
+                            {message.content && <p className="whitespace-pre-wrap leading-5">{message.content}</p>}
+                          </div>
+                        </div>
+                        {isStaff && (
+                          <Avatar size="sm" className="mt-1">
+                            <AvatarImage src={message.avatar || currentUserAvatar} alt={message.senderName} />
+                            <AvatarFallback>{message.senderName.slice(0, 1)}</AvatarFallback>
+                          </Avatar>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </CardContent>
+
+            <CardFooter className="block">
+              {chatImagePreview && (
+                <div className="mb-3 flex w-fit items-start gap-2 rounded-lg border bg-background p-2">
+                  <Image
+                    src={chatImagePreview}
+                    alt="Ảnh chuẩn bị gửi"
+                    width={96}
+                    height={72}
+                    unoptimized
+                    className="h-16 w-24 rounded-md object-cover"
+                  />
+                  <Button variant="ghost" size="sm" onClick={() => setChatImagePreview(null)}>
+                    Xóa
+                  </Button>
+                </div>
+              )}
+              <div className="flex items-end gap-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="icon-lg" asChild>
+                        <label className="cursor-pointer">
+                          <ImagePlus className="size-4" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              if (!file) return;
+                              setChatImagePreview(URL.createObjectURL(file));
+                              event.target.value = "";
+                            }}
+                          />
+                        </label>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Gửi ảnh</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Textarea
+                  value={chatDraft}
+                  onChange={(event) => setChatDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  placeholder="Nhập phản hồi cho khách hàng..."
+                  className="max-h-32 min-h-11 resize-none"
+                  rows={1}
+                />
+                <Button size="icon-lg" onClick={sendMessage} disabled={!chatDraft.trim() && !chatImagePreview}>
+                  <Send className="size-4" />
+                </Button>
+              </div>
+            </CardFooter>
+          </Card>
+
+          <Card className="hidden min-h-0 lg:flex" size="sm">
+            <CardHeader>
+              <CardTitle>Thông tin ticket</CardTitle>
+              <CardDescription>{activeChatTicket.phone}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div className="flex items-center gap-3">
+                <Avatar size="lg">
+                  <AvatarImage src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={activeChatTicket.customer} />
+                  <AvatarFallback>{activeChatTicket.customer.slice(0, 1)}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-foreground">{activeChatTicket.customer}</p>
+                  <p className="truncate text-xs text-muted-foreground">{activeChatTicket.orderId}</p>
+                </div>
+              </div>
+              <Separator />
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Ngày giặt</p>
+                  <p className="mt-1 text-foreground">{formatReadableDate(activeChatTicket.washDate)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Phụ trách</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Avatar size="sm">
+                      <AvatarImage src={activeChatTicket.ownerAvatar || currentUserAvatar} alt={activeChatTicket.owner} />
+                      <AvatarFallback>{activeChatTicket.owner.slice(0, 1)}</AvatarFallback>
+                    </Avatar>
+                    <span className="truncate text-foreground">{activeChatTicket.owner}</span>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Nội dung ban đầu</p>
+                  <p className="mt-1 rounded-lg bg-muted p-3 text-xs leading-5 text-muted-foreground">{activeChatTicket.note}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          </div>
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell fullHeight>
@@ -439,8 +984,8 @@ export default function SupportPage() {
             setQuery(value);
             setPage(1);
           }}
-          columns={columns}
-          onColumnsChange={setColumns}
+          columns={activeColumns}
+          onColumnsChange={updateColumns}
           tableResizeMode={tableResizeMode}
           onTableResizeModeChange={setTableResizeMode}
           selectedCount={selectedTicketIds.size}
@@ -475,13 +1020,23 @@ export default function SupportPage() {
 
         {viewMode === "Bảng" ? (
           <TableView
-            columns={columns}
+            columns={activeColumns}
+            onColumnsChange={updateColumns}
             rows={paginatedTickets}
             pageSize={pageSize}
             emptyMessage="Không tìm thấy ticket phù hợp."
             tableResizeMode={tableResizeMode}
             totalVisibleWidth={totalVisibleWidth}
             renderCell={renderTicketCell}
+            columnDrag={{
+              draggedColumnId,
+              dragOverColumnId,
+              onDragStart: handleDragStart,
+              onDragOver: handleDragOver,
+              onDragLeave: handleDragLeave,
+              onDrop: handleDrop,
+              onDragEnd: handleDragEnd,
+            }}
             page={page}
             pageCount={pageCount}
             totalRows={filteredTickets.length}
@@ -525,25 +1080,46 @@ export default function SupportPage() {
         onAddColumn={addCustomColumn}
       />
 
-      {openForm && (
-        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <Card className="max-h-[90dvh] w-full max-w-3xl overflow-y-auto rounded-2xl border-0 bg-white shadow-2xl">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-200 px-6 py-4"><CardTitle className="text-base font-semibold">{editingTicketId ? `Chỉnh sửa ${editingTicketId}` : "Thêm ticket hỗ trợ"}</CardTitle><button type="button" className="inline-flex size-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={() => setOpenForm(false)}><X className="size-5" /></button></CardHeader>
-            <CardContent className="grid gap-4 p-6 md:grid-cols-2">
-              <div className="space-y-2"><Label>Loại hỗ trợ</Label><Input value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })} placeholder="Mất đồ / Giao trễ" /></div>
-              <div className="space-y-2"><Label>Khách hàng</Label><Input value={form.customer} onChange={(event) => setForm({ ...form, customer: event.target.value })} placeholder="Tên khách" /></div>
-              <div className="space-y-2"><Label>Số điện thoại</Label><Input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="090..." /></div>
-              <div className="space-y-2"><Label>Mã đơn</Label><Input value={form.orderId} onChange={(event) => setForm({ ...form, orderId: event.target.value })} placeholder="DH-1022" /></div>
-              <div className="space-y-2"><Label>Ưu tiên</Label><Input value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value as Priority })} placeholder="Cao / Trung bình / Thấp" /></div>
-              <div className="space-y-2"><Label>Phụ trách</Label><Input value={form.owner} onChange={(event) => setForm({ ...form, owner: event.target.value })} placeholder="Quản lý" /></div>
-              <div className="space-y-2"><Label>Ngày tạo</Label><Input type="date" value={form.createdAt} onChange={(event) => setForm({ ...form, createdAt: event.target.value })} /></div>
-              <div className="space-y-2"><Label>Trạng thái</Label><Input value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as TicketStatus })} placeholder="Mới / Đang xử lý / Đã giải quyết" /></div>
-              <div className="space-y-2 md:col-span-2"><Label>Nội dung xử lý</Label><Textarea value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} placeholder="Mô tả vấn đề, phương án xử lý, bồi thường..." /></div>
-              <Button className="md:col-span-2 h-10 rounded-lg bg-slate-900 font-semibold text-white hover:bg-slate-800" onClick={saveTicket}>Lưu ticket</Button>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      <FormDialog
+        open={openForm}
+        onClose={() => setOpenForm(false)}
+        title={editingTicketId ? `Chỉnh sửa ${editingTicketId}` : "Thêm ticket hỗ trợ"}
+        fields={ticketFormFields}
+        form={form}
+        onFormChange={setForm}
+        onSave={saveTicket}
+        currentStaffName={currentUser}
+        currentStaffAvatar={currentUserAvatar}
+        showCloseButton={false}
+        showCloseButtonAtBottom={true}
+      />
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent showCloseButton={false} className="sm:max-w-[400px] bg-white rounded-xl border border-slate-200 shadow-xl p-6">
+          <DialogHeader className="pb-3 border-b border-slate-100">
+            <DialogTitle className="text-base font-semibold text-slate-900">Xác nhận xóa</DialogTitle>
+          </DialogHeader>
+          <div className="py-5 text-sm text-slate-600">
+            Bạn có chắc chắn muốn xóa ticket hỗ trợ này không? Hành động này không thể hoàn tác.
+          </div>
+          <DialogFooter className="flex flex-row items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 w-full sm:w-auto"
+              onClick={() => setDeleteConfirmOpen(false)}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 w-full sm:w-auto"
+              onClick={handleDeleteConfirm}
+            >
+              Xác nhận xóa
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
 }

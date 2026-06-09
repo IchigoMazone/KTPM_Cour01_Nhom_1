@@ -29,19 +29,25 @@ import {
   type DashboardViewMode,
 } from "./dashboard-primitives";
 
-interface ToolbarProps {
+type ToolbarColumn = {
+  id: string;
+  label: string;
+  visible?: boolean;
+};
+
+interface ToolbarProps<TColumn extends ToolbarColumn> {
   viewMode?: DashboardViewMode;
   onViewModeChange?: (mode: DashboardViewMode) => void;
   leftContent?: React.ReactNode;
   query: string;
   onQueryChange: (query: string) => void;
-  columns: any[];
-  onColumnsChange: Dispatch<SetStateAction<any[]>>;
+  columns: TColumn[];
+  onColumnsChange: Dispatch<SetStateAction<TColumn[]>>;
   tableResizeMode: "fit" | "custom";
   onTableResizeModeChange: (mode: "fit" | "custom") => void;
   selectedCount: number;
   onOpenAddColumn: () => void;
-  onOpenHistory: () => void;
+  onOpenHistory?: () => void;
   onExport: (format: "pdf" | "excel" | "csv", fileName: string) => void;
   defaultExportFileName: string;
   onCreateClick?: () => void;
@@ -49,9 +55,10 @@ interface ToolbarProps {
   defaultColumnIds?: string[];
   searchPlaceholder?: string;
   showHistoryButton?: boolean;
+  showAddColumnButton?: boolean;
 }
 
-export function Toolbar({
+export function Toolbar<TColumn extends ToolbarColumn>({
   viewMode,
   onViewModeChange,
   leftContent,
@@ -71,7 +78,8 @@ export function Toolbar({
   defaultColumnIds,
   searchPlaceholder = "Tìm kiếm...",
   showHistoryButton = true,
-}: ToolbarProps) {
+  showAddColumnButton = true,
+}: ToolbarProps<TColumn>) {
   const customColumns = useMemo(() => {
     if (!defaultColumnIds) return [];
     return columns.filter((col) => !defaultColumnIds.includes(col.id));
@@ -135,11 +143,15 @@ export function Toolbar({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={onOpenAddColumn}>
-              <Plus className="size-3.5 mr-2" />
-              Thêm cột mới
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            {showAddColumnButton && (
+              <>
+                <DropdownMenuItem onClick={onOpenAddColumn}>
+                  <Plus className="size-3.5 mr-2" />
+                  Thêm cột mới
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuLabel>Co giãn dữ liệu bảng</DropdownMenuLabel>
             <DropdownMenuCheckboxItem
               checked={tableResizeMode === "fit"}

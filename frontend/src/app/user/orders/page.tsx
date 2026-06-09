@@ -1,274 +1,28 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
-import type { DateRange } from "react-day-picker";
-import {
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  PackageCheck,
-  ReceiptText,
-  RotateCcw,
-  X,
-  Download,
-  Star,
-  Trash2,
-  Eye,
-  Clock,
-  Check,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import Link from "next/link";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import { ArrowRight, ArrowUpRight, CalendarDays, Download, Eye, PackageCheck, ReceiptText, RotateCcw, Star, Trash2 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
-import { API_BASE_URL } from "@/src/lib/config";
-import {
-  PageShell,
-  PaginationFooter,
-  Period,
-  PeriodTabs,
-  SectionCard,
-  StatCard,
-  StatusBadge,
-} from "@/src/app/home/_components/dashboard-primitives";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { PageShell, StatusBadge } from "@/src/app/home/_components/dashboard-primitives";
+import { FilterBar, type FilterOption } from "@/src/app/home/_components/filter-bar";
+import { TableView } from "@/src/app/home/_components/table-view";
+import { Toolbar } from "@/src/app/home/_components/toolbar";
+import { HistoryModal } from "@/src/app/home/_components/history-modal";
+import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
+import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
+import type { DashboardTableColumn } from "@/src/components/common/dashboard-data-table";
+import { defaultColumns, initialOrders } from "./data";
+import type { Order } from "./types";
 
-import { ResizableTableHead } from "@/src/components/ui/resizable-table-head";
-import { ColumnId } from "./types";
-import { orders, monthNames, defaultColumns } from "./data";
-
-const parseOrderDate = (dateStr: string) => {
-  const [day, month, year] = dateStr.split("/").map(Number);
-  return new Date(year, month - 1, day);
-};
-const getOrderTimeline = (order: { code: string; date: string; status: string }) => {
-  const baseDate = order.date;
-
-  if (order.status === "Đang giặt") {
-    return [
-      { stage: "Đã nhận đồ", time: `${baseDate} 08:00`, status: "completed", desc: "Nhân viên Panda đã nhận túi đồ từ khách hàng." },
-      { stage: "Phân loại", time: `${baseDate} 09:15`, status: "completed", desc: "Đồ giặt đã được phân loại theo chất liệu và màu sắc." },
-      { stage: "Đang giặt", time: `${baseDate} 10:30`, status: "current", desc: "Đồ đang được giặt máy bằng nước giặt hữu cơ sinh học." },
-      { stage: "Sấy & gấp", time: "--:--", status: "pending", desc: "Sấy khô ở nhiệt độ thích hợp và xếp gọn vào túi." },
-      { stage: "Giao lại", time: "--:--", status: "pending", desc: "Giao đồ sạch tận tay khách hàng theo lịch hẹn." },
-    ];
-  } else if (order.status === "Sẵn sàng giao") {
-    return [
-      { stage: "Đã nhận đồ", time: `${baseDate} 08:30`, status: "completed", desc: "Nhân viên Panda đã nhận túi đồ từ khách hàng." },
-      { stage: "Phân loại", time: `${baseDate} 09:40`, status: "completed", desc: "Đồ giặt đã được phân loại theo chất liệu và màu sắc." },
-      { stage: "Đang giặt", time: `${baseDate} 11:00`, status: "completed", desc: "Đồ đã được giặt sạch bằng nước giặt hữu cơ sinh học." },
-      { stage: "Sấy & gấp", time: `${baseDate} 14:30`, status: "completed", desc: "Đồ đã được sấy khô và xếp gọn gàng vào túi đóng gói sạch." },
-      { stage: "Giao lại (Chờ giao)", time: `${baseDate} 15:00`, status: "current", desc: "Đồ sạch sẵn sàng để giao lại. Đang chờ tài xế lấy đồ giao." },
-    ];
-  } else if (order.status === "Hoàn tất") {
-    return [
-      { stage: "Đã nhận đồ", time: `${baseDate} 08:00`, status: "completed", desc: "Nhân viên Panda đã nhận túi đồ từ khách hàng." },
-      { stage: "Phân loại", time: `${baseDate} 09:00`, status: "completed", desc: "Đồ giặt đã được phân loại theo chất liệu và màu sắc." },
-      { stage: "Đang giặt", time: `${baseDate} 10:30`, status: "completed", desc: "Đồ đã được giặt sạch bằng nước giặt hữu cơ sinh học." },
-      { stage: "Sấy & gấp", time: `${baseDate} 13:00`, status: "completed", desc: "Đồ đã được sấy khô và xếp gọn gàng vào túi đóng gói sạch." },
-      { stage: "Giao lại hoàn tất", time: `${baseDate} 16:30`, status: "completed", desc: "Đã giao lại túi đồ giặt là sạch sẽ và thơm tho cho khách hàng." },
-    ];
-  } else {
-    return [
-      { stage: "Đã nhận đồ", time: `${baseDate} 09:00`, status: "completed", desc: "Nhân viên Panda đã nhận túi đồ từ khách hàng." },
-      { stage: "Đã hủy đơn", time: `${baseDate} 10:15`, status: "cancelled", desc: "Khách hàng yêu cầu hủy đơn hàng. Đã hoàn tất hoàn trả đồ nhận." },
-    ];
-  }
-};
-
-const getOrderDetails = (code: string) => {
-  const detailsMap: Record<string, {
-    customerName: string;
-    phone: string;
-    items: { name: string; qty: string; price: string }[];
-    paymentMethod: string;
-    address: string;
-    notes: string;
-    weight?: string;
-  }> = {
-    "DH-1055": {
-      customerName: "nn",
-      phone: "0901 234 567",
-      items: [
-        { name: "Giặt sấy quần áo thường", qty: "4.6 kg", price: "82.800đ" },
-        { name: "Phụ phí nước giặt hữu cơ", qty: "1", price: "9.200đ" }
-      ],
-      paymentMethod: "Ví điện tử MoMo",
-      address: "12 Nguyễn Trãi, Quận 1, TP.HCM",
-      notes: "Giặt riêng đồ màu trắng, sấy khô hoàn toàn.",
-      weight: "4.6 kg"
-    },
-    "DH-1048": {
-      customerName: "Nguyen Van A",
-      phone: "0901 234 567",
-      items: [
-        { name: "Giặt hấp Áo khoác vest", qty: "2 cái", price: "120.000đ" },
-        { name: "Giặt hấp Váy đầm cao cấp", qty: "1 cái", price: "60.000đ" }
-      ],
-      paymentMethod: "Thẻ ATM Nội địa",
-      address: "12 Nguyễn Trãi, Quận 1, TP.HCM",
-      notes: "Ủi phẳng, móc treo cẩn thận.",
-      weight: "3 cái"
-    },
-    "DH-1032": {
-      customerName: "Trịnh Văn B",
-      phone: "0901 234 567",
-      items: [
-        { name: "Giặt chăn bông dày", qty: "1 cái", price: "150.000đ" },
-        { name: "Giặt ga trải giường", qty: "2 cái", price: "90.000đ" }
-      ],
-      paymentMethod: "Thanh toán khi nhận đồ (COD)",
-      address: "12 Nguyễn Trãi, Quận 1, TP.HCM",
-      notes: "Sử dụng nước xả vải Downy huyền bí thơm nhẹ.",
-      weight: "3 chiếc"
-    },
-    "DH-1019": {
-      customerName: "AAA",
-      phone: "0901 234 567",
-      items: [
-        { name: "Giặt khô Áo dạ dài", qty: "1 cái", price: "135.000đ" }
-      ],
-      paymentMethod: "Ví điện tử MoMo",
-      address: "12 Nguyễn Trãi, Quận 1, TP.HCM",
-      notes: "Hộp giấy bảo quản form áo dạ.",
-      weight: "1 cái"
-    },
-    "DH-1015": {
-      customerName: "BBBB",
-      phone: "0901 234 567",
-      items: [
-        { name: "Giặt sấy quần áo thường", qty: "3.7 kg", price: "66.600đ" },
-        { name: "Nước xả vải cao cấp", qty: "1", price: "8.400đ" }
-      ],
-      paymentMethod: "Thanh toán khi nhận đồ (COD)",
-      address: "12 Nguyễn Trãi, Quận 1, TP.HCM",
-      notes: "Không sấy ở nhiệt độ quá cao tránh co rút vải.",
-      weight: "3.7 kg"
-    },
-    "DH-1012": {
-      customerName: "CCC",
-      phone: "0901 234 567",
-      items: [
-        { name: "Giặt sấy quần áo thường", qty: "5.5 kg", price: "99.000đ" },
-        { name: "Phụ phí giặt nước ấm", qty: "1", price: "11.000đ" }
-      ],
-      paymentMethod: "Ví điện tử MoMo",
-      address: "12 Nguyễn Trãi, Quận 1, TP.HCM",
-      notes: "Đồ em bé giặt riêng bằng xà phòng hypoallergenic.",
-      weight: "5.5 kg"
-    },
-    "DH-1008": {
-      customerName: "DDDD",
-      phone: "0901 234 567",
-      items: [
-        { name: "Giặt hấp Giày thể thao", qty: "2 đôi", price: "100.000đ" },
-        { name: "Giặt hấp Mũ lưỡi trai hiệu", qty: "1 cái", price: "50.000đ" }
-      ],
-      paymentMethod: "Chuyển khoản Ngân hàng",
-      address: "12 Nguyễn Trãi, Quận 1, TP.HCM",
-      notes: "Ủ giày thơm tho sạch sẽ.",
-      weight: "3 món"
-    },
-    "DH-1005": {
-      customerName: "EEEE",
-      phone: "0901 234 567",
-      items: [
-        { name: "Giặt hấp Vét comple nam", qty: "1 bộ", price: "140.000đ" },
-        { name: "Giặt hấp Áo sơ mi lụa", qty: "2 cái", price: "80.000đ" }
-      ],
-      paymentMethod: "Chuyển khoản Ngân hàng",
-      address: "12 Nguyễn Trãi, Quận 1, TP.HCM",
-      notes: "Ủi phẳng xếp nếp quần tây.",
-      weight: "3 món"
-    },
-    "DH-0998": {
-      customerName: "FFFF",
-      phone: "0901 234 567",
-      items: [
-        { name: "Giặt sấy quần áo thường", qty: "4.7 kg", price: "84.600đ" },
-        { name: "Thơm xịt sấy", qty: "1", price: "10.400đ" }
-      ],
-      paymentMethod: "Thanh toán khi nhận đồ (COD)",
-      address: "12 Nguyễn Trãi, Quận 1, TP.HCM",
-      notes: "Hẹn giao tối sau 19h.",
-      weight: "4.7 kg"
-    }
-  };
-
-  return detailsMap[code] || {
-    customerName: "GGGG",
-    phone: "0901 234 567",
-    items: [{ name: "Giặt sấy tổng hợp", qty: "1 gói", price: "92.000đ" }],
-    paymentMethod: "Thanh toán khi nhận đồ (COD)",
-    address: "12 Nguyễn Trãi, Quận 1, TP.HCM",
-    notes: "Không có ghi chú."
-  };
-};
-
-const getWeekRange = (date: Date) => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diffToMon = day === 0 ? -6 : 1 - day;
-  const monday = new Date(d);
-  monday.setDate(d.getDate() + diffToMon);
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-  return { from: monday, to: sunday };
-};
-
-const getWeeksInMonth = (year: number, month: number) => {
-  const weeks: { from: Date; to: Date }[] = [];
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-
-  const start = new Date(firstDay);
-  const day = start.getDay();
-  const diffToMon = day === 0 ? -6 : 1 - day;
-  start.setDate(start.getDate() + diffToMon);
-  start.setHours(0, 0, 0, 0);
-
-  let current = new Date(start);
-  while (current <= lastDay) {
-    const from = new Date(current);
-    const to = new Date(current);
-    to.setDate(to.getDate() + 6);
-    to.setHours(23, 59, 59, 999);
-    weeks.push({ from, to });
-    current.setDate(current.getDate() + 7);
-  }
-  return weeks;
-};
-
-interface Order {
-  order_id: string;
-  code: string;
-  date: string;
-  service: string;
-  total: string;
-  status: string;
-  status_display: string;
-  tone: "default" | "success" | "danger" | "warning";
-  total_amount: number;
-}
+type OrderTone = "default" | "success" | "danger" | "warning";
 
 interface OrderItem {
   name: string;
@@ -290,893 +44,760 @@ interface OrderDetail {
   address: string;
   paymentMethod: string;
   notes: string;
-  weight?: string;
   total: string;
   status: string;
-  status_display: string;
-  tone: string;
+  status_display?: string;
+  tone: OrderTone;
   items: OrderItem[];
   timeline: TimelineEvent[];
 }
 
-export default function UserOrdersPage() {
-  const [columns, setColumns] = useState(defaultColumns);
-  const [orderList, setOrderList] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [deleteOrderCode, setDeleteOrderCode] = useState<string | null>(null);
-  const [period, setPeriod] = useState<Period>("Tháng");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const [selectedWeek, setSelectedWeek] = useState<{ from: Date; to: Date } | undefined>(undefined);
-  const [selectedMonth, setSelectedMonth] = useState<{ month: number; year: number } | undefined>(undefined);
-  const [monthPickerYear, setMonthPickerYear] = useState(new Date().getFullYear());
-  const [weekPickerMonth, setWeekPickerMonth] = useState(new Date().getMonth());
-  const [weekPickerYear, setWeekPickerYear] = useState(new Date().getFullYear());
-  const [page, setPage] = useState(1);
-  const [ratingDialogOpen, setRatingDialogOpen] = useState(false);
-  const [ratingValue, setRatingValue] = useState(5);
-  const [reviewText, setReviewText] = useState("");
-  const [reorderConfirmOpen, setReorderConfirmOpen] = useState(false);
-  const [selectedTimelineOrder, setSelectedTimelineOrder] = useState<Order | null>(null);
-  const [selectedOrderDetail, setSelectedOrderDetail] = useState<OrderDetail | null>(null);
-  const [isDetailLoading, setIsDetailLoading] = useState(false);
+const checkboxClass =
+  "relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all checked:border-emerald-300 checked:bg-emerald-300 after:absolute after:left-1/2 after:top-1/2 after:hidden after:h-[9px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-[58%] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block";
 
-  const fetchOrders = () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setOrderList(orders as unknown as Order[]);
-      return;
-    }
-    setIsLoading(true);
-    fetch(`${API_BASE_URL}/api/orders`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error();
-        return res.json() as Promise<Order[]>;
-      })
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setOrderList(data);
-        } else {
-          setOrderList(orders as unknown as Order[]);
-        }
-      })
-      .catch((err) => {
-        console.error("Error fetching orders:", err);
-        setOrderList(orders as unknown as Order[]);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+const statusStyle: Record<string, { color: string; bg: string; tone: OrderTone }> = {
+  "Tiếp nhận": { color: "#3b82f6", bg: "rgba(59,130,246,0.08)", tone: "default" },
+  "Đang giặt": { color: "#8b5cf6", bg: "rgba(139,92,246,0.08)", tone: "default" },
+  "Kiểm tra": { color: "#f59e0b", bg: "rgba(245,158,11,0.08)", tone: "warning" },
+  "Chờ thanh toán": { color: "#ec4899", bg: "rgba(236,72,153,0.08)", tone: "warning" },
+  "Hoàn thành": { color: "#10b981", bg: "rgba(16,185,129,0.08)", tone: "success" },
+  "Đã hủy": { color: "#ef4444", bg: "rgba(239,68,68,0.08)", tone: "danger" },
+};
+
+const statusOptions: FilterOption[] = [
+  { id: "Tất cả", label: "Tất cả", color: "#64748b", bgColor: "rgba(100,116,139,0.09)" },
+  ...Object.entries(statusStyle).map(([status, style]) => ({
+    id: status,
+    label: status,
+    color: style.color,
+    bgColor: style.bg,
+  })),
+];
+
+function parseOrderDate(dateStr: string) {
+  if (!dateStr) return new Date();
+  if (dateStr.includes("-")) {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+  const [day, month, year] = dateStr.split("/").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+const statuses = ["Tiếp nhận", "Đang giặt", "Kiểm tra", "Chờ thanh toán", "Hoàn thành", "Đã hủy"];
+
+const statusDotColor: Record<string, string> = {
+  "Tiếp nhận": "#3b82f6",
+  "Đang giặt": "#8b5cf6",
+  "Kiểm tra": "#f59e0b",
+  "Chờ thanh toán": "#ec4899",
+  "Hoàn thành": "#10b981",
+  "Đã hủy": "#ef4444",
+};
+
+const statusBgColor: Record<string, string> = {
+  "Tiếp nhận": "rgba(59,130,246,0.08)",
+  "Đang giặt": "rgba(139,92,246,0.08)",
+  "Kiểm tra": "rgba(245,158,11,0.08)",
+  "Chờ thanh toán": "rgba(236,72,153,0.08)",
+  "Hoàn thành": "rgba(16,185,129,0.08)",
+  "Đã hủy": "rgba(239,68,68,0.08)",
+};
+
+const getStatusTime = (
+  order: Order,
+  statusIndex: number,
+  isCurrentStatus: boolean,
+) => {
+  if (statusIndex === 0)
+    return `${order.createdAt} · Tiếp nhận`;
+
+  const baseDate = parseOrderDate(order.createdAt);
+  if (Number.isNaN(baseDate.getTime()))
+    return `${order.createdAt} · Chưa ghi giờ`;
+
+  baseDate.setHours(baseDate.getHours() + statusIndex * 2);
+  return baseDate.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+
+function getOrderTimeline(order: Order): TimelineEvent[] {
+  const dateStr = order.createdAt;
+  if (order.status === "Đang giặt") {
+    return [
+      { stage: "Đã nhận đồ", time: `${dateStr} 08:00`, status: "completed", desc: "Nhân viên đã nhận túi đồ từ khách hàng." },
+      { stage: "Phân loại", time: `${dateStr} 09:15`, status: "completed", desc: "Đồ giặt đã được phân loại theo chất liệu và màu sắc." },
+      { stage: "Đang giặt", time: `${dateStr} 10:30`, status: "current", desc: "Đồ đang được giặt bằng nước giặt sinh học." },
+      { stage: "Sấy & gấp", time: "--:--", status: "pending", desc: "Sấy khô và xếp gọn vào túi." },
+      { stage: "Giao lại", time: "--:--", status: "pending", desc: "Giao đồ sạch tận tay khách hàng." },
+    ];
+  }
+
+  if (order.status === "Đã hủy") {
+    return [
+      { stage: "Đã nhận yêu cầu", time: `${dateStr} 09:00`, status: "completed", desc: "Hệ thống ghi nhận yêu cầu đặt dịch vụ." },
+      { stage: "Đã hủy đơn", time: `${dateStr} 10:15`, status: "cancelled", desc: "Khách hàng yêu cầu hủy đơn hàng." },
+    ];
+  }
+
+  return [
+    { stage: "Đã nhận đồ", time: `${dateStr} 08:30`, status: "completed", desc: "Nhân viên đã nhận túi đồ từ khách hàng." },
+    { stage: "Phân loại", time: `${dateStr} 09:40`, status: "completed", desc: "Đồ giặt đã được phân loại." },
+    { stage: "Đang giặt", time: `${dateStr} 11:00`, status: "completed", desc: "Đồ đã được giặt sạch." },
+    { stage: "Sấy & gấp", time: `${dateStr} 14:30`, status: "completed", desc: "Đồ đã được sấy khô và đóng gói." },
+    { stage: order.status === "Hoàn thành" ? "Giao lại hoàn tất" : "Chờ giao lại", time: `${dateStr} 16:30`, status: order.status === "Hoàn thành" ? "completed" : "current", desc: order.status === "Hoàn thành" ? "Đã giao túi đồ sạch cho khách hàng." : "Đang chờ tài xế giao lại." },
+  ];
+}
+
+function getLocalDetail(order: Order): OrderDetail {
+  const tone = statusStyle[order.status]?.tone || "default";
+  const amountStr = order.amount.toLocaleString("vi-VN") + "đ";
+  return {
+    code: order.id,
+    customerName: "Nguyễn Thị Hương",
+    phone: order.phone || "0901 234 567",
+    address: order.address || "12 Nguyễn Trãi, Quận 1, TP.HCM",
+    paymentMethod: "Thanh toán khi nhận đồ",
+    notes: order.note || "Giặt riêng đồ sáng màu, dùng nước xả thơm nhẹ.",
+    total: amountStr,
+    status: order.status,
+    status_display: order.status,
+    tone,
+    items: [
+      { name: order.service, qty: order.quantity || "1", price: amountStr },
+      { name: "Đóng gói sạch", qty: "1", price: "0đ" },
+    ],
+    timeline: getOrderTimeline(order),
   };
+}
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+function numericTotal(order: Order) {
+  return order.amount;
+}
 
-  useEffect(() => {
-    if (!selectedTimelineOrder) {
-      setSelectedOrderDetail(null);
-      return;
-    }
+function exportOrders(format: "pdf" | "excel" | "csv", fileName: string, columns: DashboardTableColumn[], rows: Order[]) {
+  const exportColumns = columns.filter((column) => column.visible !== false && column.id !== "actions");
+  const headers = exportColumns.map((column) => column.label);
+  const values = rows.map((row) => exportColumns.map((column) => String(row[column.id as keyof Order] ?? "")));
 
-    const token = localStorage.getItem("token");
-    if (!token) {
-      const localDetail = getOrderDetails(selectedTimelineOrder.code);
-      const timeline = getOrderTimeline(selectedTimelineOrder);
-      setSelectedOrderDetail({
-        ...localDetail,
-        code: selectedTimelineOrder.code,
-        status: selectedTimelineOrder.status,
-        status_display: selectedTimelineOrder.status_display || selectedTimelineOrder.status,
-        tone: selectedTimelineOrder.tone,
-        total: selectedTimelineOrder.total,
-        timeline,
-      });
-      return;
-    }
+  if (format === "csv") {
+    const csv = "\uFEFF" + [headers, ...values].map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${fileName}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    return;
+  }
 
-    setIsDetailLoading(true);
-    fetch(`${API_BASE_URL}/api/orders/${selectedTimelineOrder.code}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error();
-        return res.json() as Promise<OrderDetail>;
-      })
-      .then((data) => {
-        setSelectedOrderDetail(data);
-      })
-      .catch((err) => {
-        console.error("Error fetching order details:", err);
-        const localDetail = getOrderDetails(selectedTimelineOrder.code);
-        const timeline = getOrderTimeline(selectedTimelineOrder);
-        setSelectedOrderDetail({
-          ...localDetail,
-          code: selectedTimelineOrder.code,
-          status: selectedTimelineOrder.status,
-          status_display: selectedTimelineOrder.status_display || selectedTimelineOrder.status,
-          tone: selectedTimelineOrder.tone,
-          total: selectedTimelineOrder.total,
-          timeline,
-        });
-      })
-      .finally(() => {
-        setIsDetailLoading(false);
-      });
-  }, [selectedTimelineOrder]);
+  const head = headers.map((header) => `<th>${header}</th>`).join("");
+  const body = values.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("");
+  if (format === "excel") {
+    const url = URL.createObjectURL(new Blob([`<html><meta charset="utf-8" /><body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`], { type: "application/vnd.ms-excel" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${fileName}.xls`;
+    link.click();
+    URL.revokeObjectURL(url);
+    return;
+  }
 
-  const pageSize = 4;
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return;
+  printWindow.document.write(`<html><body><h2>Đơn của tôi</h2><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`);
+  printWindow.document.close();
+  printWindow.print();
+}
 
-  const handlePeriodChange = (newPeriod: Period) => {
-    setPeriod(newPeriod);
-    setDateRange(undefined);
-    setSelectedWeek(undefined);
-    setSelectedMonth(undefined);
-    setCalendarOpen(false);
-    setPage(1);
-  };
-
-  const filteredOrders = useMemo(() => {
-    return orderList.filter((order) => {
-      if (!dateRange?.from) return true;
-
-      const orderDate = parseOrderDate(order.date);
-      orderDate.setHours(0, 0, 0, 0);
-
-      const from = new Date(dateRange.from);
-      from.setHours(0, 0, 0, 0);
-
-      if (orderDate < from) return false;
-
-      if (dateRange.to) {
-        const to = new Date(dateRange.to);
-        to.setHours(23, 59, 59, 999);
-        if (orderDate > to) return false;
-      }
-      return true;
-    });
-  }, [dateRange, orderList]);
-
-  const pageCount = Math.ceil(filteredOrders.length / pageSize) || 1;
-  const paginatedOrders = useMemo(() => {
-    return filteredOrders.slice((page - 1) * pageSize, page * pageSize);
-  }, [filteredOrders, page, pageSize]);
-
-
-
-  const totalOrders = filteredOrders.length;
-  const completedOrders = filteredOrders.filter((o) => o.status === "Hoàn tất").length;
-  const totalSpent = useMemo(() => {
-    const sum = filteredOrders.reduce((acc, o) => {
-      const numeric = parseInt(o.total.replace(/\D/g, ""), 10) || 0;
-      return acc + numeric;
-    }, 0);
-    if (sum >= 1000000) {
-      return (sum / 1000000).toLocaleString("vi-VN", { maximumFractionDigits: 2 }) + "tr";
-    }
-    return sum.toLocaleString("vi-VN") + "đ";
-  }, [filteredOrders]);
-
-  const pickerActions = (
-    <div className="flex flex-wrap items-center gap-2">
-      {period === "Ngày" && (
-        <div className="relative">
-          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={`w-[180px] sm:w-[220px] justify-start text-left font-normal ${dateRange?.from ? "pr-8" : ""}`}
-                size="sm"
-              >
-                <CalendarDays className="mr-2 size-4 shrink-0 text-muted-foreground" />
-                <span className="truncate">
-                  {dateRange?.from ? (
-                    dateRange.to && dateRange.to.getTime() !== dateRange.from.getTime() ? (
-                      <>
-                        {dateRange.from.toLocaleDateString("vi-VN")} –{" "}
-                        {dateRange.to.toLocaleDateString("vi-VN")}
-                      </>
-                    ) : (
-                      dateRange.from.toLocaleDateString("vi-VN")
-                    )
-                  ) : (
-                    "Chọn ngày"
-                  )}
-                </span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="range"
-                selected={dateRange}
-                onSelect={(range) => {
-                  setDateRange(range);
-                  setPage(1);
-                }}
-              />
-            </PopoverContent>
-          </Popover>
-          {dateRange?.from && (
-            <button
-              type="button"
-              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-sm bg-background p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                setDateRange(undefined);
-                setPage(1);
-              }}
-              title="Xóa bộ lọc ngày"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
-      )}
-
-      {period === "Tuần" && (
-        <div className="relative">
-          <Popover
-            open={calendarOpen}
-            onOpenChange={(open) => {
-              setCalendarOpen(open);
-              if (open) {
-                const refDate = selectedWeek?.from || new Date();
-                setWeekPickerMonth(refDate.getMonth());
-                setWeekPickerYear(refDate.getFullYear());
-              }
-            }}
-          >
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={`w-[180px] sm:w-[220px] justify-start text-left font-normal ${selectedWeek ? "pr-8" : ""}`}
-                size="sm"
-              >
-                <CalendarDays className="mr-2 size-4 shrink-0 text-muted-foreground" />
-                <span className="truncate">
-                  {selectedWeek ? (
-                    <>
-                      {selectedWeek.from.toLocaleDateString("vi-VN")} –{" "}
-                      {selectedWeek.to.toLocaleDateString("vi-VN")}
-                    </>
-                  ) : (
-                    "Chọn tuần"
-                  )}
-                </span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[280px] p-3" align="end">
-              <div className="flex items-center justify-between mb-3">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  onClick={() => {
-                    if (weekPickerMonth === 0) {
-                      setWeekPickerMonth(11);
-                      setWeekPickerYear((y) => y - 1);
-                    } else {
-                      setWeekPickerMonth((m) => m - 1);
-                    }
-                  }}
-                >
-                  <ChevronLeft className="size-4" />
-                </Button>
-                <span className="text-sm font-medium">
-                  Tháng {weekPickerMonth + 1} / {weekPickerYear}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  onClick={() => {
-                    if (weekPickerMonth === 11) {
-                      setWeekPickerMonth(0);
-                      setWeekPickerYear((y) => y + 1);
-                    } else {
-                      setWeekPickerMonth((m) => m + 1);
-                    }
-                  }}
-                >
-                  <ChevronRight className="size-4" />
-                </Button>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                {getWeeksInMonth(weekPickerYear, weekPickerMonth).slice(0, 4).map((week, idx) => {
-                  const isSelected = selectedWeek &&
-                    selectedWeek.from.getTime() === week.from.getTime() &&
-                    selectedWeek.to.getTime() === week.to.getTime();
-                  return (
-                    <Button
-                      key={idx}
-                      variant={isSelected ? "default" : "outline"}
-                      className="w-full justify-between text-xs font-normal h-9 px-3"
-                      onClick={() => {
-                        setSelectedWeek(week);
-                        setDateRange({ from: week.from, to: week.to });
-                        setPage(1);
-                        setCalendarOpen(false);
-                      }}
-                    >
-                      <span className="font-medium">Tuần {idx + 1}</span>
-                      <span className={isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}>
-                        {week.from.toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' })} - {week.to.toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' })}
-                      </span>
-                    </Button>
-                  );
-                })}
-              </div>
-            </PopoverContent>
-          </Popover>
-          {selectedWeek && (
-            <button
-              type="button"
-              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-sm bg-background p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedWeek(undefined);
-                setDateRange(undefined);
-                setPage(1);
-              }}
-              title="Xóa bộ lọc tuần"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
-      )}
-
-      {period === "Tháng" && (
-        <div className="relative">
-          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={`w-[180px] sm:w-[220px] justify-start text-left font-normal ${selectedMonth ? "pr-8" : ""}`}
-                size="sm"
-              >
-                <CalendarDays className="mr-2 size-4 shrink-0 text-muted-foreground" />
-                <span className="truncate">
-                  {selectedMonth ? (
-                    `Tháng ${selectedMonth.month + 1} / ${selectedMonth.year}`
-                  ) : (
-                    "Chọn tháng"
-                  )}
-                </span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[260px] p-3" align="end">
-              <div className="flex items-center justify-between mb-3">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  onClick={() => setMonthPickerYear((y) => y - 1)}
-                >
-                  <ChevronLeft className="size-4" />
-                </Button>
-                <span className="text-sm font-medium">{monthPickerYear}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  onClick={() => setMonthPickerYear((y) => y + 1)}
-                >
-                  <ChevronRight className="size-4" />
-                </Button>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {monthNames.map((name, idx) => (
-                  <Button
-                    key={name}
-                    variant={selectedMonth?.month === idx && selectedMonth?.year === monthPickerYear ? "default" : "ghost"}
-                    size="sm"
-                    className="h-9 text-xs"
-                    onClick={() => {
-                      setSelectedMonth({ month: idx, year: monthPickerYear });
-                      const from = new Date(monthPickerYear, idx, 1);
-                      const to = new Date(monthPickerYear, idx + 1, 0, 23, 59, 59, 999);
-                      setDateRange({ from, to });
-                      setPage(1);
-                      setCalendarOpen(false);
-                    }}
-                  >
-                    {name}
-                  </Button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-          {selectedMonth && (
-            <button
-              type="button"
-              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-sm bg-background p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedMonth(undefined);
-                setDateRange(undefined);
-                setPage(1);
-              }}
-              title="Xóa bộ lọc tháng"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
-      )}
-
-      <PeriodTabs value={period} onChange={handlePeriodChange} />
-    </div>
-  );
-
+function KpiCard({
+  title,
+  value,
+  hint,
+  change,
+  icon: Icon,
+  color,
+}: {
+  title: string;
+  value: string;
+  hint: string;
+  change: string;
+  icon: LucideIcon;
+  color: string;
+}) {
   return (
-    <PageShell
-      title="Đơn Của Tôi"
-      description="Theo dõi trạng thái đơn hiện tại, hóa đơn và lịch sử giặt theo thời gian."
-      action={pickerActions}
-    >
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Tổng đơn" value={String(totalOrders)} hint={`Thống kê theo ${period.toLowerCase()}`} icon={ClipboardList} />
-        <StatCard label="Đã hoàn tất" value={String(completedOrders)} hint="Không có khiếu nại" icon={PackageCheck} tone="success" />
-        <StatCard label="Tổng chi tiêu" value={totalSpent} hint="Đã gồm ưu đãi" icon={ReceiptText} />
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="grid size-7 place-items-center rounded-lg" style={{ color, backgroundColor: `${color}14` }}>
+            <Icon className="size-3.5" />
+          </span>
+          <p className="text-xs font-semibold text-slate-900">{title}</p>
+        </div>
+        <ArrowUpRight className="size-3.5 text-slate-400" />
       </div>
-
-      <SectionCard title="Danh sách đơn hàng" description="Các đơn gần nhất của tài khoản này.">
-        <div className="overflow-x-auto">
-          <Table className="table-fixed w-max">
-            <TableHeader>
-              <TableRow className="bg-[#f7f7f7] hover:bg-[#f7f7f7]">
-                {columns.filter(c => c.visible).map(col => (
-                  <ResizableTableHead key={col.id} width={col.width} className={col.alignRight ? "text-right" : ""}>
-                    {col.alignRight ? (
-                      <div className="text-right w-full">{col.label}</div>
-                    ) : (
-                      col.label
-                    )}
-                  </ResizableTableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedOrders.length > 0 ? (
-                paginatedOrders.map((order) => (
-                  <TableRow
-                    key={order.code}
-                    className="cursor-pointer hover:bg-neutral-50/80 transition-colors"
-                    onClick={() => setSelectedTimelineOrder(order)}
-                    title="Nhấp để xem tiến trình chi tiết"
-                  >
-                    {columns.filter(c => c.visible).map(col => {
-                      if (col.id === "code") return <TableCell key={col.id} className="font-semibold text-neutral-900 truncate overflow-hidden max-w-0" title={order.code}>{order.code}</TableCell>;
-                      if (col.id === "date") return <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={order.date}>{order.date}</TableCell>;
-                      if (col.id === "service") return <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={order.service}>{order.service}</TableCell>;
-                      if (col.id === "status") return (
-                        <TableCell key={col.id} className="truncate overflow-hidden max-w-0">
-                          <StatusBadge tone={order.tone}>{order.status}</StatusBadge>
-                        </TableCell>
-                      );
-                      if (col.id === "total") return <TableCell key={col.id} className="text-right font-medium truncate overflow-hidden max-w-0" title={order.total}>{order.total}</TableCell>;
-                      if (col.id === "actions") return (
-                        <TableCell key={col.id} className="text-right overflow-hidden max-w-0" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-md"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteOrderCode(order.code);
-                            }}
-                            title="Xóa đơn hàng"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </TableCell>
-                      );
-                      return null;
-                    })}
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={columns.filter(c => c.visible).length} className="h-24 text-center text-muted-foreground">
-                    Không tìm thấy đơn hàng nào trong khoảng thời gian đã chọn.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-        <PaginationFooter
-          page={page}
-          pageCount={pageCount}
-          total={totalOrders}
-          onPrev={() => setPage((p) => Math.max(1, p - 1))}
-          onNext={() => setPage((p) => Math.min(pageCount, p + 1))}
-        />
-      </SectionCard>
-
-      <SectionCard title="Thao tác nhanh" description="Lặp lại đơn cũ hoặc tải hóa đơn.">
-        <div className="grid gap-3 p-4 md:grid-cols-3">
-          <Button
-            variant="outline"
-            className="justify-start gap-2 border-neutral-200 hover:bg-neutral-50"
-            onClick={() => {
-              setReorderConfirmOpen(true);
-            }}
-          >
-            <RotateCcw className="size-4 text-neutral-500" />
-            Đặt lại DH-1032
-          </Button>
-
-          <Button
-            variant="outline"
-            className="justify-start gap-2 border-neutral-200 hover:bg-neutral-50"
-            onClick={() => {
-              toast.success("Đang xuất hóa đơn PDF...", {
-                description: "Tệp hóa đơn tháng 5 đang được chuẩn bị tải về máy."
-              });
-            }}
-          >
-            <Download className="size-4 text-neutral-500" />
-            Tải hóa đơn tháng 5
-          </Button>
-
-          <Button
-            variant="outline"
-            className="justify-start gap-2 border-neutral-200 hover:bg-neutral-50"
-            onClick={() => {
-              setRatingValue(5);
-              setReviewText("");
-              setRatingDialogOpen(true);
-            }}
-          >
-            <Star className="size-4 text-neutral-500" />
-            Đánh giá dịch vụ
-          </Button>
-        </div>
-      </SectionCard>
-
-      {/* Rating Dialog */}
-      <Dialog open={ratingDialogOpen} onOpenChange={setRatingDialogOpen}>
-        <DialogContent className="max-w-[400px] gap-0 rounded-xl border border-black/10 bg-white p-0 shadow-lg" showCloseButton={false}>
-          <DialogHeader className="gap-3 px-5 pb-4 pt-5">
-            <DialogTitle className="text-base font-semibold leading-6 text-neutral-900">
-              Đánh giá dịch vụ giặt là
-            </DialogTitle>
-            <DialogDescription className="text-sm leading-5 text-[#6b6b6b]">
-              Ý kiến phản hồi của bạn giúp chúng tôi nâng cao chất lượng phục vụ mỗi ngày.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="px-5 pb-5">
-            <div className="flex gap-2 justify-center my-4">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setRatingValue(star)}
-                  className="focus:outline-none transition-transform hover:scale-110"
-                >
-                  <Star
-                    className={`size-8 ${star <= ratingValue
-                        ? "fill-amber-400 text-amber-400"
-                        : "text-zinc-200 border-zinc-200"
-                      }`}
-                  />
-                </button>
-              ))}
-            </div>
-
-            <textarea
-              placeholder="Nhập ý kiến đóng góp của bạn tại đây (không bắt buộc)..."
-              value={reviewText}
-              onChange={(e) => setReviewText(e.target.value)}
-              className="w-full min-h-[100px] rounded-lg border border-zinc-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900 resize-none text-neutral-800 placeholder-zinc-400"
-            />
-          </div>
-
-          <DialogFooter className="m-0 flex-row justify-end gap-2 rounded-b-xl border-t border-black/[0.06] bg-[#fafafa] px-4 py-3">
-            <DialogClose asChild>
-              <Button variant="ghost" className="text-neutral-500 hover:text-neutral-900">Hủy</Button>
-            </DialogClose>
-            <Button
-              className="bg-neutral-900 text-white hover:bg-neutral-800"
-              onClick={() => {
-                toast.success("Gửi đánh giá thành công!", {
-                  description: `Cảm ơn bạn đã đánh giá ${ratingValue} sao cho dịch vụ!`
-                });
-                setRatingDialogOpen(false);
-              }}
-            >
-              Gửi đánh giá
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Reorder Confirmation Dialog */}
-      <Dialog open={reorderConfirmOpen} onOpenChange={setReorderConfirmOpen}>
-        <DialogContent className="max-w-[400px] gap-0 rounded-xl border border-black/10 bg-white p-0 shadow-lg" showCloseButton={false}>
-          <DialogHeader className="gap-3 px-5 pb-4 pt-5">
-            <DialogTitle className="text-base font-semibold leading-6 text-neutral-900">
-              Xác nhận đặt lại đơn hàng
-            </DialogTitle>
-            <DialogDescription className="text-sm leading-5 text-[#6b6b6b]">
-              Bạn có chắc chắn muốn đặt lại đơn hàng **DH-1032** không? Các dịch vụ từ đơn hàng này sẽ được tự động thêm vào giỏ đồ của bạn.
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter className="m-0 flex-row justify-end gap-2 rounded-b-xl border-t border-black/[0.06] bg-[#fafafa] px-4 py-3">
-            <DialogClose asChild>
-              <Button variant="ghost" className="text-neutral-500 hover:text-neutral-900">Hủy</Button>
-            </DialogClose>
-            <Button
-              className="bg-neutral-900 text-white hover:bg-neutral-800"
-              onClick={() => {
-                toast.success("Đặt lại đơn hàng DH-1032 thành công!", {
-                  description: "Các dịch vụ của đơn DH-1032 đã được thêm vào giỏ đồ của bạn."
-                });
-                setReorderConfirmOpen(false);
-              }}
-            >
-              Xác nhận
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={!!deleteOrderCode} onOpenChange={(open) => !open && setDeleteOrderCode(null)}>
-        <DialogContent className="max-w-[400px] gap-0 rounded-xl border border-black/10 bg-white p-0 shadow-lg" showCloseButton={false}>
-          <DialogHeader className="gap-3 px-5 pb-4 pt-5">
-            <DialogTitle className="text-base font-semibold leading-6 text-neutral-900">
-              Xác nhận hủy đơn hàng
-            </DialogTitle>
-            <DialogDescription className="text-sm leading-5 text-[#6b6b6b]">
-              Bạn có chắc chắn muốn yêu cầu hủy đơn hàng **{deleteOrderCode}** không? Thao tác này chỉ áp dụng cho đơn hàng đang chờ xử lý và không thể hoàn tác.
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter className="m-0 flex-row justify-end gap-2 rounded-b-xl border-t border-black/[0.06] bg-[#fafafa] px-4 py-3">
-            <DialogClose asChild>
-              <Button variant="ghost" className="text-neutral-500 hover:text-neutral-900">Hủy</Button>
-            </DialogClose>
-            <Button
-              className="bg-red-600 text-white hover:bg-red-700"
-              onClick={async () => {
-                if (!deleteOrderCode) return;
-                const token = localStorage.getItem("token");
-                if (!token) {
-                  toast.error("Vui lòng đăng nhập.");
-                  return;
-                }
-
-                try {
-                  const response = await fetch(`${API_BASE_URL}/api/orders/${deleteOrderCode}/cancel`, {
-                    method: "POST",
-                    headers: {
-                      Authorization: `Bearer ${token}`,
-                    },
-                  });
-
-                  const data = await response.json();
-                  if (response.ok) {
-                    toast.success(`Đã hủy đơn hàng ${deleteOrderCode} thành công!`);
-                    fetchOrders();
-                  } else {
-                    toast.error(data.detail || "Không thể hủy đơn hàng.");
-                  }
-                } catch (error) {
-                  console.error("Error cancelling order:", error);
-                  toast.error("Có lỗi xảy ra khi kết nối máy chủ.");
-                } finally {
-                  setDeleteOrderCode(null);
-                }
-              }}
-            >
-              Hủy đơn
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Order Progress & Timeline Dialog */}
-      <Dialog open={!!selectedTimelineOrder} onOpenChange={(open) => !open && setSelectedTimelineOrder(null)}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[760px] w-[95vw] max-h-[90vh] sm:max-h-[85vh] flex flex-col gap-0 rounded-xl border border-black/10 bg-white p-0 shadow-lg" showCloseButton={false}>
-          <DialogHeader className="gap-3 px-5 pb-3 pt-4 border-b border-neutral-100 shrink-0">
-            <DialogTitle className="text-base font-semibold leading-6 text-neutral-900 flex items-center justify-between">
-              <span>Chi tiết tiến trình đơn hàng</span>
-              {selectedTimelineOrder && (
-                <span className="text-xs font-mono bg-neutral-100 text-neutral-600 px-2.5 py-1 rounded-md font-bold">
-                  {selectedTimelineOrder.code}
-                </span>
-              )}
-            </DialogTitle>
-            <DialogDescription className="text-xs leading-4 text-[#6b6b6b]">
-              Xem trạng thái xử lý chi tiết và các mốc thời gian thực tế của đơn hàng dưới dạng bảng tiến trình.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="px-5 py-4 w-full min-w-0 overflow-y-auto flex-1 pr-4 mr-1 scrollbar-thin">
-            {isDetailLoading ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-3">
-                <div className="size-8 rounded-full border-4 border-stone-200 border-t-stone-800 animate-spin" />
-                <p className="text-sm text-stone-500 font-medium">Đang tải thông tin đơn hàng...</p>
-              </div>
-            ) : selectedTimelineOrder && selectedOrderDetail ? (
-              <>
-                {/* Detailed Order Panel Grid */}
-                <div className="grid gap-3.5 md:grid-cols-2 mb-4">
-                  {/* Left Column: Customer & Delivery Details */}
-                  <div className="rounded-xl border border-neutral-100 bg-neutral-50/50 p-3 space-y-2">
-                    <h4 className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
-                      Thông tin giao nhận
-                    </h4>
-                    <div className="space-y-1.5 text-xs">
-                      <div>
-                        <span className="text-neutral-400 block text-[9px] font-bold uppercase tracking-wide">Khách hàng</span>
-                        <span className="font-semibold text-neutral-800">{selectedOrderDetail.customerName}</span>
-                        {selectedOrderDetail.phone && (
-                          <span className="text-neutral-500 ml-1 text-[11px]">({selectedOrderDetail.phone})</span>
-                        )}
-                      </div>
-                      <div>
-                        <span className="text-neutral-400 block text-[9px] font-bold uppercase tracking-wide">Địa chỉ nhận/giao</span>
-                        <span className="font-medium text-neutral-700 text-xs leading-relaxed block mt-0.5">{selectedOrderDetail.address}</span>
-                      </div>
-                      <div>
-                        <span className="text-neutral-400 block text-[9px] font-bold uppercase tracking-wide">Ghi chú</span>
-                        <span className="font-medium text-neutral-600 italic text-xs bg-white border border-neutral-100/70 rounded px-2 py-1 mt-0.5 block leading-relaxed">
-                          "{selectedOrderDetail.notes || "Không có ghi chú"}"
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column: Items list & Payment */}
-                  <div className="rounded-xl border border-neutral-100 bg-neutral-50/50 p-3 flex flex-col justify-between">
-                    <div>
-                      <h4 className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5">
-                        Chi tiết dịch vụ
-                      </h4>
-                      <div className="space-y-1 max-h-[90px] overflow-y-auto pr-1">
-                        {selectedOrderDetail.items.map((item, idx) => (
-                          <div key={idx} className="flex justify-between items-center text-xs border-b border-neutral-100/60 pb-0.5 last:border-0 last:pb-0">
-                            <span className="text-neutral-600 font-medium truncate max-w-[200px]" title={item.name}>
-                              {item.name}
-                            </span>
-                            <span className="text-neutral-400 text-[10px] ml-1 font-mono">({item.qty})</span>
-                            <span className="font-mono text-neutral-800 font-medium ml-auto">{item.price}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="border-t border-neutral-200/60 pt-2 mt-2 space-y-1">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-neutral-400 font-medium">Thanh toán:</span>
-                        <span className="font-medium text-neutral-700 font-mono text-[10px] bg-neutral-100/80 px-1.5 py-0.5 rounded">{selectedOrderDetail.paymentMethod}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-neutral-500 font-bold">Tổng thanh toán:</span>
-                        <span className="text-xs font-bold text-neutral-900">{selectedTimelineOrder.total}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Additional Quick Summary Badge Row */}
-                <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs border-y border-neutral-100 py-2 px-1 bg-neutral-50/20">
-                  <div className="flex items-center">
-                    <span className="text-neutral-400 mr-1.5 font-medium">Mã đơn hàng:</span>
-                    <span className="font-mono font-bold text-neutral-800 bg-neutral-100 px-1.5 py-0.5 rounded">{selectedTimelineOrder.code}</span>
-                  </div>
-                  <div>
-                    <span className="text-neutral-400 mr-1.5 font-medium">Ngày đặt:</span>
-                    <span className="font-semibold text-neutral-700">{selectedTimelineOrder.date}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="text-neutral-400 mr-1.5 font-medium">Trạng thái:</span>
-                    <StatusBadge tone={selectedTimelineOrder.tone}>{selectedTimelineOrder.status}</StatusBadge>
-                  </div>
-                </div>
-
-                {/* Timeline Table */}
-                <div className="mt-3 border-t border-neutral-100 pt-3">
-                  <h3 className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-2">
-                    Bảng tiến trình thực hiện
-                  </h3>
-                  <div className="overflow-x-auto rounded-lg border border-neutral-100 w-full">
-                    <Table className="min-w-[600px] w-full">
-                      <TableHeader>
-                        <TableRow className="bg-[#f7f7f7] hover:bg-[#f7f7f7] h-8">
-                          <TableHead className="w-[50px] text-center font-bold text-neutral-800 text-xs py-1">STT</TableHead>
-                          <TableHead className="w-[140px] font-bold text-neutral-800 text-xs py-1">Giai đoạn</TableHead>
-                          <TableHead className="w-[110px] font-bold text-neutral-800 text-xs py-1">Trạng thái</TableHead>
-                          <TableHead className="w-[130px] font-bold text-neutral-800 text-xs py-1">Thời gian</TableHead>
-                          <TableHead className="font-bold text-neutral-800 text-xs py-1">Mô tả hoạt động</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedOrderDetail.timeline.map((event, idx) => {
-                          const getStatusConfig = (status: string) => {
-                            switch (status) {
-                              case "completed":
-                                return { text: "Đã xong", badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200/50" };
-                              case "current":
-                                return { text: "Đang xử lý", badgeClass: "bg-amber-50 text-amber-700 border-amber-200 border-dashed animate-pulse" };
-                              case "cancelled":
-                                return { text: "Đã hủy", badgeClass: "bg-rose-50 text-rose-700 border-rose-200/50" };
-                              default:
-                                return { text: "Chờ xử lý", badgeClass: "bg-zinc-50 text-zinc-400 border-zinc-200" };
-                            }
-                          };
-
-                          const config = getStatusConfig(event.status);
-
-                          const getStageColor = (idx: number, status: string) => {
-                            if (status === "pending") return "text-zinc-400 font-normal";
-                            switch (idx) {
-                              case 0: return "text-indigo-600 font-semibold";
-                              case 1: return "text-blue-600 font-semibold";
-                              case 2: return "text-amber-600 font-semibold";
-                              case 3: return "text-cyan-600 font-semibold";
-                              case 4: return "text-emerald-600 font-semibold";
-                              default: return "text-neutral-800 font-semibold";
-                            }
-                          };
-
-                          return (
-                            <TableRow key={idx} className={`h-8 hover:bg-neutral-50/50 transition-colors ${event.status === "pending" ? "bg-neutral-50/30 text-zinc-400" : ""}`}>
-                              <TableCell className="text-center font-mono text-xs py-1.5">
-                                <span className={`inline-flex size-5 items-center justify-center rounded-full text-[10px] font-bold ${event.status === "pending"
-                                    ? "border border-zinc-200 bg-white text-zinc-400"
-                                    : event.status === "cancelled"
-                                      ? "bg-rose-500 text-white"
-                                      : "bg-neutral-900 text-white"
-                                  }`}>
-                                  {idx + 1}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-xs py-1.5">
-                                <span className={getStageColor(idx, event.status)}>{event.stage}</span>
-                              </TableCell>
-                              <TableCell className="text-xs py-1.5">
-                                <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-medium border ${config.badgeClass}`}>
-                                  {config.text}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-xs py-1.5 font-mono font-medium text-neutral-600">
-                                {event.time}
-                              </TableCell>
-                              <TableCell className={`text-xs py-1.5 leading-relaxed ${event.status === "pending" ? "text-zinc-400/80" : "text-neutral-600"}`}>
-                                {event.desc}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-8 text-stone-500 text-sm">
-                Không tìm thấy chi tiết đơn hàng.
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="m-0 flex-row justify-end gap-2 rounded-b-xl border-t border-black/[0.06] bg-[#fafafa] px-4 py-3 shrink-0">
-            <DialogClose asChild>
-              <Button className="bg-neutral-900 text-white hover:bg-neutral-800" size="sm">Đóng</Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </PageShell>
+      <p className="mt-3 text-xl font-semibold tracking-tight text-slate-950">{value}</p>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="truncate text-xs text-slate-400">{hint}</span>
+        <span className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium" style={{ color, backgroundColor: `${color}12` }}>
+          {change}
+        </span>
+      </div>
+    </div>
   );
 }
 
+export default function UserOrdersPage() {
+  const router = useRouter();
+  const range = useDashboardTimeRangeStore((state) => state.range);
+  const rangeLabel = formatRange(normalizeRange(range));
+
+  const [columns, setColumns] = useState<DashboardTableColumn[]>(defaultColumns);
+  const [orderList, setOrderList] = useState<Order[]>(initialOrders as unknown as Order[]);
+  const [query, setQuery] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("Tất cả");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [tableResizeMode, setTableResizeMode] = useState<"fit" | "custom">("fit");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [customPageSize, setCustomPageSize] = useState("");
+  const [openPageSizeMenu, setOpenPageSizeMenu] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedDetail, setSelectedDetail] = useState<OrderDetail | null>(null);
+  const [deleteOrderCode, setDeleteOrderCode] = useState<string | null>(null);
+  const [purgeOrderId, setPurgeOrderId] = useState<string | null>(null);
+  const [ratingOpen, setRatingOpen] = useState(false);
+  const [ratingValue, setRatingValue] = useState(5);
+  const [reviewText, setReviewText] = useState("");
+  const [reorderOpen, setReorderOpen] = useState(false);
+  const [openHistory, setOpenHistory] = useState(false);
+  const [activeHistoryOrderId, setActiveHistoryOrderId] = useState<string | null>(null);
+
+  const selectedOrders = useMemo(() => {
+    const selected = orderList.filter((order) => selectedIds.has(order.id));
+    return selected.length > 0 ? selected : orderList;
+  }, [orderList, selectedIds]);
+
+  const filteredOrders = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return orderList.filter((order) => {
+      const matchesStatus = selectedStatus === "Tất cả" || order.status === selectedStatus;
+      const matchesQuery =
+        !normalizedQuery ||
+        [order.id, order.createdAt, order.service, order.quantity, order.status, order.staff]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(normalizedQuery));
+
+      return matchesStatus && matchesQuery;
+    });
+  }, [orderList, query, selectedStatus]);
+
+  const totalOrders = filteredOrders.length;
+  const completedOrders = filteredOrders.filter((order) => order.status === "Hoàn thành").length;
+  const inProgressOrders = filteredOrders.filter((order) => order.status !== "Hoàn thành" && order.status !== "Đã hủy").length;
+  const totalSpent = filteredOrders.reduce((sum, order) => sum + numericTotal(order), 0);
+  const latestOrder = orderList.find((order) => order.status !== "Đã hủy");
+  const pageCount = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const paginatedOrders = filteredOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const visibleIds = filteredOrders.map((order) => order.id);
+  const selectedVisibleCount = visibleIds.filter((id) => selectedIds.has(id)).length;
+  const allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
+  const totalVisibleWidth = columns.filter((column) => column.visible !== false).reduce((sum, column) => sum + (column.width || 150), 0);
+
+  const toggleOrder = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) visibleIds.forEach((id) => next.delete(id));
+      else visibleIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const applyCustomPageSize = () => {
+    const parsed = Number(customPageSize);
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+    setPageSize(Math.floor(parsed));
+    setPage(1);
+    setOpenPageSizeMenu(false);
+  };
+
+  const openOrderDetail = (order: Order) => {
+    setSelectedOrder(order);
+    setSelectedDetail(getLocalDetail(order));
+  };
+
+  const handleCancelOrder = () => {
+    if (!deleteOrderCode) return;
+    setOrderList((prev) =>
+      prev.map((order) =>
+        order.id === deleteOrderCode
+          ? { ...order, status: "Đã hủy" }
+          : order,
+      ),
+    );
+    toast.success(`Đã chuyển ${deleteOrderCode} sang trạng thái đã hủy trong dữ liệu demo.`);
+    setDeleteOrderCode(null);
+  };
+
+  const handlePurgeOrder = () => {
+    if (!purgeOrderId) return;
+    setOrderList((prev) => prev.filter((order) => order.id !== purgeOrderId));
+    toast.success(`Đã xóa dữ liệu đơn hàng ${purgeOrderId} thành công.`);
+    setPurgeOrderId(null);
+  };
+
+  const renderCell = (order: Order, column: DashboardTableColumn) => {
+    if (column.id === "id") {
+      return (
+        <TableCell key={column.id} className="pl-4 font-semibold text-slate-900">
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={selectedIds.has(order.id)} onChange={() => toggleOrder(order.id)} onClick={(event) => event.stopPropagation()} className={checkboxClass} aria-label={`Chọn ${order.id}`} />
+            {order.id}
+          </div>
+        </TableCell>
+      );
+    }
+    if (column.id === "customer") {
+      return (
+        <TableCell key={column.id}>
+          <div className="flex min-w-0 items-center gap-2">
+            <Image src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={order.customer} width={24} height={24} className="size-6 shrink-0 rounded-full object-cover" />
+            <span className="truncate font-semibold text-slate-800">{order.customer}</span>
+          </div>
+        </TableCell>
+      );
+    }
+    if (column.id === "staff") {
+      return (
+        <TableCell key={column.id}>
+          <div className="flex min-w-0 items-center gap-2">
+            <Image src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={order.staff} width={24} height={24} className="size-6 shrink-0 rounded-full object-cover" />
+            <span className="truncate font-medium text-slate-700">{order.staff}</span>
+          </div>
+        </TableCell>
+      );
+    }
+    if (column.id === "status") {
+      const style = statusStyle[order.status] || { color: "#64748b", bg: "rgba(100,116,139,0.09)" };
+      return (
+        <TableCell key={column.id} className="truncate overflow-hidden max-w-0">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium truncate max-w-full" style={{ color: style.color, backgroundColor: style.bg }}>
+            <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: style.color }} />
+            <span className="truncate">{order.status}</span>
+          </span>
+        </TableCell>
+      );
+    }
+    if (column.id === "amount") {
+      return (
+        <TableCell key={column.id} className="font-semibold text-slate-900">
+          {order.amount.toLocaleString("vi-VN") + "đ"}
+        </TableCell>
+      );
+    }
+    if (column.id === "actions") {
+      const canCancel = order.status === "Tiếp nhận";
+      const canDelete = order.status === "Hoàn thành" || order.status === "Đã hủy";
+
+      return (
+        <TableCell key={column.id} className="px-4" onClick={(event) => event.stopPropagation()}>
+          <div className="flex items-center gap-1.5">
+            <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 hover:bg-slate-50" onClick={() => openOrderDetail(order)}>
+              <Eye className="size-3" />
+              Xem
+            </button>
+            {canCancel && (
+              <button type="button" className="inline-flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-red-50 hover:text-red-600" onClick={() => setDeleteOrderCode(order.id)} title="Yêu cầu hủy">
+                <Trash2 className="size-3.5" />
+              </button>
+            )}
+            {canDelete && (
+              <button type="button" className="inline-flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => setPurgeOrderId(order.id)} title="Xóa dữ liệu">
+                <Trash2 className="size-3.5 text-red-500" />
+              </button>
+            )}
+          </div>
+        </TableCell>
+      );
+    }
+    return <TableCell key={column.id} className="font-medium text-slate-700">{String(order[column.id as keyof Order] ?? "")}</TableCell>;
+  };
+
+  return (
+    <PageShell fullHeight>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 pt-5 pb-0">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              title="Đơn gần nhất"
+              value={latestOrder ? latestOrder.id : "--"}
+              hint={latestOrder ? latestOrder.createdAt : "Chưa có đơn"}
+              change={latestOrder ? latestOrder.status : "Trống"}
+              icon={ReceiptText}
+              color={latestOrder ? (statusStyle[latestOrder.status]?.color || "#06b6d4") : "#06b6d4"}
+            />
+            <KpiCard
+              title="Đang xử lý"
+              value={String(inProgressOrders)}
+              hint="Đang giặt hoặc chờ xử lý"
+              change={inProgressOrders > 0 ? `${inProgressOrders} đơn` : "Không có"}
+              icon={RotateCcw}
+              color="#f59e0b"
+            />
+            <KpiCard
+              title="Đã hoàn tất"
+              value={String(completedOrders)}
+              hint="Không có khiếu nại"
+              change="Ổn định"
+              icon={PackageCheck}
+              color="#10b981"
+            />
+            <KpiCard
+              title="Tổng chi tiêu"
+              value={totalSpent.toLocaleString("vi-VN") + "đ"}
+              hint="Tổng tích lũy"
+              change="Đã gồm ưu đãi"
+              icon={Star}
+              color="#3b82f6"
+            />
+          </div>
+
+          <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
+            <Toolbar
+              leftContent={
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold text-slate-900">Bảng đơn hàng</h2>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{filteredOrders.length}</span>
+                  </div>
+                </div>
+              }
+              query={query}
+              onQueryChange={(value) => { setQuery(value); setPage(1); }}
+              columns={columns}
+              onColumnsChange={setColumns}
+              tableResizeMode={tableResizeMode}
+              onTableResizeModeChange={setTableResizeMode}
+              selectedCount={selectedIds.size}
+              onOpenAddColumn={() => toast.info("Bảng đơn của tôi dùng bộ cột cố định.")}
+              onOpenHistory={() => setOpenHistory(true)}
+              onExport={(format, fileName) => {
+                const selectedRows = filteredOrders.filter((order) => selectedIds.has(order.id));
+                exportOrders(format, fileName, columns, selectedRows.length > 0 ? selectedRows : filteredOrders);
+              }}
+              defaultExportFileName={`don-cua-toi-${new Date().toISOString().slice(0, 10)}`}
+              onCreateClick={() => router.push("/user/bookings")}
+              createLabel="Đặt lịch"
+              defaultColumnIds={defaultColumns.map((column) => column.id)}
+              searchPlaceholder="Tìm mã đơn, dịch vụ, trạng thái..."
+              showHistoryButton={true}
+              showAddColumnButton={false}
+            />
+            <FilterBar
+              rangeLabel={rangeLabel}
+              selectedValue={selectedStatus}
+              onValueChange={(value) => { setSelectedStatus(value); setPage(1); }}
+              filterOptions={statusOptions}
+              filterLabel="Trạng thái đơn"
+              allSelected={allVisibleSelected}
+              disabled={visibleIds.length === 0}
+              selectedCount={selectedVisibleCount}
+              totalCount={visibleIds.length}
+              itemLabel="đơn"
+              checkboxClass={checkboxClass}
+              onToggleAll={toggleAll}
+            />
+            <TableView
+              columns={columns}
+              rows={paginatedOrders}
+              pageSize={pageSize}
+              emptyMessage="Không tìm thấy đơn hàng phù hợp."
+              tableResizeMode={tableResizeMode}
+              totalVisibleWidth={totalVisibleWidth}
+              renderCell={renderCell}
+              page={safePage}
+              pageCount={pageCount}
+              totalRows={filteredOrders.length}
+              customPageSize={customPageSize}
+              openPageSizeMenu={openPageSizeMenu}
+              onOpenPageSizeMenuChange={setOpenPageSizeMenu}
+              onCustomPageSizeChange={setCustomPageSize}
+              onApplyCustomPageSize={applyCustomPageSize}
+              onUpdatePageSize={(size) => { setPageSize(size); setPage(1); }}
+              onPageChange={setPage}
+            />
+          </div>
+        </div>
+      </div>
+
+      <Dialog open={ratingOpen} onOpenChange={setRatingOpen}>
+        <DialogContent className="max-w-[480px] gap-0 rounded-xl border border-slate-200 bg-white p-0 shadow-lg" showCloseButton={false}>
+          <DialogHeader className="gap-3 px-5 pb-4 pt-5">
+            <DialogTitle className="text-base font-semibold text-slate-900">Đánh giá dịch vụ</DialogTitle>
+            <DialogDescription className="text-sm text-slate-500">Ý kiến của bạn giúp chúng tôi cải thiện chất lượng dịch vụ tốt hơn.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 px-5 pb-5">
+            <div className="flex justify-center gap-1.5 py-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button key={star} type="button" onClick={() => setRatingValue(star)} className="focus:outline-none">
+                  <Star className={`size-8 transition-colors ${star <= ratingValue ? "fill-amber-400 text-amber-400" : "text-slate-200"}`} />
+                </button>
+              ))}
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="review-comment" className="text-xs font-semibold text-slate-700">Ý kiến phản hồi (nếu có)</label>
+              <Textarea id="review-comment" placeholder="Nhập cảm nhận của bạn về chất lượng dịch vụ..." value={reviewText} onChange={(e) => setReviewText(e.target.value)} className="min-h-[90px] border-slate-200 text-xs focus-visible:border-slate-300 focus-visible:ring-0" />
+            </div>
+          </div>
+          <DialogFooter className="m-0 flex-row justify-end gap-2 rounded-b-xl border-t border-slate-100 bg-slate-50 px-4 py-3">
+            <DialogClose asChild><Button variant="outline" className="h-8 border-slate-200 text-xs">Hủy</Button></DialogClose>
+            <Button className="h-8 bg-slate-950 text-xs text-white hover:bg-slate-800" onClick={() => { toast.success(`Cảm ơn bạn đã đánh giá ${ratingValue} sao.`); setRatingOpen(false); }}>Gửi đánh giá</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reorderOpen} onOpenChange={setReorderOpen}>
+        <DialogContent className="max-w-[400px] gap-0 rounded-xl border border-slate-200 bg-white p-0 shadow-lg" showCloseButton={false}>
+          <DialogHeader className="gap-3 px-5 pb-4 pt-5">
+            <DialogTitle className="text-base font-semibold text-slate-900">Đặt lại đơn hàng?</DialogTitle>
+            <DialogDescription className="text-sm text-slate-500">Các dịch vụ từ đơn hàng sẽ được dùng làm mẫu cho lịch đặt mới.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="m-0 flex-row justify-end gap-2 rounded-b-xl border-t border-slate-100 bg-slate-50 px-4 py-3">
+            <DialogClose asChild><Button variant="outline" className="h-8 border-slate-200 text-xs">Hủy</Button></DialogClose>
+            <Button className="h-8 bg-slate-950 text-xs text-white hover:bg-slate-800" onClick={() => { toast.success("Đã tạo mẫu đặt lại."); setReorderOpen(false); }}>Xác nhận</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteOrderCode} onOpenChange={(open) => !open && setDeleteOrderCode(null)}>
+        <DialogContent className="max-w-[400px] gap-0 rounded-xl border border-slate-200 bg-white p-0 shadow-lg" showCloseButton={false}>
+          <DialogHeader className="gap-3 px-5 pb-4 pt-5">
+            <DialogTitle className="text-base font-semibold text-slate-900">Yêu cầu hủy đơn?</DialogTitle>
+            <DialogDescription className="text-sm text-slate-500">Bạn có chắc chắn muốn yêu cầu hủy đơn {deleteOrderCode} không?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="m-0 flex-row justify-end gap-2 rounded-b-xl border-t border-slate-100 bg-slate-50 px-4 py-3">
+            <DialogClose asChild><Button variant="outline" className="h-8 border-slate-200 text-xs">Đóng</Button></DialogClose>
+            <Button className="h-8 bg-red-600 text-xs text-white hover:bg-red-700" onClick={handleCancelOrder}>Hủy đơn</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!purgeOrderId} onOpenChange={(open) => !open && setPurgeOrderId(null)}>
+        <DialogContent className="max-w-[400px] gap-0 rounded-xl border border-slate-200 bg-white p-0 shadow-lg" showCloseButton={false}>
+          <DialogHeader className="gap-3 px-5 pb-4 pt-5">
+            <DialogTitle className="text-base font-semibold text-slate-900">Xóa dữ liệu đơn hàng?</DialogTitle>
+            <DialogDescription className="text-sm text-slate-500">Bạn có chắc chắn muốn xóa dữ liệu lần giặt {purgeOrderId} không? Thao tác này không thể hoàn tác.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="m-0 flex-row justify-end gap-2 rounded-b-xl border-t border-slate-100 bg-slate-50 px-4 py-3">
+            <DialogClose asChild><Button variant="outline" className="h-8 border-slate-200 text-xs">Đóng</Button></DialogClose>
+            <Button className="h-8 bg-red-600 text-xs text-white hover:bg-red-700" onClick={handlePurgeOrder}>Xóa dữ liệu</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
+        <DialogContent className="flex max-h-[86vh] w-[95vw] max-w-[820px] flex-col gap-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-0 shadow-lg" showCloseButton={false}>
+          <DialogHeader className="border-b border-slate-100 px-5 pb-3 pt-4">
+            <DialogTitle className="flex items-center justify-between text-base font-semibold text-slate-900">
+              <span>Chi tiết tiến trình đơn hàng</span>
+              {selectedOrder && <span className="rounded-md bg-slate-100 px-2.5 py-1 font-mono text-xs text-slate-600">{selectedOrder.id}</span>}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">Thông tin giao nhận, dịch vụ và các mốc trạng thái.</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            {!selectedDetail ? (
+              <div className="grid min-h-[240px] place-items-center text-sm text-slate-400">Không tìm thấy thông tin đơn hàng.</div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Thông tin giao nhận</h3>
+                    <div className="mt-3 space-y-2 text-sm">
+                      <p><span className="text-slate-400">Khách hàng:</span> <span className="font-semibold text-slate-900">{selectedDetail.customerName}</span></p>
+                      <p><span className="text-slate-400">Điện thoại:</span> <span className="font-medium text-slate-700">{selectedDetail.phone}</span></p>
+                      <p><span className="text-slate-400">Địa chỉ:</span> <span className="font-medium text-slate-700">{selectedDetail.address}</span></p>
+                      <p className="rounded-md border border-slate-200 bg-white p-2 text-xs italic text-slate-500">{selectedDetail.notes}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">Chi tiết dịch vụ</h3>
+                    <div className="mt-3 space-y-2">
+                      {selectedDetail.items.map((item) => (
+                        <div key={`${item.name}-${item.qty}`} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 text-sm last:border-0">
+                          <span className="min-w-0 truncate font-medium text-slate-700">{item.name} <span className="text-xs text-slate-400">({item.qty})</span></span>
+                          <span className="shrink-0 font-semibold text-slate-900">{item.price}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-sm">
+                      <span className="text-slate-500">{selectedDetail.paymentMethod}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-lg border border-slate-200">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50 hover:bg-slate-50">
+                        <TableHead className="w-[56px] text-center text-xs">STT</TableHead>
+                        <TableHead className="text-xs">Giai đoạn</TableHead>
+                        <TableHead className="text-xs">Trạng thái</TableHead>
+                        <TableHead className="text-xs">Thời gian</TableHead>
+                        <TableHead className="text-xs">Mô tả</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedDetail.timeline.map((event, index) => (
+                        <TableRow key={`${event.stage}-${index}`} className="text-xs">
+                          <TableCell className="text-center">
+                            <span className={`inline-grid size-5 place-items-center rounded-full text-[10px] font-bold ${event.status === "pending" ? "bg-slate-100 text-slate-400" : event.status === "cancelled" ? "bg-red-500 text-white" : "bg-slate-950 text-white"}`}>{index + 1}</span>
+                          </TableCell>
+                          <TableCell className="font-semibold text-slate-800">{event.stage}</TableCell>
+                          <TableCell>
+                            <StatusBadge tone={event.status === "completed" ? "success" : event.status === "current" ? "warning" : event.status === "cancelled" ? "danger" : "default"}>
+                              {event.status === "completed" ? "Đã xong" : event.status === "current" ? "Đang xử lý" : event.status === "cancelled" ? "Đã hủy" : "Chờ xử lý"}
+                            </StatusBadge>
+                          </TableCell>
+                          <TableCell className="font-mono text-slate-600">{event.time}</TableCell>
+                          <TableCell className="text-slate-500">{event.desc}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="m-0 flex-row justify-end gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3">
+            <DialogClose asChild><Button className="h-8 bg-slate-950 text-xs text-white hover:bg-slate-800">Đóng</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <HistoryModal
+        open={openHistory}
+        onClose={() => setOpenHistory(false)}
+        title="Lịch sử đơn hàng"
+        items={selectedOrders}
+        activeItemId={activeHistoryOrderId || selectedOrders[0]?.id || null}
+        onActiveItemChange={setActiveHistoryOrderId}
+        itemLabel="đơn"
+        renderSidebarItem={(order, active) => (
+          <div className="flex min-w-0 items-start gap-2">
+            <Image
+              src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+              alt={order.customer}
+              width={28}
+              height={28}
+              className="size-7 shrink-0 rounded-full object-cover ring-1 ring-background"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-xs font-semibold text-foreground">{order.id}</span>
+                <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ color: statusDotColor[order.status], backgroundColor: statusBgColor[order.status] }}>
+                  {order.status}
+                </span>
+              </div>
+              <p className="mt-1.5 truncate text-xs font-medium text-foreground/80">{order.customer}</p>
+              <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{order.service} · {order.quantity}</p>
+            </div>
+          </div>
+        )}
+        renderDetail={(order) => {
+          const currentStatusIndex = statuses.indexOf(order.status);
+          return (
+            <div>
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <Image
+                    src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+                    alt={order.customer}
+                    width={40}
+                    height={40}
+                    className="size-10 shrink-0 rounded-full object-cover ring-1 ring-border"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {order.id} · {order.customer}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {order.phone} · {order.address}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {order.service} · {order.quantity} · {order.staff}
+                    </p>
+                  </div>
+                </div>
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+                  style={{
+                    color: statusDotColor[order.status],
+                    backgroundColor: statusBgColor[order.status],
+                  }}
+                >
+                  <span className="size-2 rounded-full" style={{ backgroundColor: statusDotColor[order.status] }} />
+                  {order.status}
+                </span>
+              </div>
+
+              <div className="space-y-0 text-sm">
+                {statuses.map((status, idx) => {
+                  const reached = idx <= currentStatusIndex;
+                  const isCurrentStatus = status === order.status;
+                  const statusColor = statusDotColor[status];
+                  const statusBg = statusBgColor[status];
+
+                  return (
+                    <div key={status} className="flex gap-2.5">
+                      <div className="flex flex-col items-center">
+                        <span
+                          className="mt-1 size-3 rounded-full border-2 bg-white"
+                          style={reached ? { borderColor: statusColor, backgroundColor: statusColor } : undefined}
+                        />
+                        {idx < statuses.length - 1 && (
+                          <span
+                            className="mt-1 h-9 w-0.5 bg-border/60"
+                            style={reached ? { backgroundColor: statusColor, opacity: 0.35 } : undefined}
+                          />
+                        )}
+                      </div>
+                      <div className="min-w-0 pb-3">
+                        <p
+                          className={`inline-flex rounded-md px-1.5 py-0.5 text-xs font-medium ${reached ? "" : "text-muted-foreground"}`}
+                          style={reached ? { color: statusColor, backgroundColor: statusBg } : undefined}
+                        >
+                          {status}
+                        </p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {reached
+                            ? getStatusTime(order, idx, isCurrentStatus)
+                            : "Chưa cập nhật"}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }}
+      />
+    </PageShell>
+  );
+}

@@ -77,11 +77,9 @@ export default function OrdersPage() {
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [currentStaffName] = useState(() => {
     if (typeof window === "undefined") return "Chưa gán";
-    return (
-      localStorage.getItem("accountName") ||
-      localStorage.getItem("username") ||
-      "Chưa gán"
-    );
+    const username = localStorage.getItem("username");
+    const displayName = localStorage.getItem("fullName") || localStorage.getItem("fullname") || localStorage.getItem("accountName");
+    return displayName && displayName !== username ? displayName : "Chưa gán";
   });
 
   /* ─── Derived values ─── */
@@ -94,7 +92,7 @@ export default function OrdersPage() {
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
-      const source = `${order.id} ${order.customer} ${order.phone} ${order.address} ${order.service} ${order.staff}`;
+      const source = `${order.id} ${order.customer} ${order.phone} ${order.address} ${order.service} ${order.staff} ${order.washer || ""} ${order.dryer || ""}`;
       const matchQuery = source.toLowerCase().includes(query.toLowerCase());
       const matchStatus = selectedStatus === "Tất cả" || order.status === selectedStatus;
       const createdAt = fromOrderDate(order.createdAt);
@@ -132,14 +130,6 @@ export default function OrdersPage() {
     () => columns.filter((c) => c.visible && c.id !== "actions"),
     [columns],
   );
-  const hourOptions = useMemo(
-    () => Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0")),
-    [],
-  );
-  const minuteOptions = useMemo(
-    () => Array.from({ length: 60 }, (_, m) => String(m).padStart(2, "0")),
-    [],
-  );
   const visibleColumnIds = useMemo(
     () => new Set(columns.filter((c) => c.visible).map((c) => c.id)),
     [columns],
@@ -148,9 +138,13 @@ export default function OrdersPage() {
     () => columns.filter((c) => c.visible).reduce((sum, c) => sum + (c.width || 150), 0),
     [columns],
   );
+  const formatDisplayDate = (dateStr?: string) => {
+    if (!dateStr) return "-";
+    const [year, month, day] = dateStr.split("-");
+    if (!year || !month || !day) return dateStr;
+    return `${day}/${month}/${year}`;
+  };
 
-  const activeHistoryOrder =
-    selectedOrders.find((o) => o.id === activeHistoryOrderId) ?? selectedOrders[0] ?? null;
   const allVisibleSelected =
     visibleOrderIds.length > 0 && visibleOrderIds.every((id) => selectedOrderIds.has(id));
   const allKanbanOrdersSelected =
@@ -285,6 +279,8 @@ export default function OrdersPage() {
       appointment: order.appointment,
       deliveryDate: order.deliveryDate,
       deliveryTime: order.deliveryTime,
+      washer: order.washer || "",
+      dryer: order.dryer || "",
       staff: order.staff,
       status: order.status,
       createdAt: order.createdAt,
@@ -315,14 +311,18 @@ export default function OrdersPage() {
       handleCreateOrder();
       window.history.replaceState(null, "", window.location.pathname);
     } else if (matchedOrder && action === "invoice") {
-      setInvoiceOrder(matchedOrder);
-      setQuery(matchedOrder.id);
-      setPage(1);
+      queueMicrotask(() => {
+        setInvoiceOrder(matchedOrder);
+        setQuery(matchedOrder.id);
+        setPage(1);
+      });
       window.history.replaceState(null, "", window.location.pathname);
     } else if (matchedOrder && action === "edit") {
-      openEditForm(matchedOrder);
-      setQuery(matchedOrder.id);
-      setPage(1);
+      queueMicrotask(() => {
+        openEditForm(matchedOrder);
+        setQuery(matchedOrder.id);
+        setPage(1);
+      });
       window.history.replaceState(null, "", window.location.pathname);
     }
 
@@ -343,6 +343,8 @@ export default function OrdersPage() {
       appointment: form.appointment || "Chưa hẹn",
       deliveryDate: form.deliveryDate || form.createdAt || new Date().toISOString().slice(0, 10),
       deliveryTime: form.deliveryTime || "Chưa hẹn",
+      washer: form.washer || "",
+      dryer: form.dryer || "",
       staff: currentStaffName || form.staff || "Chưa gán",
       createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
       note: `${form.note}${form.discount ? ` · Mã ${form.discount}` : ""}`,
@@ -379,8 +381,11 @@ export default function OrdersPage() {
       { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
       { id: "service", label: "Dịch vụ", type: "text" },
       { id: "quantity", label: "Số lượng", type: "text", placeholder: "5 kg / 3 món" },
+      { id: "washer", label: "Máy giặt", type: "text", placeholder: "MG-01" },
+      { id: "dryer", label: "Máy sấy", type: "text", placeholder: "MS-01" },
+      { id: "deliveryDate", label: "Ngày giao", type: "date" },
       { id: "deliveryTime", label: "Giờ giao", type: "time" },
-      { id: "createdAt", label: "Thời gian", type: "date" },
+      { id: "createdAt", label: "Ngày tạo đơn", type: "date" },
       { id: "staff", label: "Nhân viên xử lý", type: "custom_staff" },
       { id: "amount", label: "Giá tiền", type: "number" },
       { id: "status", label: "Cập nhật trạng thái", type: "custom_status" },
@@ -407,6 +412,7 @@ export default function OrdersPage() {
       color: { text: statusDotColor[status], bg: statusBgColor[status] },
     }));
   }, []);
+  const isOrderStatus = (value: string): value is OrderStatus => statuses.includes(value as OrderStatus);
 
   const renderOrderCell = (order: Order, col: { id: string }) => {
     if (col.id === "id") return (
@@ -447,6 +453,20 @@ export default function OrdersPage() {
         {order.amount.toLocaleString("vi-VN")}đ
       </TableCell>
     );
+    if (col.id === "washer" || col.id === "dryer") {
+      const value = order[col.id];
+      const displayValue = value ? String(value) : "Chưa có";
+      return (
+        <TableCell key={col.id} className={`truncate overflow-hidden max-w-0 ${value ? "text-slate-600" : "text-slate-400 italic"}`} title={displayValue}>
+          {displayValue}
+        </TableCell>
+      );
+    }
+    if (col.id === "deliveryDate") return (
+      <TableCell key={col.id} className="text-slate-500 truncate overflow-hidden max-w-0" title={formatDisplayDate(order.deliveryDate)}>
+        {formatDisplayDate(order.deliveryDate)}
+      </TableCell>
+    );
     if (col.id === "deliveryTime") return (
       <TableCell key={col.id} className="text-slate-500 truncate overflow-hidden max-w-0" title={order.deliveryTime}>{order.deliveryTime}</TableCell>
     );
@@ -471,9 +491,9 @@ export default function OrdersPage() {
       </TableCell>
     );
     if (col.id === "createdAt") return (
-      <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={order.createdAt}>
+      <TableCell key={col.id} className="truncate overflow-hidden max-w-0" title={formatDisplayDate(order.createdAt)}>
         <div className="flex items-center gap-2 text-slate-500">
-          <span className="text-xs truncate">{order.createdAt}</span>
+          <span className="text-xs truncate">{formatDisplayDate(order.createdAt)}</span>
         </div>
       </TableCell>
     );
@@ -541,7 +561,7 @@ export default function OrdersPage() {
         </div>
         <p className="mt-2 truncate text-xs text-slate-500">{order.service} · {order.quantity}</p>
         <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2">
-          <span className="truncate text-[11px] text-slate-500">{order.deliveryTime}</span>
+          <span className="truncate text-[11px] text-slate-500">{formatDisplayDate(order.deliveryDate)} · {order.deliveryTime}</span>
           <span className="text-[13px] font-bold text-slate-900">{order.amount.toLocaleString("vi-VN")}đ</span>
         </div>
         <div className="mt-2 flex justify-end">
@@ -595,7 +615,8 @@ export default function OrdersPage() {
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                 <span>{order.phone}</span>
                 <span>{order.service} · {order.quantity}</span>
-                <span>Hẹn giao: {order.deliveryDate} · {order.deliveryTime}</span>
+                <span>Hẹn giao: {formatDisplayDate(order.deliveryDate)} · {order.deliveryTime}</span>
+                {(order.washer || order.dryer) && <span>{order.washer || "Chưa có máy giặt"} · {order.dryer || "Chưa có máy sấy"}</span>}
               </div>
               {order.note && <p className="mt-2 text-xs text-slate-400">{order.note}</p>}
             </div>
@@ -664,7 +685,10 @@ export default function OrdersPage() {
           <FilterBar
             rangeLabel={rangeLabel}
             selectedValue={selectedStatus}
-            onValueChange={(status) => { setSelectedStatus(status as any); setPage(1); }}
+            onValueChange={(status) => {
+              setSelectedStatus(status === "Tất cả" || isOrderStatus(status) ? status : "Tất cả");
+              setPage(1);
+            }}
             filterOptions={orderFilterOptions}
             filterLabel="Trạng thái đơn"
             allSelected={viewMode === "Bảng kéo" ? allKanbanOrdersSelected : allVisibleSelected}
@@ -713,10 +737,11 @@ export default function OrdersPage() {
               draggedItemId={draggedOrderId}
               onDraggedItemIdChange={setDraggedOrderId}
               dragOverColumnId={dragOverStatus}
-              onDragOverColumnIdChange={(status) => setDragOverStatus(status as any)}
+              onDragOverColumnIdChange={(status) => setDragOverStatus(isOrderStatus(status) ? status : null)}
               onDropItem={(orderId, status) => {
+                if (!isOrderStatus(status)) return;
                 setOrders((prev) =>
-                  prev.map((o) => (o.id === orderId ? { ...o, status: status as any } : o)),
+                  prev.map((o) => (o.id === orderId ? { ...o, status } : o)),
                 );
               }}
               renderCard={renderOrderKanbanCard}
@@ -738,7 +763,7 @@ export default function OrdersPage() {
         title={editingOrderId ? `Chi tiết đơn ${editingOrderId}` : "Tạo đơn giặt mới"}
         fields={orderFormFields}
         form={form}
-        onFormChange={(newForm) => setForm(newForm as any)}
+        onFormChange={(newForm) => setForm({ ...emptyForm, ...newForm })}
         onSave={saveOrder}
         customColumns={customColumns}
         currentStaffName={currentStaffName}
@@ -759,7 +784,7 @@ export default function OrdersPage() {
         activeItemId={activeHistoryOrderId}
         onActiveItemChange={setActiveHistoryOrderId}
         itemLabel="đơn"
-        renderSidebarItem={(order, active) => (
+        renderSidebarItem={(order) => (
           <div className="flex min-w-0 items-start gap-2">
             <Image
               src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"

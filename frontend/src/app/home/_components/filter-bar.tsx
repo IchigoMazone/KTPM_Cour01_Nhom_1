@@ -53,6 +53,8 @@ export function FilterBar({
   onToggleAll,
   showSelectionBar = true,
 }: FilterBarProps) {
+  const selectedOption = filterOptions.find((option) => option.id === selectedValue);
+
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-3">
       <button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
@@ -63,7 +65,7 @@ export function FilterBar({
         <DropdownMenuTrigger asChild>
           <button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
             <SlidersHorizontal className="size-3.5" />
-            {selectedValue}
+            {selectedOption?.label || selectedValue}
             <ChevronDown className="size-3.5" />
           </button>
         </DropdownMenuTrigger>
