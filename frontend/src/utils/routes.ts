@@ -3,7 +3,7 @@ import {
   ClipboardList,
   CircleUser,
   BadgeCheck,
-  CalendarDays,
+  Truck,
   Package,
   MessageCircle,
 } from "lucide-react";
@@ -24,7 +24,7 @@ export const menus = [
   },
   {
     label: "Giao nhận",
-    icon: CalendarDays,
+    icon: Truck,
     path: "/home/delivery",
     description: "Lịch lấy/trả đồ, tài xế và trạng thái giao hàng",
   },

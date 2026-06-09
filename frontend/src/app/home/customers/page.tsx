@@ -2,43 +2,66 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
+import { MetricCard } from "../_components/metric-card";
+import { Toolbar } from "../_components/toolbar";
+import { FilterBar } from "../_components/filter-bar";
+import { TableView } from "../_components/table-view";
+import { KanbanView } from "../_components/kanban-view";
+import { ListView } from "../_components/list-view";
+import { FormDialog, type FormField } from "../_components/form-dialog";
+import { AddColumnDialog } from "../_components/add-column-dialog";
 import {
   Search,
   Star,
   Plus,
   ChevronDown,
-  ChevronsLeft,
-  ChevronsRight,
-  Pencil,
-  Trash2,
   Clock,
+  Download,
   EyeOff,
+  FileDown,
+  FileSpreadsheet,
+  FileText,
+  FileType,
   History,
-  Kanban,
-  Table2,
-  List,
+  Settings,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TableCell } from "@/components/ui/table";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   PageShell,
+  ViewModeTabs,
+  type DashboardViewMode,
 } from "../_components/dashboard-primitives";
+import {
+  DashboardDataTable,
+  DashboardSelectionBar,
+  DashboardTableFooter,
+  type DashboardTableColumn,
+} from "@/src/components/common/dashboard-data-table";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 
-type Customer = {
-  id: string;
+type CustomerFields = {
   name: string;
   phone: string;
   address: string;
@@ -50,6 +73,28 @@ type Customer = {
   email: string;
   birthday: string;
   createdAt?: string;
+};
+
+type Customer = CustomerFields & {
+  id: string;
+  [key: string]: string | number | undefined;
+};
+
+type ExportFormat = "pdf" | "excel" | "csv";
+type CustomerColumn = DashboardTableColumn;
+type SaveFilePickerWindow = Window & {
+  showSaveFilePicker?: (options: {
+    suggestedName?: string;
+    types?: Array<{
+      description: string;
+      accept: Record<string, string[]>;
+    }>;
+  }) => Promise<{
+    createWritable: () => Promise<{
+      write: (data: Blob) => Promise<void>;
+      close: () => Promise<void>;
+    }>;
+  }>;
 };
 
 const seedCustomers: Customer[] = [
@@ -76,8 +121,27 @@ const rankColor: Record<string, { text: string; bg: string }> = {
 
 const allRankColor = "#0f766e";
 const allRankBgColor = "rgba(15,118,110,0.09)";
+const rankDotColors = Object.fromEntries(
+  Object.entries(rankColor).map(([rank, color]) => [rank, color.text])
+);
 
-const pageSize = 10;
+const initialPageSize = 10;
+const defaultColumns: CustomerColumn[] = [
+  { id: "name", label: "Tên khách hàng", width: 208, visible: true },
+  { id: "email", label: "Email", width: 176, visible: true },
+  { id: "phone", label: "Số điện thoại", width: 112, visible: true },
+  { id: "address", label: "Địa chỉ", width: 190, visible: true },
+  { id: "totalOrders", label: "Tổng đơn", width: 82, visible: true },
+  { id: "totalSpend", label: "Chi tiêu", width: 112, visible: true },
+  { id: "points", label: "Điểm", width: 76, visible: true },
+  { id: "rank", label: "Hạng", width: 92, visible: true },
+  { id: "birthday", label: "Ngày sinh", width: 92, visible: true },
+  { id: "createdAt", label: "Ngày tạo tài khoản", width: 128, visible: true },
+  { id: "note", label: "Ghi chú", width: 150, visible: true },
+  { id: "actions", label: "Thao tác", width: 150, visible: true },
+];
+const defaultColumnIdSet = new Set(defaultColumns.map((column) => column.id));
+const rankOptions = ["Kim cương", "Vàng", "Bạc", "Thường"];
 
 const formatBirthday = (dateStr?: string) => {
   if (!dateStr) return "-";
@@ -106,12 +170,56 @@ export default function CustomersPage() {
   const [selectedRank, setSelectedRank] = useState<string | "Tất cả">("Tất cả");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer>(seedCustomers[0]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPageSize);
+  const [columns, setColumns] = useState<CustomerColumn[]>(defaultColumns);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<DashboardViewMode>("Bảng");
+  const [tableResizeMode, setTableResizeMode] = useState<"fit" | "custom">("fit");
+  const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
+  const [draggedCustomerId, setDraggedCustomerId] = useState<string | null>(null);
+  const [dragOverRank, setDragOverRank] = useState<string | null>(null);
+  const [openPageSizeMenu, setOpenPageSizeMenu] = useState(false);
+  const [customPageSize, setCustomPageSize] = useState("");
+  const [openAddColumn, setOpenAddColumn] = useState(false);
+  const [newColumnName, setNewColumnName] = useState("");
   const [openForm, setOpenForm] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [form, setForm] = useState<typeof emptyForm & Record<string, string>>(emptyForm);
+
+  const customerFormFields = useMemo<FormField[]>(() => {
+    const fieldByColumnId: Record<string, FormField> = {
+      name: { id: "name", label: "Họ tên", type: "text", placeholder: "Họ và tên" },
+      phone: { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
+      email: { id: "email", label: "Email", type: "text", placeholder: "khachhang@example.com" },
+      birthday: { id: "birthday", label: "Ngày sinh", type: "date" },
+      address: { id: "address", label: "Địa chỉ mặc định", type: "text", placeholder: "Số nhà, tên đường, quận/huyện..." },
+      rank: { id: "rank", label: "Hạng khách hàng", type: "select", options: rankOptions, placeholder: "Chọn hạng", optionDotColors: rankDotColors },
+      points: { id: "points", label: "Điểm tích lũy", type: "number" },
+      totalOrders: { id: "totalOrders", label: "Tổng đơn", type: "number" },
+      totalSpend: { id: "totalSpend", label: "Chi tiêu", type: "number" },
+      createdAt: { id: "createdAt", label: "Ngày tạo tài khoản", type: "date" },
+      note: { id: "note", label: "Ghi chú đặc biệt", type: "textarea", placeholder: "Dị ứng hóa chất, giờ giao hàng yêu thích..." },
+    };
+
+    return columns
+      .filter((column) => column.visible && column.id !== "actions")
+      .map((column) => {
+        return fieldByColumnId[column.id] || {
+          id: column.id,
+          label: column.label,
+          type: "text",
+          placeholder: `Nhập ${column.label.toLowerCase()}`,
+        } satisfies FormField;
+      });
+  }, [columns]);
 
   const range = useDashboardTimeRangeStore((state) => state.range);
   const rangeLabel = formatRange(normalizeRange(range));
+  const checkboxClass =
+    "relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all duration-150 checked:border-emerald-300 checked:bg-emerald-300 after:absolute after:left-1/2 after:top-1/2 after:hidden after:h-[9px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-[58%] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block";
 
   const filteredCustomers = useMemo(() => {
     return customers.filter((c) => {
@@ -124,15 +232,320 @@ export default function CustomersPage() {
 
   const pageCount = Math.ceil(filteredCustomers.length / pageSize);
   const paginatedCustomers = filteredCustomers.slice((page - 1) * pageSize, page * pageSize);
+  const totalSpend = filteredCustomers.reduce((sum, customer) => sum + customer.totalSpend, 0);
+  const vipCustomers = filteredCustomers.filter((customer) => ["Vàng", "Kim cương"].includes(customer.rank)).length;
+  const averageSpend =
+    filteredCustomers.length > 0 ? Math.round(totalSpend / filteredCustomers.length) : 0;
+  const visibleColumns = columns.filter((column) => column.visible);
+  const exportColumns = visibleColumns.filter((column) => column.id !== "actions");
+  const customColumns = columns.filter((column) => !defaultColumnIdSet.has(column.id));
+  const totalVisibleWidth = visibleColumns.reduce((sum, column) => sum + (column.width || 150), 0);
+  const visibleCustomerIds = useMemo(
+    () => paginatedCustomers.map((customer) => customer.id),
+    [paginatedCustomers],
+  );
+  const kanbanCustomerIds = useMemo(
+    () => filteredCustomers.map((customer) => customer.id),
+    [filteredCustomers],
+  );
+  const selectedCustomers = useMemo(
+    () => customers.filter((customer) => selectedCustomerIds.has(customer.id)),
+    [customers, selectedCustomerIds],
+  );
+  const allVisibleSelected =
+    visibleCustomerIds.length > 0 && visibleCustomerIds.every((id) => selectedCustomerIds.has(id));
+  const allKanbanCustomersSelected =
+    kanbanCustomerIds.length > 0 && kanbanCustomerIds.every((id) => selectedCustomerIds.has(id));
+  const selectedVisibleCustomerCount = visibleCustomerIds.filter((id) => selectedCustomerIds.has(id)).length;
+  const selectedKanbanCustomerCount = kanbanCustomerIds.filter((id) => selectedCustomerIds.has(id)).length;
+
+  const toggleVisibleCustomers = () => {
+    setSelectedCustomerIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        visibleCustomerIds.forEach((id) => next.delete(id));
+      } else {
+        visibleCustomerIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const toggleKanbanCustomers = () => {
+    setSelectedCustomerIds((prev) => {
+      const next = new Set(prev);
+      if (allKanbanCustomersSelected) {
+        kanbanCustomerIds.forEach((id) => next.delete(id));
+      } else {
+        kanbanCustomerIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const toggleCustomer = (id: string) => {
+    setSelectedCustomerIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const updatePageSize = (size: number) => {
+    const nextSize = Math.max(1, Math.min(500, Math.floor(size)));
+    setPageSize(nextSize);
+    setPage(1);
+    setOpenPageSizeMenu(false);
+  };
+
+  const applyCustomPageSize = () => {
+    const nextSize = Number(customPageSize);
+    if (!Number.isFinite(nextSize) || nextSize <= 0) return;
+    updatePageSize(nextSize);
+    setCustomPageSize("");
+  };
+
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  const sanitizeFileName = (value: string) =>
+    value
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, "-")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+
+  const getDefaultExportFileName = () => {
+    const fileScope = selectedCustomerIds.size > 0 ? "da-chon" : "tat-ca";
+    const fileDate = new Date().toISOString().slice(0, 10);
+    return `khach-hang-${fileScope}-${fileDate}`;
+  };
+
+  const getExportValue = (customer: Customer, columnId: CustomerColumn["id"]) => {
+    if (columnId === "actions") return "";
+    const value = customer[columnId];
+    if (columnId === "birthday") return formatBirthday(customer.birthday);
+    if (columnId === "totalSpend") return `${customer.totalSpend.toLocaleString("vi-VN")}đ`;
+    if (columnId === "totalOrders") return `${customer.totalOrders} đơn`;
+    if (columnId === "points") return customer.points.toLocaleString("vi-VN");
+    return value === undefined || value === null || value === "" ? "Chưa có" : String(value);
+  };
+
+  const downloadBlob = async (
+    content: BlobPart,
+    fileName: string,
+    type: string,
+    extension: string,
+    description: string,
+  ) => {
+    const blob = new Blob([content], { type });
+    const savePicker = (window as SaveFilePickerWindow).showSaveFilePicker;
+
+    if (savePicker) {
+      try {
+        const fileHandle = await savePicker({
+          suggestedName: fileName,
+          types: [{ description, accept: { [type.split(";")[0]]: [extension] } }],
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExport = async (format: ExportFormat, fileName: string) => {
+    const rows = selectedCustomerIds.size > 0 ? selectedCustomers : customers;
+    if (rows.length === 0) return;
+
+    const baseFileName = sanitizeFileName(fileName) || getDefaultExportFileName();
+    const exportedAt = new Date().toLocaleString("vi-VN");
+    const exportTotalSpend = rows.reduce((sum, customer) => sum + customer.totalSpend, 0);
+
+    if (format === "csv") {
+      const csvRows = [
+        ["Thời gian lọc", rangeLabel],
+        ["Thời điểm xuất file", exportedAt],
+        ["Số khách", String(rows.length)],
+        ["Tổng chi tiêu", `${exportTotalSpend.toLocaleString("vi-VN")}đ`],
+        [],
+        exportColumns.map((column) => column.label),
+        ...rows.map((customer) => exportColumns.map((column) => getExportValue(customer, column.id))),
+      ];
+      const csv = csvRows
+        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+      await downloadBlob(`\uFEFF${csv}`, `${baseFileName}.csv`, "text/csv;charset=utf-8", ".csv", "CSV");
+      return;
+    }
+
+    const tableHead = exportColumns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join("");
+    const tableBody = rows
+      .map((customer) =>
+        `<tr>${exportColumns
+          .map((column) => `<td>${escapeHtml(getExportValue(customer, column.id))}</td>`)
+          .join("")}</tr>`,
+      )
+      .join("");
+    const exportSummary = `
+      <div class="summary">
+        <p><span>Thời gian:</span> ${escapeHtml(rangeLabel)}</p>
+        <p><span>Thời điểm xuất file:</span> ${escapeHtml(exportedAt)}</p>
+        <p><span>Số khách:</span> ${rows.length}</p>
+        <p><span>Tổng chi tiêu:</span> ${escapeHtml(`${exportTotalSpend.toLocaleString("vi-VN")}đ`)}</p>
+      </div>
+    `;
+
+    if (format === "excel") {
+      const workbook = `
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <style>
+              h1 { font-size: 18px; }
+              .summary { margin-bottom: 16px; }
+              .summary p { margin: 0 0 4px; }
+              .summary span { font-weight: 700; }
+              table { border-collapse: collapse; }
+              th, td { border: 1px solid #d9e2ec; padding: 8px; }
+              th { background: #f8fafc; }
+            </style>
+          </head>
+          <body>
+            <h1>Danh sách khách hàng</h1>
+            ${exportSummary}
+            <table><thead><tr>${tableHead}</tr></thead><tbody>${tableBody}</tbody></table>
+          </body>
+        </html>
+      `;
+      await downloadBlob(workbook, `${baseFileName}.xls`, "application/vnd.ms-excel;charset=utf-8", ".xls", "Excel");
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=1200,height=800");
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <!doctype html>
+      <html lang="vi">
+        <head>
+          <meta charset="utf-8" />
+          <title>${escapeHtml(baseFileName)}</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #0f172a; padding: 24px; }
+            h1 { font-size: 20px; margin: 0 0 6px; }
+            p { margin: 0 0 18px; color: #64748b; font-size: 12px; }
+            .summary { margin-bottom: 18px; }
+            .summary p { margin: 0 0 5px; color: #334155; font-size: 12px; }
+            .summary span { font-weight: 700; color: #0f172a; }
+            table { width: 100%; border-collapse: collapse; font-size: 11px; }
+            th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+            th { background: #f8fafc; font-weight: 700; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>Danh sách khách hàng</h1>
+          <p>${rows.length} khách · ${selectedCustomerIds.size > 0 ? "Khách đã chọn" : "Tất cả khách hàng"}</p>
+          ${exportSummary}
+          <table><thead><tr>${tableHead}</tr></thead><tbody>${tableBody}</tbody></table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
+  const getCustomFields = (source: Record<string, unknown> = {}): Record<string, string> =>
+    Object.fromEntries(customColumns.map((column) => [column.id, String(source[column.id] ?? "")]));
+
+  const addCustomColumn = () => {
+    const label = newColumnName.trim();
+    if (!label) return;
+
+    const newColumn: CustomerColumn = {
+      id: `custom_${Date.now()}`,
+      label,
+      width: 150,
+      visible: true,
+    };
+
+    setColumns((prev) => {
+      const next = [...prev];
+      const actionIndex = next.findIndex((column) => column.id === "actions");
+      next.splice(actionIndex === -1 ? next.length : actionIndex, 0, newColumn);
+      return next;
+    });
+    setForm((prev) => ({ ...prev, [newColumn.id]: "" }));
+    setNewColumnName("");
+    setOpenAddColumn(false);
+  };
+
+  const handleDragStart = (event: React.DragEvent<HTMLTableCellElement>, id: string) => {
+    setDraggedColumnId(id);
+    event.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLTableCellElement>, id: string) => {
+    event.preventDefault();
+    if (id !== draggedColumnId) setDragOverColumnId(id);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLTableCellElement>, id: string) => {
+    event.preventDefault();
+    if (!draggedColumnId || draggedColumnId === id) {
+      setDragOverColumnId(null);
+      return;
+    }
+
+    setColumns((prev) => {
+      const draggedIndex = prev.findIndex((column) => column.id === draggedColumnId);
+      const dropIndex = prev.findIndex((column) => column.id === id);
+      if (draggedIndex === -1 || dropIndex === -1) return prev;
+
+      const next = [...prev];
+      const temp = next[draggedIndex];
+      next[draggedIndex] = next[dropIndex];
+      next[dropIndex] = temp;
+      return next;
+    });
+
+    setDraggedColumnId(null);
+    setDragOverColumnId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedColumnId(null);
+    setDragOverColumnId(null);
+  };
 
   const openCreateForm = () => {
     setEditingCustomerId(null);
-    setForm({ ...emptyForm, createdAt: new Date().toISOString().slice(0, 10) });
+    setForm({ ...emptyForm, ...getCustomFields(), createdAt: new Date().toISOString().slice(0, 10) });
     setOpenForm(true);
   };
 
-  const openEditForm = (c: Customer, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const openEditForm = (c: Customer, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setEditingCustomerId(c.id);
     setForm({
       name: c.name,
@@ -146,24 +559,40 @@ export default function CustomersPage() {
       totalOrders: String(c.totalOrders),
       totalSpend: String(c.totalSpend),
       createdAt: c.createdAt || new Date().toISOString().slice(0, 10),
+      ...getCustomFields(c),
     });
     setOpenForm(true);
   };
 
-  const deleteCustomer = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCustomers((prev) => prev.filter((c) => c.id !== id));
-    if (selectedCustomer.id === id) {
-      const remaining = customers.filter((c) => c.id !== id);
+  const requestDeleteCustomer = (customer: Customer, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setDeleteTarget(customer);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteCustomer = () => {
+    if (!deleteTarget) return;
+
+    setCustomers((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+    setSelectedCustomerIds((prev) => {
+      const next = new Set(prev);
+      next.delete(deleteTarget.id);
+      return next;
+    });
+    if (selectedCustomer.id === deleteTarget.id) {
+      const remaining = customers.filter((c) => c.id !== deleteTarget.id);
       if (remaining.length > 0) setSelectedCustomer(remaining[0]);
     }
+    setDeleteConfirmOpen(false);
+    setDeleteTarget(null);
     setPage(1);
   };
 
   const saveCustomer = () => {
     if (!form.name.trim() || !form.phone.trim()) return;
 
-    const payload: Omit<Customer, "id"> = {
+    const payload: CustomerFields & Record<string, string | number | undefined> = {
+      ...getCustomFields(form),
       name: form.name,
       phone: form.phone,
       email: form.email || "khachhang@example.com",
@@ -196,402 +625,443 @@ export default function CustomersPage() {
     setOpenForm(false);
   };
 
-  return (
-    <PageShell fullHeight>
-      <div className="flex min-h-0 flex-1 flex-col">
-        {/* ════════════ MAIN TABLE CONTAINER ════════════ */}
-        <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
-          
-          {/* ── Top Toolbar ── */}
-          <div className="flex flex-col gap-3 border-b border-slate-200 px-5 pt-1 pb-3 xl:flex-row xl:items-center xl:justify-between">
-            {/* Left: View Tabs */}
-            <div className="flex items-center gap-1">
-              {([
-                ["Bảng", Table2],
-                ["Bảng kéo", Kanban],
-                ["Danh sách", List],
-              ] as const).map(([label, Icon]) => (
-                <button
-                  key={label}
-                  type="button"
-                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                    label === "Bảng"
-                      ? "text-slate-800"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
-                  }`}
-                >
-                  <Icon className="size-3.5" />
-                  {label}
-                </button>
-              ))}
-            </div>
+  const renderCustomerCell = (customer: Customer, column: CustomerColumn) => {
+    if (column.id === "name") {
+      return (
+        <TableCell key={column.id} className="pl-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <input
+              type="checkbox"
+              aria-label={`Chọn ${customer.name}`}
+              checked={selectedCustomerIds.has(customer.id)}
+              onChange={() => toggleCustomer(customer.id)}
+              onClick={(event) => event.stopPropagation()}
+              className={checkboxClass}
+            />
+            <Image
+              src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+              alt={customer.name}
+              width={28}
+              height={28}
+              className="size-6 shrink-0 rounded-full object-cover"
+            />
+            <span className="truncate font-medium text-slate-900">{customer.name}</span>
+          </div>
+        </TableCell>
+      );
+    }
 
-            {/* Right: Search & Actions */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative min-w-[220px] flex-1 xl:w-64 xl:flex-none">
-                <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" />
-                <Input
-                  className="h-8 rounded-md border-slate-200 bg-white pl-8 text-xs text-slate-700 shadow-none placeholder:text-slate-500 focus-visible:ring-slate-200"
-                  placeholder="Tìm tên, SĐT, địa chỉ..."
-                  value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    setPage(1);
+    if (column.id === "email") {
+      return (
+        <TableCell key={column.id} className="max-w-0 truncate overflow-hidden text-slate-500" title={customer.email}>
+          {customer.email}
+        </TableCell>
+      );
+    }
+
+    if (column.id === "phone") {
+      return (
+        <TableCell key={column.id} className="max-w-0 truncate overflow-hidden" title={customer.phone}>
+          <a href={`tel:${customer.phone}`} className="text-slate-500 transition-colors hover:text-slate-800" onClick={(event) => event.stopPropagation()}>
+            {customer.phone}
+          </a>
+        </TableCell>
+      );
+    }
+
+    if (column.id === "address") {
+      return (
+        <TableCell key={column.id} className="max-w-0 truncate overflow-hidden text-slate-600" title={customer.address}>
+          {customer.address}
+        </TableCell>
+      );
+    }
+
+    if (column.id === "totalOrders") {
+      return <TableCell key={column.id} className="font-medium text-slate-600">{customer.totalOrders} đơn</TableCell>;
+    }
+
+    if (column.id === "totalSpend") {
+      return <TableCell key={column.id} className="font-medium text-slate-900">{customer.totalSpend.toLocaleString("vi-VN")}đ</TableCell>;
+    }
+
+    if (column.id === "points") {
+      return <TableCell key={column.id} className="font-medium text-slate-500">{customer.points.toLocaleString("vi-VN")}</TableCell>;
+    }
+
+    if (column.id === "rank") {
+      return (
+        <TableCell key={column.id}>
+          <span
+            className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium"
+            style={{
+              color: rankColor[customer.rank]?.text || "#475569",
+              backgroundColor: rankColor[customer.rank]?.bg || "rgba(71,85,105,0.08)",
+            }}
+          >
+            <span
+              className="inline-block size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: rankColor[customer.rank]?.text || "#475569" }}
+            />
+            <span className="truncate">{customer.rank}</span>
+          </span>
+        </TableCell>
+      );
+    }
+
+    if (column.id === "birthday") {
+      return <TableCell key={column.id} className="text-slate-500">{formatBirthday(customer.birthday)}</TableCell>;
+    }
+
+    if (column.id === "createdAt") {
+      return <TableCell key={column.id} className="text-slate-500">{formatBirthday(customer.createdAt)}</TableCell>;
+    }
+
+    if (column.id === "note") {
+      return (
+        <TableCell key={column.id} className="max-w-0 truncate overflow-hidden text-slate-500" title={customer.note || "-"}>
+          {customer.note || "-"}
+        </TableCell>
+      );
+    }
+
+    if (column.id === "actions") {
+      return (
+      <TableCell key={column.id} className="px-4" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-start gap-1.5">
+          <button
+            type="button"
+            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+            onClick={(event) => openEditForm(customer, event)}
+            title="Chỉnh sửa"
+          >
+            Sửa
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+            onClick={(event) => requestDeleteCustomer(customer, event)}
+            title="Xóa"
+          >
+            Xóa
+          </button>
+        </div>
+      </TableCell>
+      );
+    }
+
+    const customValue = customer[column.id];
+    const displayValue = customValue ? String(customValue) : "Chưa có";
+
+    return (
+      <TableCell
+        key={column.id}
+        className={`max-w-0 truncate overflow-hidden ${customValue ? "text-slate-600" : "text-slate-400 italic"}`}
+        title={displayValue}
+      >
+        {displayValue}
+      </TableCell>
+    );
+  };
+
+  const customerFilterOptions = useMemo(() => {
+    return (["Tất cả", ...rankOptions] as const).map((rank) => {
+      const isAll = rank === "Tất cả";
+      return {
+        id: rank,
+        label: rank,
+        color: isAll ? allRankColor : rankColor[rank].text,
+        bgColor: isAll ? allRankBgColor : rankColor[rank].bg,
+      };
+    });
+  }, []);
+
+  const customerKanbanColumns = useMemo(() => {
+    return rankOptions.map((rank) => ({
+      id: rank,
+      label: rank,
+      color: { text: rankColor[rank].text, bg: rankColor[rank].bg },
+    }));
+  }, []);
+
+  const renderCustomerKanbanCard = (customer: Customer) => {
+    return (
+      <div
+        key={customer.id}
+        draggable
+        onDragStart={(event) => {
+          setDraggedCustomerId(customer.id);
+          event.dataTransfer.effectAllowed = "move";
+        }}
+        onDragEnd={() => {
+          setDraggedCustomerId(null);
+          setDragOverRank(null);
+        }}
+        className={`cursor-grab rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:cursor-grabbing ${draggedCustomerId === customer.id ? "opacity-50 ring-2 ring-slate-400" : ""}`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <input
+              type="checkbox"
+              aria-label={`Chọn ${customer.name}`}
+              checked={selectedCustomerIds.has(customer.id)}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
+              onChange={() => toggleCustomer(customer.id)}
+              className={`shrink-0 ${checkboxClass}`}
+            />
+            <Image
+              src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+              alt={customer.name}
+              width={32}
+              height={32}
+              className="size-8 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
+            />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-slate-700">{customer.name}</p>
+              <p className="truncate text-[11px] text-slate-400">{customer.phone}</p>
+            </div>
+          </div>
+          <span className="shrink-0 text-[11px] font-semibold text-slate-400">{customer.id}</span>
+        </div>
+        <p className="mt-2 truncate text-xs text-slate-500">{customer.email}</p>
+        <p className="mt-1 truncate text-xs text-slate-500">{customer.totalOrders} đơn · {customer.points.toLocaleString("vi-VN")} điểm</p>
+        <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2">
+          <span className="truncate text-[11px] text-slate-500">{formatBirthday(customer.birthday)}</span>
+          <span className="text-[13px] font-bold text-slate-900">{customer.totalSpend.toLocaleString("vi-VN")}đ</span>
+        </div>
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => openEditForm(customer)}
+            className="inline-flex h-6 items-center rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200"
+          >
+            Chi tiết
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCustomerListRow = (customer: Customer) => {
+    return (
+      <div key={customer.id} className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <input
+              type="checkbox"
+              aria-label={`Chọn ${customer.name}`}
+              checked={selectedCustomerIds.has(customer.id)}
+              onChange={() => toggleCustomer(customer.id)}
+              className={`mt-1 shrink-0 ${checkboxClass}`}
+            />
+            <Image
+              src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+              alt={customer.name}
+              width={40}
+              height={40}
+              className="size-10 shrink-0 rounded-full object-cover"
+            />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-slate-950">{customer.name}</p>
+                <span className="text-xs font-medium text-slate-400">{customer.id}</span>
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium"
+                  style={{
+                    color: rankColor[customer.rank]?.text || "#475569",
+                    backgroundColor: rankColor[customer.rank]?.bg || "rgba(71,85,105,0.08)",
                   }}
-                />
-              </div>
-              <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-                <EyeOff className="size-3.5" />
-                Ẩn cột
-              </button>
-              <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-                <History className="size-3.5" />
-                Lịch sử
-              </button>
-              <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-                Xuất file
-              </button>
-              <button
-                type="button"
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                onClick={openCreateForm}
-              >
-                Thêm khách
-                <ChevronDown className="size-3.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* ── Filter Pills ── */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-3">
-            <button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-              <Star className="size-3.5" />
-              {selectedRank}
-              <ChevronDown className="size-3.5" />
-            </button>
-            <button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">
-              <Clock className="size-3.5" />
-              {rangeLabel}
-              <ChevronDown className="size-3.5" />
-            </button>
-            <button type="button" className="inline-flex h-7 items-center gap-1.5 px-2 text-xs text-slate-500 transition-colors hover:text-slate-700">
-              <Plus className="size-3.5" />
-              Thêm bộ lọc
-            </button>
-            <div className="ml-auto hidden flex-wrap gap-1.5 2xl:flex">
-              {["Tất cả", "Kim cương", "Vàng", "Bạc", "Thường"].map((rank) => {
-                const active = selectedRank === rank;
-                const isAll = rank === "Tất cả";
-                const activeColor = isAll ? allRankColor : rankColor[rank].text;
-                const activeBgColor = isAll ? allRankBgColor : rankColor[rank].bg;
-
-                return (
-                  <button
-                    key={rank}
-                    type="button"
-                    onClick={() => {
-                      setSelectedRank(rank);
-                      setPage(1);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-all hover:bg-slate-50"
-                    style={
-                      active
-                        ? { color: activeColor, backgroundColor: activeBgColor }
-                        : { color: "#64748b", backgroundColor: "transparent" }
-                    }
-                  >
-                    <span
-                      className="inline-block size-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: active ? activeColor : "#cbd5e1" }}
-                    />
-                    {rank}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ── Table Container ── */}
-          <div className="flex-1 overflow-auto">
-            <Table className="w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-              <TableHeader>
-                <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                  <TableHead className="w-[208px] pl-4 text-xs font-medium text-slate-600">
-                    <span className="inline-flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        aria-label="Chọn tất cả khách hàng"
-                        className="relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all duration-150 checked:border-slate-900 checked:bg-slate-900 after:absolute after:left-[4.5px] after:top-[1px] after:hidden after:h-[9px] after:w-[5px] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block"
-                      />
-                      Tên khách hàng
-                    </span>
-                  </TableHead>
-                  <TableHead className="w-[176px] border-l border-slate-100 text-xs font-medium text-slate-600">Email</TableHead>
-                  <TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Số điện thoại</TableHead>
-                  <TableHead className="w-[190px] border-l border-slate-100 text-xs font-medium text-slate-600">Địa chỉ</TableHead>
-                  <TableHead className="w-[82px] border-l border-slate-100 text-xs font-medium text-slate-600">Tổng đơn</TableHead>
-                  <TableHead className="w-[112px] border-l border-slate-100 text-xs font-medium text-slate-600">Chi tiêu</TableHead>
-                  <TableHead className="w-[76px] border-l border-slate-100 text-xs font-medium text-slate-600">Điểm</TableHead>
-                  <TableHead className="w-[92px] border-l border-slate-100 text-xs font-medium text-slate-600">Hạng</TableHead>
-                  <TableHead className="w-[92px] border-l border-slate-100 text-xs font-medium text-slate-600">Ngày sinh</TableHead>
-                  <TableHead className="w-[150px] border-l border-slate-100 text-xs font-medium text-slate-600">Ghi chú</TableHead>
-                  <TableHead className="w-[150px] border-l border-slate-100 px-4 text-left text-xs font-medium text-slate-600">Thao tác</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedCustomers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={11}>
-                      <div className="grid min-h-[300px] place-items-center text-sm text-slate-400">
-                        Không tìm thấy khách hàng phù hợp.
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedCustomers.map((c) => (
-                    <TableRow
-                      key={c.id}
-                      className={`group h-9 cursor-pointer border-b border-slate-100 text-slate-700 transition-colors ${
-                        selectedCustomer.id === c.id ? "bg-slate-50/80 hover:bg-slate-50" : "hover:bg-slate-50/60"
-                      }`}
-                      onClick={() => setSelectedCustomer(c)}
-                    >
-                      {/* Name */}
-                      <TableCell className="pl-4">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <input
-                            type="checkbox"
-                            aria-label={`Chọn ${c.name}`}
-                            className="relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all duration-150 checked:border-slate-900 checked:bg-slate-900 after:absolute after:left-[4.5px] after:top-[1px] after:hidden after:h-[9px] after:w-[5px] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                          <Image
-                            src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
-                            alt={c.name}
-                            width={28}
-                            height={28}
-                            className="size-6 shrink-0 rounded-full object-cover"
-                          />
-                          <span className="whitespace-nowrap font-medium text-slate-900">
-                            {c.name}
-                          </span>
-                        </div>
-                      </TableCell>
-
-                      {/* Email */}
-                      <TableCell className="text-slate-500 truncate max-w-[140px]">
-                        {c.email}
-                      </TableCell>
-
-                      {/* Phone */}
-                      <TableCell>
-                        <a href={`tel:${c.phone}`} className="text-slate-500 transition-colors hover:text-slate-800" onClick={(e) => e.stopPropagation()}>
-                          {c.phone}
-                        </a>
-                      </TableCell>
-
-                      {/* Address */}
-                      <TableCell className="text-slate-600 truncate max-w-[150px]">{c.address}</TableCell>
-
-                      {/* Total Orders */}
-                      <TableCell className="text-slate-600 font-medium">{c.totalOrders} đơn</TableCell>
-
-                      {/* Spending */}
-                      <TableCell className="text-slate-900 font-medium">{c.totalSpend.toLocaleString("vi-VN")}đ</TableCell>
-
-                      {/* Points */}
-                      <TableCell className="text-slate-500 font-medium">{c.points.toLocaleString("vi-VN")}</TableCell>
-
-                      {/* Rank */}
-                      <TableCell>
-                        <span
-                          className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium"
-                          style={{
-                            color: rankColor[c.rank]?.text || "#475569",
-                            backgroundColor: rankColor[c.rank]?.bg || "rgba(71,85,105,0.08)",
-                          }}
-                        >
-                          <span
-                            className="inline-block size-1.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: rankColor[c.rank]?.text || "#475569" }}
-                          />
-                          {c.rank}
-                        </span>
-                      </TableCell>
-
-                      {/* Birthday */}
-                      <TableCell className="text-slate-500">{formatBirthday(c.birthday)}</TableCell>
-
-                      {/* Note */}
-                      <TableCell className="text-slate-500 truncate max-w-[180px]">{c.note || "-"}</TableCell>
-
-                      {/* Actions */}
-                      <TableCell className="px-4" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-start gap-1.5">
-                          <button
-                            type="button"
-                            className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
-                            onClick={(e) => openEditForm(c, e)}
-                            title="Chỉnh sửa"
-                          >
-                            <Pencil className="size-3.5" />
-                            Sửa
-                          </button>
-                          <button
-                            type="button"
-                            className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600"
-                            onClick={(e) => deleteCustomer(c.id, e)}
-                            title="Xóa"
-                          >
-                            <Trash2 className="size-3.5" />
-                            Xóa
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-
-                {/* empty filler rows */}
-                {paginatedCustomers.length > 0 && paginatedCustomers.length < pageSize &&
-                  Array.from({ length: pageSize - paginatedCustomers.length }).map((_, i) => (
-                    <TableRow key={`empty-${i}`} className="border-b border-slate-100">
-                      <TableCell className="pl-4">
-                        <input type="checkbox" disabled className="size-4 opacity-0" />
-                      </TableCell>
-                      {Array.from({ length: 10 }).map((_, j) => (
-                        <TableCell key={j}>&nbsp;</TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                }
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* ── Pagination Footer ── */}
-          <div className="border-t border-slate-200 px-5 pt-3 pb-1">
-            <div className="flex flex-col gap-3 text-xs text-slate-700 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-3">
-                <span>Số khách hàng mỗi trang</span>
-                <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50">
-                  {pageSize}
-                  <ChevronDown className="size-3.5" />
-                </button>
-                <span className="text-slate-400">
-                  {filteredCustomers.length === 0 ? 0 : (page - 1) * pageSize + 1}–
-                  {Math.min(page * pageSize, filteredCustomers.length)} trong {filteredCustomers.length} khách hàng
+                >
+                  <span className="size-1.5 rounded-full" style={{ backgroundColor: rankColor[customer.rank]?.text || "#475569" }} />
+                  {customer.rank}
                 </span>
               </div>
-
-              <div className="flex items-center justify-end gap-1">
-                <button
-                  type="button"
-                  className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40"
-                  disabled={page <= 1}
-                  onClick={() => setPage(1)}
-                >
-                  <ChevronsLeft className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40"
-                  disabled={page <= 1}
-                  onClick={() => setPage((current) => Math.max(current - 1, 1))}
-                >
-                  <ChevronDown className="size-4 rotate-90" />
-                </button>
-                <span className="px-3 text-sm font-medium text-slate-700">
-                  {page} / {pageCount || 1}
-                </span>
-                <button
-                  type="button"
-                  className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40"
-                  disabled={page >= pageCount}
-                  onClick={() => setPage((current) => Math.min(current + 1, pageCount))}
-                >
-                  <ChevronDown className="size-4 -rotate-90" />
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600 disabled:opacity-40"
-                  disabled={page >= pageCount}
-                  onClick={() => setPage(pageCount || 1)}
-                >
-                  <ChevronsRight className="size-4" />
-                </button>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                <span>{customer.phone}</span>
+                <span>{customer.email}</span>
+                <span>{customer.totalOrders} đơn · {customer.points.toLocaleString("vi-VN")} điểm</span>
               </div>
+              <p className="mt-2 line-clamp-2 text-xs text-slate-400">{customer.address}</p>
             </div>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              {customer.totalSpend.toLocaleString("vi-VN")}đ
+            </span>
+            <button
+              type="button"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+              onClick={() => openEditForm(customer)}
+            >
+              Sửa
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+              onClick={(event) => requestDeleteCustomer(customer, event)}
+            >
+              Xóa
+            </button>
           </div>
         </div>
       </div>
+    );
+  };
 
-      {/* ════════════ MODAL: CREATE / EDIT CUSTOMER ════════════ */}
-      {openForm && (
-        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <Card className="w-full max-w-xl rounded-2xl border-0 shadow-2xl overflow-hidden bg-white">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-200 px-6 py-4">
-              <CardTitle className="text-base font-semibold">
-                {editingCustomerId ? "Chỉnh sửa thông tin khách hàng" : "Thêm khách hàng mới"}
-              </CardTitle>
-              <button
-                type="button"
-                className="inline-flex size-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                onClick={() => setOpenForm(false)}
-              >
-                <X className="size-5" />
-              </button>
-            </CardHeader>
-            <CardContent className="grid gap-4 p-6 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Họ tên</Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Họ và tên" />
-              </div>
-              <div className="space-y-2">
-                <Label>Số điện thoại</Label>
-                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="090..." />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="khachhang@example.com" />
-              </div>
-              <div className="space-y-2">
-                <Label>Ngày sinh</Label>
-                <Input type="date" value={form.birthday} onChange={(e) => setForm({ ...form, birthday: e.target.value })} />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label>Địa chỉ mặc định</Label>
-                <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Số nhà, tên đường, quận/huyện..." />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label>Ghi chú đặc biệt</Label>
-                <Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Dị ứng hóa chất, giờ giao hàng yêu thích..." />
-              </div>
-              
-              {editingCustomerId && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Hạng khách hàng</Label>
-                    <Input value={form.rank} onChange={(e) => setForm({ ...form, rank: e.target.value })} placeholder="Thường, Bạc, Vàng, Kim cương" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Điểm tích lũy</Label>
-                    <Input type="number" value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Ngày tham gia</Label>
-                    <Input type="date" value={form.createdAt} onChange={(e) => setForm({ ...form, createdAt: e.target.value })} />
-                  </div>
-                </>
-              )}
+  return (
+    <PageShell fullHeight>
+      <div className="grid shrink-0 gap-3 md:grid-cols-4">
+        <MetricCard title="Khách trong bộ lọc" value={String(filteredCustomers.length)} hint={`${selectedRank} · ${rangeLabel}`} icon={Star} color="#2563eb" />
+        <MetricCard title="Khách VIP" value={String(vipCustomers)} hint="Vàng và Kim cương" icon={History} color="#d97706" />
+        <MetricCard title="Tổng chi tiêu" value={`${totalSpend.toLocaleString("vi-VN")}đ`} hint="Theo khách đang hiển thị" icon={Clock} color="#10b981" />
+        <MetricCard title="Chi tiêu TB" value={`${averageSpend.toLocaleString("vi-VN")}đ`} hint="Trung bình mỗi khách" icon={Search} color="#8b5cf6" />
+      </div>
 
-              <Button className="md:col-span-2 mt-2 bg-slate-900 text-white hover:bg-slate-800 h-10 font-semibold rounded-lg transition-colors" onClick={saveCustomer}>
-                Lưu thông tin
-              </Button>
-            </CardContent>
-          </Card>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
+          <Toolbar
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            query={query}
+            onQueryChange={(q) => { setQuery(q); setPage(1); }}
+            columns={columns}
+            onColumnsChange={setColumns}
+            tableResizeMode={tableResizeMode}
+            onTableResizeModeChange={setTableResizeMode}
+            selectedCount={selectedCustomerIds.size}
+            onOpenAddColumn={() => setOpenAddColumn(true)}
+            onExport={handleExport}
+            defaultExportFileName={getDefaultExportFileName()}
+            onCreateClick={openCreateForm}
+            createLabel="Thêm khách"
+            defaultColumnIds={defaultColumns.map((c) => c.id)}
+            searchPlaceholder="Tìm tên, SĐT, địa chỉ..."
+            showHistoryButton={false}
+          />
+          <FilterBar
+            rangeLabel={rangeLabel}
+            selectedValue={selectedRank}
+            onValueChange={(rank) => { setSelectedRank(rank); setPage(1); }}
+            filterOptions={customerFilterOptions}
+            filterLabel="Hạng khách hàng"
+            allSelected={viewMode === "Bảng kéo" ? allKanbanCustomersSelected : allVisibleSelected}
+            disabled={viewMode === "Bảng kéo" ? kanbanCustomerIds.length === 0 : visibleCustomerIds.length === 0}
+            selectedCount={viewMode === "Bảng kéo" ? selectedKanbanCustomerCount : selectedVisibleCustomerCount}
+            totalCount={viewMode === "Bảng kéo" ? kanbanCustomerIds.length : visibleCustomerIds.length}
+            itemLabel="khách"
+            checkboxClass={checkboxClass}
+            onToggleAll={viewMode === "Bảng kéo" ? toggleKanbanCustomers : toggleVisibleCustomers}
+          />
+
+          {viewMode === "Bảng" ? (
+            <TableView
+              columns={columns}
+              rows={paginatedCustomers}
+              pageSize={pageSize}
+              emptyMessage="Không tìm thấy khách hàng phù hợp."
+              tableResizeMode={tableResizeMode}
+              totalVisibleWidth={totalVisibleWidth}
+              renderCell={renderCustomerCell}
+              columnDrag={{
+                draggedColumnId,
+                dragOverColumnId,
+                onDragStart: handleDragStart,
+                onDragOver: handleDragOver,
+                onDragLeave: () => setDragOverColumnId(null),
+                onDrop: handleDrop,
+                onDragEnd: handleDragEnd,
+              }}
+              page={page}
+              pageCount={pageCount}
+              totalRows={filteredCustomers.length}
+              customPageSize={customPageSize}
+              openPageSizeMenu={openPageSizeMenu}
+              onOpenPageSizeMenuChange={setOpenPageSizeMenu}
+              onCustomPageSizeChange={setCustomPageSize}
+              onApplyCustomPageSize={applyCustomPageSize}
+              onUpdatePageSize={updatePageSize}
+              onPageChange={setPage}
+            />
+          ) : viewMode === "Bảng kéo" ? (
+            <KanbanView
+              columns={customerKanbanColumns}
+              rows={filteredCustomers}
+              groupByKey="rank"
+              draggedItemId={draggedCustomerId}
+              onDraggedItemIdChange={setDraggedCustomerId}
+              dragOverColumnId={dragOverRank}
+              onDragOverColumnIdChange={setDragOverRank}
+              onDropItem={(customerId, rank) => {
+                setCustomers((prev) =>
+                  prev.map((c) => (c.id === customerId ? { ...c, rank } : c)),
+                );
+              }}
+              renderCard={renderCustomerKanbanCard}
+              tableResizeMode={tableResizeMode}
+            />
+          ) : (
+            <ListView
+              paginatedRows={paginatedCustomers}
+              emptyMessage="Không tìm thấy khách hàng phù hợp."
+              renderRow={renderCustomerListRow}
+            />
+          )}
         </div>
-      )}
+      </div>
+
+      <FormDialog
+        open={openForm}
+        onClose={() => setOpenForm(false)}
+        title={editingCustomerId ? "Chỉnh sửa thông tin khách hàng" : "Thêm khách hàng mới"}
+        fields={customerFormFields}
+        form={form}
+        onFormChange={(newForm) => setForm({ ...emptyForm, ...newForm })}
+        onSave={saveCustomer}
+        gridClassName="grid gap-4 md:grid-cols-2"
+        showCloseButton={false}
+        showCloseButtonAtBottom
+      />
+
+      <AddColumnDialog
+        open={openAddColumn}
+        onOpenChange={setOpenAddColumn}
+        newColumnName={newColumnName}
+        onNewColumnNameChange={setNewColumnName}
+        onAddColumn={addCustomColumn}
+      />
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent showCloseButton={false} className="rounded-xl border border-slate-200 bg-white p-6 shadow-xl sm:max-w-[400px]">
+          <DialogHeader className="border-b border-slate-100 pb-3">
+            <DialogTitle className="text-base font-semibold text-slate-900">Xác nhận xóa</DialogTitle>
+          </DialogHeader>
+          <div className="py-5 text-sm leading-6 text-slate-600">
+            Bạn có chắc chắn muốn xóa khách hàng {deleteTarget ? `"${deleteTarget.name}"` : "này"} không? Hành động này không thể hoàn tác.
+          </div>
+          <DialogFooter className="flex flex-row items-center justify-end gap-2 border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              className="inline-flex h-9 w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                setDeleteTarget(null);
+              }}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-9 w-full items-center justify-center rounded-lg bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
+              onClick={confirmDeleteCustomer}
+            >
+              Xác nhận xóa
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </PageShell>
   );
 }

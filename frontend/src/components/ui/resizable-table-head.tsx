@@ -1,14 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { TableHead } from "@/components/ui/table";
 
 export function ResizableTableHead({ children, className, width: initialWidth, autoWidth, ...props }: React.ComponentProps<"th"> & { width?: number | string; autoWidth?: boolean }) {
-  const [width, setWidth] = useState<number | string | undefined>(initialWidth);
-
-  useEffect(() => {
-    setWidth(initialWidth);
-  }, [initialWidth]);
+  const [resizedWidth, setResizedWidth] = useState<number | string | undefined>();
+  const width = resizedWidth ?? initialWidth;
 
   const startResize = (e: React.MouseEvent) => {
     if (autoWidth) return;
@@ -65,7 +62,7 @@ export function ResizableTableHead({ children, className, width: initialWidth, a
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const newWidth = startWidth + (moveEvent.pageX - startX);
-      setWidth(Math.max(minW, Math.min(newWidth, maxW)));
+      setResizedWidth(Math.max(minW, Math.min(newWidth, maxW)));
     };
 
     const onMouseUp = () => {

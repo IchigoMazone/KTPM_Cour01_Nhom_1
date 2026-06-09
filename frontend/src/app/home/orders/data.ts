@@ -44,6 +44,8 @@ export const emptyForm = {
   appointment: "",
   deliveryDate: "",
   deliveryTime: "",
+  washer: "",
+  dryer: "",
   staff: "Chưa gán",
   status: "Tiếp nhận" as OrderStatus,
   createdAt: "",
@@ -79,10 +81,16 @@ export const defaultColumns = [
   { id: "phone" as ColumnId, label: "Số điện thoại", width: 120, visible: true },
   { id: "service" as ColumnId, label: "Dịch vụ", width: 120, visible: true },
   { id: "quantity" as ColumnId, label: "Khối lượng", width: 100, visible: true },
+  { id: "washer" as ColumnId, label: "Máy giặt", width: 110, visible: true },
+  { id: "dryer" as ColumnId, label: "Máy sấy", width: 110, visible: true },
   { id: "amount" as ColumnId, label: "Giá", width: 120, visible: true },
+  { id: "deliveryDate" as ColumnId, label: "Ngày giao", width: 110, visible: true },
   { id: "deliveryTime" as ColumnId, label: "Giờ giao", width: 100, visible: true },
   { id: "staff" as ColumnId, label: "Nhân viên", width: 160, visible: true },
   { id: "status" as ColumnId, label: "Trạng thái", width: 150, visible: true },
-  { id: "createdAt" as ColumnId, label: "Thời gian", width: 120, visible: true },
+  { id: "createdAt" as ColumnId, label: "Ngày tạo đơn", width: 120, visible: true },
   { id: "actions" as ColumnId, label: "Thao tác", width: 180, visible: true },
 ];
+
+export const checkboxClass =
+  "relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all duration-150 checked:border-emerald-300 checked:bg-emerald-300 after:absolute after:left-1/2 after:top-1/2 after:hidden after:h-[9px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-[58%] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block";

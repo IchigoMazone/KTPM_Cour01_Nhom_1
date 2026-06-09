@@ -18,10 +18,19 @@ export type Order = {
   appointment: string;
   deliveryDate: string;
   deliveryTime: string;
+  washer?: string;
+  dryer?: string;
   staff: string;
   createdAt: string;
   note: string;
-  [key: string]: any;
+  [key: string]: string | number | undefined;
 };
 
 export type ColumnId = string;
+
+export type ColumnDef = {
+  id: string;
+  label: string;
+  width: number;
+  visible: boolean;
+};

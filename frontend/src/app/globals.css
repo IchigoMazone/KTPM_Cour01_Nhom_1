@@ -104,6 +104,14 @@
     font-weight: inherit;
   }
 
+  button,
+  input[type="checkbox"],
+  select,
+  [role="button"],
+  [role="menuitem"] {
+    cursor: pointer;
+  }
+
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-thumb) transparent;

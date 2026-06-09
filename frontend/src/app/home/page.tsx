@@ -1,16 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowUpRight,
   CalendarClock,
-  EyeOff,
   CheckCircle2,
   PackageCheck,
-  Search,
-  Settings2,
   Wallet,
   WashingMachine,
   FlaskConical,
@@ -22,8 +19,6 @@ import type { LucideIcon } from "lucide-react";
 import {
   CartesianGrid,
   Cell,
-  Line,
-  LineChart,
   Area,
   AreaChart,
   Pie,
@@ -32,20 +27,36 @@ import {
   Tooltip,
   XAxis,
 } from "recharts";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { TableCell } from "@/components/ui/table";
 import { PageShell } from "./_components/dashboard-primitives";
+import { Toolbar } from "./_components/toolbar";
+import { FilterBar, type FilterOption } from "./_components/filter-bar";
+import { TableView } from "./_components/table-view";
+import { AddColumnDialog } from "./_components/add-column-dialog";
+import { FormDialog, type FormField } from "./_components/form-dialog";
+import { InvoiceModal } from "./orders/_components/invoice-modal";
+import type { Order as LaundryOrder } from "./orders/types";
+import { seedOrders, statuses, statusDotColor } from "./orders/data";
+import { type DashboardTableColumn } from "@/src/components/common/dashboard-data-table";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { addDays, formatRange, normalizeRange, shortDateFormatter } from "@/src/utils/dashboard-time";
 
 type OrderStatus = "Tiếp nhận" | "Đang giặt" | "Kiểm tra" | "Chờ thanh toán" | "Hoàn thành" | "Quá hạn";
+
+const latestOrderColumns: DashboardTableColumn[] = [
+  { id: "id", label: "Mã đơn", width: 110, visible: true },
+  { id: "customerName", label: "Khách hàng", width: 170, visible: true },
+  { id: "customerType", label: "Loại khách", width: 100, visible: true },
+  { id: "service", label: "Dịch vụ", width: 100, visible: true },
+  { id: "weight", label: "Khối lượng", width: 100, visible: true },
+  { id: "status", label: "Trạng thái", width: 130, visible: true },
+  { id: "deliveryDate", label: "Ngày giao", width: 100, visible: true },
+  { id: "deliveryTime", label: "Giờ giao", width: 90, visible: true },
+  { id: "washer", label: "Máy giặt", width: 125, visible: true },
+  { id: "dryer", label: "Máy sấy", width: 125, visible: true },
+  { id: "staff", label: "Nhân viên", width: 110, visible: true },
+  { id: "actions", label: "Thao tác", width: 150, visible: true },
+];
 
 const statusStyle: Record<OrderStatus, { color: string; bg: string }> = {
   "Tiếp nhận": { color: "#6366f1", bg: "rgba(99,102,241,0.08)" },
@@ -55,6 +66,32 @@ const statusStyle: Record<OrderStatus, { color: string; bg: string }> = {
   "Hoàn thành": { color: "#10b981", bg: "rgba(16,185,129,0.08)" },
   "Quá hạn": { color: "#dc2626", bg: "rgba(220,38,38,0.08)" },
 };
+
+const latestOrderStatusOptions: FilterOption[] = [
+  { id: "Tất cả", label: "Tất cả", color: "#64748b", bgColor: "rgba(100,116,139,0.09)" },
+  ...Object.entries(statusStyle).map(([status, style]) => ({
+    id: status,
+    label: status,
+    color: style.color,
+    bgColor: style.bg,
+  })),
+];
+
+const checkboxClass =
+  "relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all duration-150 checked:border-emerald-300 checked:bg-emerald-300 after:absolute after:left-1/2 after:top-1/2 after:hidden after:h-[9px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-[58%] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block";
+
+const latestOrderFormFields: FormField[] = [
+  { id: "customer", label: "Tên khách", type: "text", placeholder: "Tên khách" },
+  { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
+  { id: "service", label: "Dịch vụ", type: "text" },
+  { id: "quantity", label: "Khối lượng", type: "text", placeholder: "5 kg / 3 món" },
+  { id: "deliveryTime", label: "Giờ giao", type: "time" },
+  { id: "createdAt", label: "Thời gian", type: "date" },
+  { id: "staff", label: "Nhân viên xử lý", type: "custom_staff" },
+  { id: "amount", label: "Giá tiền", type: "number" },
+  { id: "status", label: "Cập nhật trạng thái", type: "custom_status" },
+  { id: "note", label: "Ghi chú", type: "textarea", placeholder: "Ghi chú xử lý đơn" },
+];
 
 const latestOrders: Array<{
   id: string;
@@ -70,12 +107,12 @@ const latestOrders: Array<{
   staff: string;
 }> = [
   {
-    id: "DH-1078",
+    id: "DH-1048",
     customerName: "Nguyễn Thị Hương",
     customerType: "Cũ",
-    service: "Giặt sấy",
+    service: "Giặt",
     weight: "6 kg",
-    status: "Đang giặt",
+    status: "Kiểm tra",
     deliveryDate: "30/05",
     deliveryTime: "18:00",
     washer: "Máy giặt 01",
@@ -83,69 +120,69 @@ const latestOrders: Array<{
     staff: "Anh Minh",
   },
   {
-    id: "DH-1077",
+    id: "DH-1052",
     customerName: "Trần Minh",
     customerType: "Mới",
-    service: "Giặt khô",
-    weight: "3 kg",
-    status: "Kiểm tra",
+    service: "Giặt sấy",
+    weight: "8 kg",
+    status: "Chờ thanh toán",
     deliveryDate: "30/05",
-    deliveryTime: "17:30",
+    deliveryTime: "19:00",
     washer: "Máy giặt 02",
     dryer: null,
     staff: "Chị Lan",
   },
   {
-    id: "DH-1076",
+    id: "DH-1057",
     customerName: "Công ty ABC",
     customerType: "Cũ",
     service: "Chăn màn",
     weight: "8 kg",
-    status: "Tiếp nhận",
+    status: "Đang giặt",
     deliveryDate: "30/05",
     deliveryTime: "20:00",
-    washer: null,
-    dryer: null,
-    staff: "Anh Tuấn",
-  },
-  {
-    id: "DH-1075",
-    customerName: "Shop Linen",
-    customerType: "Cũ",
-    service: "Giặt sấy",
-    weight: "12 kg",
-    status: "Chờ thanh toán",
-    deliveryDate: "31/05",
-    deliveryTime: "19:00",
-    washer: "Máy giặt 01",
-    dryer: "Máy sấy 01",
-    staff: "Chị Lan",
-  },
-  {
-    id: "DH-1074",
-    customerName: "Hotel Majestic",
-    customerType: "Cũ",
-    service: "Chăn màn",
-    weight: "25 kg",
-    status: "Quá hạn",
-    deliveryDate: "30/05",
-    deliveryTime: "16:30",
     washer: "Máy giặt 02",
     dryer: null,
     staff: "Anh Minh",
   },
   {
-    id: "DH-1073",
+    id: "DH-1061",
+    customerName: "Shop Linen",
+    customerType: "Cũ",
+    service: "Giặt sấy",
+    weight: "12 kg",
+    status: "Tiếp nhận",
+    deliveryDate: "31/05",
+    deliveryTime: "21:00",
+    washer: null,
+    dryer: null,
+    staff: "Chưa gán",
+  },
+  {
+    id: "DH-1067",
+    customerName: "Hotel Majestic",
+    customerType: "Cũ",
+    service: "Chăn màn",
+    weight: "25 kg",
+    status: "Kiểm tra",
+    deliveryDate: "30/05",
+    deliveryTime: "19:00",
+    washer: "Máy giặt 02",
+    dryer: null,
+    staff: "Anh Tuấn",
+  },
+  {
+    id: "DH-1062",
     customerName: "Lê Mai",
     customerType: "Mới",
     service: "Vệ sinh rèm",
-    weight: "4 kg",
+    weight: "4 bộ",
     status: "Hoàn thành",
     deliveryDate: "30/05",
-    deliveryTime: "15:00",
+    deliveryTime: "18:30",
     washer: "Máy giặt 02",
     dryer: "Máy sấy 02",
-    staff: "Anh Tuấn",
+    staff: "Chị Lan",
   },
 ];
 
@@ -229,6 +266,21 @@ export default function HomeOverview() {
   const rangeLabel = formatRange(normalizeRange(range));
   const revenue7Days = useMemo(() => buildRevenue7Days(), []);
   const todayRevenue = revenue7Days[revenue7Days.length - 1]?.revenue ?? 0;
+  const [latestOrderQuery, setLatestOrderQuery] = useState("");
+  const [selectedLatestOrderStatus, setSelectedLatestOrderStatus] = useState<OrderStatus | "Tất cả">("Tất cả");
+  const [selectedLatestOrderIds, setSelectedLatestOrderIds] = useState<Set<string>>(new Set());
+  const [latestOrderColumnsState, setLatestOrderColumnsState] = useState<DashboardTableColumn[]>(latestOrderColumns);
+  const [latestOrderTableResizeMode, setLatestOrderTableResizeMode] = useState<"fit" | "custom">("fit");
+  const [latestOrderPage, setLatestOrderPage] = useState(1);
+  const [latestOrderPageSize, setLatestOrderPageSize] = useState(latestOrders.length);
+  const [latestOrderCustomPageSize, setLatestOrderCustomPageSize] = useState("");
+  const [openLatestOrderPageSizeMenu, setOpenLatestOrderPageSizeMenu] = useState(false);
+  const [openLatestOrderAddColumn, setOpenLatestOrderAddColumn] = useState(false);
+  const [newLatestOrderColumnName, setNewLatestOrderColumnName] = useState("");
+  const [latestOrderRows, setLatestOrderRows] = useState(latestOrders);
+  const [editingLatestOrderId, setEditingLatestOrderId] = useState<string | null>(null);
+  const [latestOrderForm, setLatestOrderForm] = useState<Record<string, string>>({});
+  const [invoiceLatestOrder, setInvoiceLatestOrder] = useState<LaundryOrder | null>(null);
 
   const activeMachinesCount = useMemo(() => machines.filter((m) => m.status === "Đang chạy").length, []);
   const totalMachines = machines.length;
@@ -236,6 +288,305 @@ export default function HomeOverview() {
     if (totalMachines === 0) return 0;
     return Math.round((activeMachinesCount / totalMachines) * 100);
   }, [activeMachinesCount, totalMachines]);
+
+  const filteredLatestOrders = useMemo(() => {
+    const query = latestOrderQuery.trim().toLowerCase();
+    return latestOrderRows.filter((order) => {
+      const matchesStatus = selectedLatestOrderStatus === "Tất cả" || order.status === selectedLatestOrderStatus;
+      const matchesQuery =
+        !query ||
+        [
+          order.id,
+          order.customerName,
+          order.customerType,
+          order.service,
+          order.weight,
+          order.status,
+          order.deliveryDate,
+          order.deliveryTime,
+          order.washer,
+          order.dryer,
+          order.staff,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query));
+
+      return matchesStatus && matchesQuery;
+    });
+  }, [latestOrderQuery, latestOrderRows, selectedLatestOrderStatus]);
+
+  const latestOrderPageCount = Math.max(1, Math.ceil(filteredLatestOrders.length / latestOrderPageSize));
+  const latestOrderSafePage = Math.min(latestOrderPage, latestOrderPageCount);
+  const paginatedLatestOrders = filteredLatestOrders.slice((latestOrderSafePage - 1) * latestOrderPageSize, latestOrderSafePage * latestOrderPageSize);
+  const visibleLatestOrderIds = filteredLatestOrders.map((order) => order.id);
+  const selectedVisibleLatestOrderCount = visibleLatestOrderIds.filter((id) => selectedLatestOrderIds.has(id)).length;
+  const allVisibleLatestOrdersSelected = visibleLatestOrderIds.length > 0 && selectedVisibleLatestOrderCount === visibleLatestOrderIds.length;
+  const latestOrderTotalWidth = latestOrderColumnsState
+    .filter((column) => column.visible !== false)
+    .reduce((sum, column) => sum + (column.width || 150), 0);
+
+  const toggleLatestOrder = (orderId: string) => {
+    setSelectedLatestOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  const toggleVisibleLatestOrders = () => {
+    setSelectedLatestOrderIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleLatestOrdersSelected) {
+        visibleLatestOrderIds.forEach((id) => next.delete(id));
+      } else {
+        visibleLatestOrderIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const updateLatestOrderPageSize = (size: number) => {
+    setLatestOrderPageSize(size);
+    setLatestOrderPage(1);
+  };
+
+  const applyLatestOrderCustomPageSize = () => {
+    const parsed = Number(latestOrderCustomPageSize);
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+    updateLatestOrderPageSize(Math.floor(parsed));
+    setOpenLatestOrderPageSizeMenu(false);
+  };
+
+  const addLatestOrderColumn = () => {
+    const label = newLatestOrderColumnName.trim();
+    if (!label) return;
+    const newColumn: DashboardTableColumn = {
+      id: `custom_${Date.now()}`,
+      label,
+      width: 150,
+      visible: true,
+    };
+    setLatestOrderColumnsState((prev) => {
+      const next = [...prev];
+      const actionIndex = next.findIndex((column) => column.id === "actions");
+      next.splice(actionIndex === -1 ? next.length : actionIndex, 0, newColumn);
+      return next;
+    });
+    setNewLatestOrderColumnName("");
+    setOpenLatestOrderAddColumn(false);
+  };
+
+  const getDefaultLatestOrderFileName = () => `don-hang-moi-nhat-${new Date().toISOString().slice(0, 10)}`;
+
+  const findFullLatestOrder = (orderId: string) => seedOrders.find((order) => order.id === orderId);
+
+  const buildFallbackOrder = (order: (typeof latestOrders)[number]): LaundryOrder => ({
+    id: order.id,
+    customer: order.customerName,
+    phone: "",
+    address: "",
+    service: order.service,
+    quantity: order.weight,
+    amount: 0,
+    status: order.status === "Quá hạn" ? "Tiếp nhận" : order.status,
+    appointment: "Chưa hẹn",
+    deliveryDate: order.deliveryDate,
+    deliveryTime: order.deliveryTime,
+    staff: order.staff,
+    createdAt: new Date().toISOString().slice(0, 10),
+    note: "",
+  });
+
+  const openLatestOrderEdit = (order: (typeof latestOrders)[number]) => {
+    const fullOrder = findFullLatestOrder(order.id) ?? buildFallbackOrder(order);
+    setEditingLatestOrderId(order.id);
+    setLatestOrderForm({
+      customer: fullOrder.customer,
+      phone: fullOrder.phone,
+      address: fullOrder.address,
+      service: fullOrder.service,
+      quantity: fullOrder.quantity,
+      amount: String(fullOrder.amount),
+      appointment: fullOrder.appointment,
+      deliveryDate: fullOrder.deliveryDate,
+      deliveryTime: fullOrder.deliveryTime,
+      staff: fullOrder.staff,
+      status: fullOrder.status,
+      createdAt: fullOrder.createdAt,
+      payment: "Tiền mặt",
+      discount: "",
+      note: fullOrder.note,
+    });
+  };
+
+  const closeLatestOrderEdit = () => {
+    setEditingLatestOrderId(null);
+    setLatestOrderForm({});
+  };
+
+  const saveLatestOrderEdit = () => {
+    if (!editingLatestOrderId) return;
+    setLatestOrderRows((prev) =>
+      prev.map((order) =>
+        order.id === editingLatestOrderId
+          ? {
+              ...order,
+              customerName: latestOrderForm.customer || order.customerName,
+              service: latestOrderForm.service || order.service,
+              weight: latestOrderForm.quantity || order.weight,
+              status:
+                latestOrderForm.status && latestOrderForm.status in statusStyle
+                  ? (latestOrderForm.status as OrderStatus)
+                  : order.status,
+              deliveryTime: latestOrderForm.deliveryTime || order.deliveryTime,
+              staff: latestOrderForm.staff || order.staff,
+            }
+          : order,
+      ),
+    );
+    closeLatestOrderEdit();
+  };
+
+  const openLatestOrderInvoice = (order: (typeof latestOrders)[number]) => {
+    setInvoiceLatestOrder(findFullLatestOrder(order.id) ?? buildFallbackOrder(order));
+  };
+
+  const handleLatestOrderExport = (format: "pdf" | "excel" | "csv", fileName: string) => {
+    const selectedRows = filteredLatestOrders.filter((order) => selectedLatestOrderIds.has(order.id));
+    const rows = selectedRows.length > 0 ? selectedRows : filteredLatestOrders;
+    if (rows.length === 0) return;
+
+    const exportColumns = latestOrderColumnsState.filter((column) => column.visible !== false && column.id !== "actions");
+    const headers = exportColumns.map((column) => column.label);
+    const values = rows.map((row) =>
+      exportColumns.map((column) => String((row as Record<string, unknown>)[column.id] ?? ""))
+    );
+    const baseFileName = fileName || getDefaultLatestOrderFileName();
+
+    if (format === "csv") {
+      const csv = "\uFEFF" + [headers, ...values].map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${baseFileName}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const tableHead = headers.map((header) => `<th>${header}</th>`).join("");
+    const tableBody = values.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("");
+    if (format === "excel") {
+      const blob = new Blob([`<html><meta charset="utf-8" /><body><table border="1"><thead><tr>${tableHead}</tr></thead><tbody>${tableBody}</tbody></table></body></html>`], { type: "application/vnd.ms-excel" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${baseFileName}.xls`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`<html><body><h2>Bảng đơn hàng mới nhất</h2><table border="1"><thead><tr>${tableHead}</tr></thead><tbody>${tableBody}</tbody></table></body></html>`);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const renderLatestOrderCell = (order: (typeof latestOrders)[number], column: DashboardTableColumn) => {
+    if (column.id === "id") {
+      return (
+        <TableCell key={column.id} className="pl-4 font-medium text-slate-900">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={selectedLatestOrderIds.has(order.id)}
+              onChange={() => toggleLatestOrder(order.id)}
+              className={`shrink-0 ${checkboxClass}`}
+              aria-label={`Chọn ${order.id}`}
+            />
+            <span>{order.id}</span>
+          </div>
+        </TableCell>
+      );
+    }
+    if (column.id === "customerName") {
+      return (
+        <TableCell key={column.id}>
+          <div className="flex min-w-0 items-center gap-2">
+            <Image src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={order.customerName} width={24} height={24} className="size-6 shrink-0 rounded-full object-cover" />
+            <span className="truncate font-semibold text-slate-800">{order.customerName}</span>
+          </div>
+        </TableCell>
+      );
+    }
+    if (column.id === "customerType") {
+      return (
+        <TableCell key={column.id}>
+          <span className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] font-bold ${
+            order.customerType === "Mới"
+              ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+              : "border-slate-200 bg-slate-50 text-slate-600"
+          }`}>
+            Khách {order.customerType}
+          </span>
+        </TableCell>
+      );
+    }
+    if (column.id === "status") {
+      const style = statusStyle[order.status];
+      return (
+        <TableCell key={column.id}>
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-0.5 font-medium" style={{ color: style.color, backgroundColor: style.bg }}>
+            <span className="size-1.5 rounded-full" style={{ backgroundColor: style.color }} />
+            {order.status}
+          </span>
+        </TableCell>
+      );
+    }
+    if (column.id === "washer" || column.id === "dryer") {
+      const machine = order[column.id];
+      const activeClass = column.id === "washer" ? "border-blue-100 bg-blue-50/50 text-blue-700" : "border-amber-100 bg-amber-50/50 text-amber-700";
+      const dotClass = column.id === "washer" ? "bg-blue-500" : "bg-amber-500";
+      return (
+        <TableCell key={column.id}>
+          {machine ? (
+            <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-semibold ${activeClass}`}>
+              <span className={`size-1.5 rounded-full ${dotClass}`} />
+              {machine}
+            </span>
+          ) : (
+            <span className="text-[11px] italic text-slate-400">Chưa dùng</span>
+          )}
+        </TableCell>
+      );
+    }
+    if (column.id === "actions") {
+      return (
+        <TableCell key={column.id} className="px-4">
+          <div className="flex items-center justify-start gap-1.5">
+            <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openLatestOrderEdit(order)} title="Sửa đơn hàng">
+              <Pencil className="size-3" />
+              Sửa
+            </button>
+            <button type="button" className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50" onClick={() => openLatestOrderInvoice(order)} title="Xem hóa đơn">
+              <FileText className="size-3" />
+              Hóa đơn
+            </button>
+          </div>
+        </TableCell>
+      );
+    }
+    const value = order[column.id as keyof typeof order];
+    return <TableCell key={column.id} className="font-medium text-slate-700">{String(value ?? "Chưa có")}</TableCell>;
+  };
 
   return (
     <PageShell fullHeight>
@@ -530,158 +881,102 @@ export default function HomeOverview() {
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-slate-900">Bảng đơn hàng mới nhất</h2>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{latestOrders.length}</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="relative w-full min-w-[180px] flex-1 lg:w-56 lg:flex-none">
-                  <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" />
-                  <Input className="h-8 rounded-md border-transparent bg-white pl-8 text-xs shadow-none focus-visible:ring-slate-200" placeholder="Tìm đơn hàng" />
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <Toolbar
+              leftContent={
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-slate-900">Bảng đơn hàng mới nhất</h2>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{filteredLatestOrders.length}</span>
                 </div>
-                <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs text-slate-700 hover:bg-slate-50">
-                  <EyeOff className="size-3.5" />
-                  Ẩn
-                </button>
-                <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs text-slate-700 hover:bg-slate-50">
-                  <Settings2 className="size-3.5" />
-                  Tùy chỉnh
-                </button>
-                <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-800 hover:bg-slate-50">
-                  Xuất file
-                </button>
-              </div>
-            </div>
+              }
+              query={latestOrderQuery}
+              onQueryChange={(value) => {
+                setLatestOrderQuery(value);
+                setLatestOrderPage(1);
+              }}
+              columns={latestOrderColumnsState}
+              onColumnsChange={setLatestOrderColumnsState}
+              tableResizeMode={latestOrderTableResizeMode}
+              onTableResizeModeChange={setLatestOrderTableResizeMode}
+              selectedCount={selectedLatestOrderIds.size}
+              onOpenAddColumn={() => setOpenLatestOrderAddColumn(true)}
+              onOpenHistory={() => {}}
+              onExport={handleLatestOrderExport}
+              defaultExportFileName={getDefaultLatestOrderFileName()}
+              onCreateClick={() => {
+                window.location.href = "/home/orders?action=create";
+              }}
+              createLabel="Thêm đơn"
+              defaultColumnIds={latestOrderColumns.map((column) => column.id)}
+              searchPlaceholder="Tìm mã đơn, khách hàng, dịch vụ..."
+              showHistoryButton={false}
+            />
 
-            <div className="overflow-x-auto">
-              <Table className="w-[1410px] xl:w-full table-fixed text-xs [&_td:not(:first-child)]:border-l [&_td:not(:first-child)]:border-slate-100">
-                <TableHeader>
-                  <TableRow className="h-9 border-b border-slate-100 bg-slate-50 hover:bg-slate-50">
-                    <TableHead className="w-[110px] pl-4 text-xs font-medium text-slate-600">
-                      <span className="inline-flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          aria-label="Chọn tất cả đơn mới"
-                          className="relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all duration-150 checked:border-slate-900 checked:bg-slate-900 after:absolute after:left-[4.5px] after:top-[1px] after:hidden after:h-[9px] after:w-[5px] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block"
-                        />
-                        Mã đơn
-                      </span>
-                    </TableHead>
-                    <TableHead className="w-[170px] border-l border-slate-100 text-xs font-medium text-slate-600">Khách hàng</TableHead>
-                    <TableHead className="w-[100px] border-l border-slate-100 text-xs font-medium text-slate-600">Loại khách</TableHead>
-                    <TableHead className="w-[100px] border-l border-slate-100 text-xs font-medium text-slate-600">Dịch vụ</TableHead>
-                    <TableHead className="w-[100px] border-l border-slate-100 text-xs font-medium text-slate-600">Khối lượng</TableHead>
-                    <TableHead className="w-[130px] border-l border-slate-100 text-xs font-medium text-slate-600">Trạng thái</TableHead>
-                    <TableHead className="w-[100px] border-l border-slate-100 text-xs font-medium text-slate-600">Ngày giao</TableHead>
-                    <TableHead className="w-[90px] border-l border-slate-100 text-xs font-medium text-slate-600">Giờ giao</TableHead>
-                    <TableHead className="w-[125px] border-l border-slate-100 text-xs font-medium text-slate-600">Máy giặt</TableHead>
-                    <TableHead className="w-[125px] border-l border-slate-100 text-xs font-medium text-slate-600">Máy sấy</TableHead>
-                    <TableHead className="w-[110px] border-l border-slate-100 text-xs font-medium text-slate-600">Nhân viên</TableHead>
-                    <TableHead className="w-[150px] border-l border-slate-100 px-4 text-left text-xs font-medium text-slate-600">Thao tác</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {latestOrders.map((order) => {
-                    const style = statusStyle[order.status];
+            <FilterBar
+              rangeLabel={rangeLabel}
+              selectedValue={selectedLatestOrderStatus}
+              onValueChange={(value) => {
+                setSelectedLatestOrderStatus(value as OrderStatus | "Tất cả");
+                setLatestOrderPage(1);
+              }}
+              filterOptions={latestOrderStatusOptions}
+              filterLabel="Trạng thái đơn"
+              allSelected={allVisibleLatestOrdersSelected}
+              disabled={visibleLatestOrderIds.length === 0}
+              selectedCount={selectedVisibleLatestOrderCount}
+              totalCount={visibleLatestOrderIds.length}
+              itemLabel="đơn"
+              checkboxClass={checkboxClass}
+              onToggleAll={toggleVisibleLatestOrders}
+            />
 
-                    return (
-                      <TableRow key={order.id} className="h-11 border-b border-slate-100 text-slate-700 hover:bg-slate-50/60">
-                        <TableCell className="pl-4 font-medium text-slate-900">
-                          <span className="inline-flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              aria-label={`Chọn đơn ${order.id}`}
-                              className="relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all duration-150 checked:border-slate-900 checked:bg-slate-900 after:absolute after:left-[4.5px] after:top-[1px] after:hidden after:h-[9px] after:w-[5px] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block"
-                            />
-                            {order.id}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex min-w-0 items-center gap-2">
-                            <Image src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={order.customerName} width={24} height={24} className="size-6 shrink-0 rounded-full object-cover" />
-                            <span className="truncate font-semibold text-slate-800">{order.customerName}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${
-                            order.customerType === "Mới"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                              : "bg-slate-50 text-slate-600 border-slate-200"
-                          }`}>
-                            Khách {order.customerType}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-slate-600 font-medium">{order.service}</TableCell>
-                        <TableCell className="text-slate-600 font-semibold">{order.weight}</TableCell>
-                        <TableCell>
-                          <span
-                            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-0.5 font-medium"
-                            style={{ color: style.color, backgroundColor: style.bg }}
-                          >
-                            <span className="size-1.5 rounded-full" style={{ backgroundColor: style.color }} />
-                            {order.status}
-                          </span>
-                        </TableCell>
-                        <TableCell className="font-semibold text-slate-700">{order.deliveryDate}</TableCell>
-                        <TableCell className="font-semibold text-slate-900">{order.deliveryTime}</TableCell>
-                        <TableCell>
-                          {order.washer ? (
-                            <span className="inline-flex items-center gap-1 font-semibold text-blue-700 bg-blue-50/50 border border-blue-105 px-2 py-0.5 rounded-md">
-                              <span className="size-1.5 rounded-full bg-blue-500" />
-                              {order.washer}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 italic text-[11px]">Chưa dùng</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {order.dryer ? (
-                            <span className="inline-flex items-center gap-1 font-semibold text-amber-700 bg-amber-50/50 border border-amber-105 px-2 py-0.5 rounded-md">
-                              <span className="size-1.5 rounded-full bg-amber-500" />
-                              {order.dryer}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 italic text-[11px]">Chưa dùng</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-slate-600 font-medium">{order.staff}</TableCell>
-                        <TableCell className="px-4">
-                          <div className="flex items-center justify-start gap-1.5">
-                            <button
-                              type="button"
-                              className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
-                              onClick={() => {
-                                window.location.href = `/home/orders?id=${order.id}&action=edit`;
-                              }}
-                              title="Sửa đơn hàng"
-                            >
-                              <Pencil className="size-3" />
-                              Sửa
-                            </button>
-                            <button
-                              type="button"
-                              className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
-                              onClick={() => {
-                                window.location.href = `/home/orders?id=${order.id}&action=invoice`;
-                              }}
-                              title="Xem hóa đơn"
-                            >
-                              <FileText className="size-3" />
-                              Hóa đơn
-                            </button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+            <TableView
+              columns={latestOrderColumnsState}
+              rows={paginatedLatestOrders}
+              pageSize={latestOrderPageSize}
+              emptyMessage="Chưa có đơn hàng mới."
+              tableResizeMode={latestOrderTableResizeMode}
+              totalVisibleWidth={latestOrderTotalWidth}
+              renderCell={renderLatestOrderCell}
+              page={latestOrderSafePage}
+              pageCount={latestOrderPageCount}
+              totalRows={filteredLatestOrders.length}
+              customPageSize={latestOrderCustomPageSize}
+              openPageSizeMenu={openLatestOrderPageSizeMenu}
+              onOpenPageSizeMenuChange={setOpenLatestOrderPageSizeMenu}
+              onCustomPageSizeChange={setLatestOrderCustomPageSize}
+              onApplyCustomPageSize={applyLatestOrderCustomPageSize}
+              onUpdatePageSize={updateLatestOrderPageSize}
+              onPageChange={setLatestOrderPage}
+            />
           </div>
         </div>
       </div>
+
+      <AddColumnDialog
+        open={openLatestOrderAddColumn}
+        onOpenChange={setOpenLatestOrderAddColumn}
+        newColumnName={newLatestOrderColumnName}
+        onNewColumnNameChange={setNewLatestOrderColumnName}
+        onAddColumn={addLatestOrderColumn}
+      />
+
+      <FormDialog
+        open={!!editingLatestOrderId}
+        onClose={closeLatestOrderEdit}
+        title={editingLatestOrderId ? `Chi tiết đơn ${editingLatestOrderId}` : "Chi tiết đơn"}
+        fields={latestOrderFormFields}
+        form={latestOrderForm}
+        onFormChange={setLatestOrderForm}
+        onSave={saveLatestOrderEdit}
+        statusOptions={statuses}
+        statusDotColors={statusDotColor}
+      />
+
+      <InvoiceModal
+        order={invoiceLatestOrder}
+        onClose={() => setInvoiceLatestOrder(null)}
+      />
     </PageShell>
   );
 }
