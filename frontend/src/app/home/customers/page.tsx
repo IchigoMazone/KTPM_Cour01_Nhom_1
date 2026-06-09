@@ -121,6 +121,9 @@ const rankColor: Record<string, { text: string; bg: string }> = {
 
 const allRankColor = "#0f766e";
 const allRankBgColor = "rgba(15,118,110,0.09)";
+const rankDotColors = Object.fromEntries(
+  Object.entries(rankColor).map(([rank, color]) => [rank, color.text])
+);
 
 const initialPageSize = 10;
 const defaultColumns: CustomerColumn[] = [
@@ -187,18 +190,31 @@ export default function CustomersPage() {
   const [form, setForm] = useState<typeof emptyForm & Record<string, string>>(emptyForm);
 
   const customerFormFields = useMemo<FormField[]>(() => {
-    return [
-      { id: "name", label: "Họ tên", type: "text", placeholder: "Họ và tên" },
-      { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
-      { id: "email", label: "Email", type: "text", placeholder: "khachhang@example.com" },
-      { id: "birthday", label: "Ngày sinh", type: "date" },
-      { id: "address", label: "Địa chỉ mặc định", type: "text", placeholder: "Số nhà, tên đường, quận/huyện...", className: "md:col-span-2" },
-      { id: "rank", label: "Hạng khách hàng", type: "select", options: rankOptions, placeholder: "Chọn hạng" },
-      { id: "points", label: "Điểm tích lũy", type: "number" },
-      { id: "createdAt", label: "Ngày tạo tài khoản", type: "date" },
-      { id: "note", label: "Ghi chú đặc biệt", type: "textarea", placeholder: "Dị ứng hóa chất, giờ giao hàng yêu thích..." },
-    ];
-  }, []);
+    const fieldByColumnId: Record<string, FormField> = {
+      name: { id: "name", label: "Họ tên", type: "text", placeholder: "Họ và tên" },
+      phone: { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
+      email: { id: "email", label: "Email", type: "text", placeholder: "khachhang@example.com" },
+      birthday: { id: "birthday", label: "Ngày sinh", type: "date" },
+      address: { id: "address", label: "Địa chỉ mặc định", type: "text", placeholder: "Số nhà, tên đường, quận/huyện..." },
+      rank: { id: "rank", label: "Hạng khách hàng", type: "select", options: rankOptions, placeholder: "Chọn hạng", optionDotColors: rankDotColors },
+      points: { id: "points", label: "Điểm tích lũy", type: "number" },
+      totalOrders: { id: "totalOrders", label: "Tổng đơn", type: "number" },
+      totalSpend: { id: "totalSpend", label: "Chi tiêu", type: "number" },
+      createdAt: { id: "createdAt", label: "Ngày tạo tài khoản", type: "date" },
+      note: { id: "note", label: "Ghi chú đặc biệt", type: "textarea", placeholder: "Dị ứng hóa chất, giờ giao hàng yêu thích..." },
+    };
+
+    return columns
+      .filter((column) => column.visible && column.id !== "actions")
+      .map((column) => {
+        return fieldByColumnId[column.id] || {
+          id: column.id,
+          label: column.label,
+          type: "text",
+          placeholder: `Nhập ${column.label.toLowerCase()}`,
+        } satisfies FormField;
+      });
+  }, [columns]);
 
   const range = useDashboardTimeRangeStore((state) => state.range);
   const rangeLabel = formatRange(normalizeRange(range));
@@ -684,7 +700,7 @@ export default function CustomersPage() {
             }}
           >
             <span
-              className="inline-block size-1.5 shrink-0 rounded-full"
+              className="inline-block size-2 shrink-0 rounded-full"
               style={{ backgroundColor: rankColor[customer.rank]?.text || "#475569" }}
             />
             <span className="truncate">{customer.rank}</span>
@@ -1003,8 +1019,6 @@ export default function CustomersPage() {
         form={form}
         onFormChange={(newForm) => setForm({ ...emptyForm, ...newForm })}
         onSave={saveCustomer}
-        customColumns={customColumns}
-        customColumnsBeforeFieldId="createdAt"
         gridClassName="grid gap-4 md:grid-cols-2"
         showCloseButton={false}
         showCloseButtonAtBottom

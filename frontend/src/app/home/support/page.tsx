@@ -6,6 +6,10 @@ import {
   ImagePlus,
   MessageCircle,
   Send,
+  ChevronLeft,
+  CheckCheck,
+  MoreVertical,
+  Paperclip,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -105,19 +109,6 @@ const emptyForm = {
   note: "",
 };
 
-const ticketFormFields: FormField[] = [
-  { id: "type", label: "Loại hỗ trợ", type: "select", options: ["Mất đồ", "Giao trễ", "Hỏng đồ", "Thanh toán", "Khác"] },
-  { id: "customer", label: "Khách hàng", type: "text", placeholder: "Tên khách" },
-  { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
-  { id: "orderId", label: "Mã đơn", type: "text", placeholder: "DH-1022" },
-  { id: "priority", label: "Độ ưu tiên", type: "select", options: ["Cao", "Trung bình", "Thấp"] },
-  { id: "owner", label: "Người phụ trách", type: "custom_staff" },
-  { id: "createdAt", label: "Ngày tạo", type: "date" },
-  { id: "washDate", label: "Ngày giặt", type: "date" },
-  { id: "status", label: "Trạng thái", type: "select", options: ["Chưa xử lý", "Đang xử lý", "Đã giải quyết"] },
-  { id: "note", label: "Nội dung xử lý", type: "textarea", placeholder: "Mô tả vấn đề, phương án xử lý, bồi thường..." },
-];
-
 const statusColor: Record<TicketStatus, { text: string; bg: string }> = {
   "Chưa xử lý": { text: "#2563eb", bg: "rgba(37,99,235,0.09)" },
   "Đang xử lý": { text: "#d97706", bg: "rgba(217,119,6,0.09)" },
@@ -130,11 +121,18 @@ const priorityColor: Record<Priority, { text: string; bg: string }> = {
   "Thấp": { text: "#2563eb", bg: "rgba(37,99,235,0.09)" },
 };
 
+const statusDotColors = Object.fromEntries(
+  Object.entries(statusColor).map(([status, color]) => [status, color.text])
+);
+const priorityDotColors = Object.fromEntries(
+  Object.entries(priorityColor).map(([priority, color]) => [priority, color.text])
+);
+
 function PriorityPill({ label }: { label: Priority }) {
   const color = priorityColor[label];
   return (
     <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium" style={{ color: color.text, backgroundColor: color.bg }}>
-      <span className="size-1.5 rounded-full" style={{ backgroundColor: color.text }} />
+      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color.text }} />
       {label}
     </span>
   );
@@ -144,7 +142,7 @@ function StatusPill({ label }: { label: TicketStatus }) {
   const color = statusColor[label];
   return (
     <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium" style={{ color: color.text, backgroundColor: color.bg }}>
-      <span className="size-1.5 rounded-full" style={{ backgroundColor: color.text }} />
+      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color.text }} />
       {label}
     </span>
   );
@@ -232,6 +230,31 @@ export default function SupportPage() {
     ),
   );
   const activeColumns = useMemo(() => mergeDefaultColumns(columns), [columns]);
+  const ticketFormFields = useMemo<FormField[]>(() => {
+    const fieldByColumnId: Record<string, FormField> = {
+      type: { id: "type", label: "Loại hỗ trợ", type: "select", options: ["Mất đồ", "Giao trễ", "Hỏng đồ", "Thanh toán", "Khác"] },
+      customer: { id: "customer", label: "Tên khách", type: "text", placeholder: "Tên khách" },
+      phone: { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
+      orderId: { id: "orderId", label: "Mã đơn", type: "text", placeholder: "DH-1022" },
+      priority: { id: "priority", label: "Độ ưu tiên", type: "select", options: ["Cao", "Trung bình", "Thấp"], optionDotColors: priorityDotColors },
+      owner: { id: "owner", label: "Người phụ trách", type: "custom_staff" },
+      status: { id: "status", label: "Trạng thái", type: "custom_status" },
+      washDate: { id: "washDate", label: "Ngày giặt", type: "date" },
+      createdAt: { id: "createdAt", label: "Ngày tạo", type: "date" },
+      note: { id: "note", label: "Nội dung xử lý", type: "textarea", placeholder: "Mô tả vấn đề, phương án xử lý, bồi thường..." },
+    };
+
+    return activeColumns
+      .filter((column) => column.visible !== false && column.id !== "id" && column.id !== "actions")
+      .map((column) => {
+        return fieldByColumnId[column.id] || {
+          id: column.id,
+          label: column.label,
+          type: "text",
+          placeholder: `Nhập ${column.label.toLowerCase()}`,
+        } satisfies FormField;
+      });
+  }, [activeColumns]);
   const updateColumns = (value: DashboardTableColumn[] | ((prev: DashboardTableColumn[]) => DashboardTableColumn[])) => {
     setColumns((prev) => {
       const mergedPrev = mergeDefaultColumns(prev);
@@ -263,6 +286,12 @@ export default function SupportPage() {
   const selectedVisibleTicketCount = visibleTicketIds.filter((id) => selectedTicketIds.has(id)).length;
   const activeChatTicket = activeChatTicketId ? tickets.find((ticket) => ticket.id === activeChatTicketId) ?? null : null;
   const activeChatMessages = activeChatTicketId ? ticketMessages[activeChatTicketId] ?? [] : [];
+  const customColumns = useMemo(
+    () => activeColumns.filter((column) => !defaultColumns.some((defaultColumn) => defaultColumn.id === column.id)),
+    [activeColumns]
+  );
+  const getCustomFields = (source: Record<string, unknown> = {}) =>
+    Object.fromEntries(customColumns.map((column) => [column.id, String(source[column.id] ?? "")]));
 
   const toggleVisibleTickets = () => {
     setSelectedTicketIds((prev) => {
@@ -380,6 +409,7 @@ export default function SupportPage() {
       next.splice(actionIndex === -1 ? next.length : actionIndex, 0, newColumn);
       return next;
     });
+    setForm((prev) => ({ ...prev, [newColumn.id]: "" }));
     setNewColumnName("");
     setOpenAddColumn(false);
   };
@@ -410,9 +440,8 @@ export default function SupportPage() {
       if (draggedIndex === -1 || dropIndex === -1) return prev;
 
       const next = [...mergedPrev];
-      const temp = next[draggedIndex];
-      next[draggedIndex] = next[dropIndex];
-      next[dropIndex] = temp;
+      const [draggedColumn] = next.splice(draggedIndex, 1);
+      next.splice(dropIndex, 0, draggedColumn);
       return next;
     });
 
@@ -448,6 +477,7 @@ export default function SupportPage() {
     setEditingTicketId(null);
     setForm({
       ...emptyForm,
+      ...getCustomFields(),
       createdAt: new Date().toISOString().slice(0, 10),
       owner: currentUser,
     });
@@ -467,6 +497,7 @@ export default function SupportPage() {
       washDate: ticket.washDate || ticket.createdAt,
       createdAt: ticket.createdAt,
       note: ticket.note,
+      ...getCustomFields(ticket as unknown as Record<string, unknown>),
     });
     setOpenForm(true);
   };
@@ -479,11 +510,11 @@ export default function SupportPage() {
       prev.map((item) =>
         item.id === ticket.id
           ? {
-              ...item,
-              owner: currentUser,
-              ownerAvatar: currentUserAvatar,
-              status: item.status === "Chưa xử lý" ? "Đang xử lý" : item.status,
-            }
+            ...item,
+            owner: currentUser,
+            ownerAvatar: currentUserAvatar,
+            status: item.status === "Chưa xử lý" ? "Đang xử lý" : item.status,
+          }
           : item,
       ),
     );
@@ -516,11 +547,11 @@ export default function SupportPage() {
       prev.map((ticket) =>
         ticket.id === activeChatTicketId
           ? {
-              ...ticket,
-              owner: currentUser,
-              ownerAvatar: currentUserAvatar,
-              status: ticket.status === "Chưa xử lý" ? "Đang xử lý" : ticket.status,
-            }
+            ...ticket,
+            owner: currentUser,
+            ownerAvatar: currentUserAvatar,
+            status: ticket.status === "Chưa xử lý" ? "Đang xử lý" : ticket.status,
+          }
           : ticket,
       ),
     );
@@ -545,6 +576,7 @@ export default function SupportPage() {
         washDate: form.washDate || form.createdAt || new Date().toISOString().slice(0, 10),
         createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
         note: form.note || "",
+        ...getCustomFields(form),
       };
       setTickets((prev) => prev.map((ticket) => ticket.id === editingTicketId ? { ...ticket, ...payload } : ticket));
     } else {
@@ -560,6 +592,7 @@ export default function SupportPage() {
         washDate: form.washDate || form.createdAt || new Date().toISOString().slice(0, 10),
         createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
         note: form.note || "",
+        ...getCustomFields(form),
       };
       setTickets((prev) => [{ id: `HT-${Date.now().toString().slice(-3)}`, ...payload }, ...prev]);
     }
@@ -791,66 +824,97 @@ export default function SupportPage() {
   if (activeChatTicket) {
     return (
       <PageShell fullHeight>
-        <div className="grid min-h-0 flex-1 gap-4 overflow-hidden bg-muted/30 p-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <Card className="min-h-0 gap-0 py-0">
-            <CardHeader className="border-b py-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <Button variant="outline" size="sm" onClick={() => setActiveChatTicketId(null)}>
-                    Quay lại
-                  </Button>
-                  <Avatar size="lg">
-                    <AvatarImage src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={activeChatTicket.customer} />
-                    <AvatarFallback>{activeChatTicket.customer.slice(0, 1)}</AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0">
-                    <CardTitle className="truncate">{activeChatTicket.customer}</CardTitle>
-                    <CardDescription className="truncate">
-                      {activeChatTicket.id} · {activeChatTicket.type} · Đơn {activeChatTicket.orderId}
-                    </CardDescription>
-                  </div>
-                </div>
-                <div className="hidden shrink-0 items-center gap-2 md:flex">
-                  <Badge variant="outline">{activeChatTicket.priority}</Badge>
-                  <Badge variant={activeChatTicket.status === "Đã giải quyết" ? "secondary" : "outline"}>{activeChatTicket.status}</Badge>
+        <div className="min-h-0 flex-1 overflow-hidden bg-white flex flex-col">
+
+          {/* Left Column: Chat Conversation */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+
+            {/* Chat Header */}
+            <div className="border-b border-slate-100 bg-white px-4 py-3 shrink-0 flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <button
+                  onClick={() => setActiveChatTicketId(null)}
+                  className="mr-1 rounded-full p-1 text-slate-400 hover:bg-slate-100 lg:hidden"
+                  title="Quay lại"
+                >
+                  <ChevronLeft className="size-5" />
+                </button>
+                <Avatar className="size-9 border border-slate-100 shadow-sm shrink-0">
+                  <AvatarImage src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={activeChatTicket.customer} />
+                  <AvatarFallback>{activeChatTicket.customer.slice(0, 1)}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 text-left">
+                  <p className="truncate text-sm font-semibold text-slate-900 leading-tight">{activeChatTicket.customer}</p>
+                  <p className="text-[11px] font-medium text-slate-400 mt-0.5">
+                    {activeChatTicket.id} · {activeChatTicket.type}
+                  </p>
                 </div>
               </div>
-            </CardHeader>
 
-            <CardContent className="min-h-0 flex-1 px-0">
-              <ScrollArea className="h-full px-4 py-5">
-                <div className="space-y-5">
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => {
+                    setTickets(prev => prev.map(t => t.id === activeChatTicket.id ? { ...t, status: "Đã giải quyết" } : t));
+                    setActiveChatTicketId(null);
+                  }}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  Đóng Ticket
+                </button>
+                <button className="flex size-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700">
+                  <MoreVertical className="size-4.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Conversation Messages */}
+            <div className="min-h-0 flex-1 bg-white overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="space-y-6 px-5 py-6">
                   {activeChatMessages.map((message) => {
                     const isStaff = message.sender === "staff";
                     return (
-                      <div key={message.id} className={`flex gap-3 ${isStaff ? "justify-end" : "justify-start"}`}>
+                      <div key={message.id} className={`flex items-start gap-3 ${isStaff ? "justify-end" : "justify-start"}`}>
                         {!isStaff && (
-                          <Avatar size="sm" className="mt-1">
+                          <Avatar className="size-8 mt-1 border border-slate-100 shadow-sm shrink-0">
                             <AvatarImage src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={message.senderName} />
                             <AvatarFallback>{message.senderName.slice(0, 1)}</AvatarFallback>
                           </Avatar>
                         )}
-                        <div className={`flex max-w-[78%] flex-col gap-1 ${isStaff ? "items-end" : "items-start"}`}>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className={`flex max-w-[70%] flex-col gap-1 ${isStaff ? "items-end" : "items-start"}`}>
+                          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold mb-0.5">
                             <span>{message.senderName}</span>
+                            <span>·</span>
                             <span>{formatReadableDate(message.createdAt)}</span>
+                            {isStaff && <span className="font-bold text-[#0ebd85]">You</span>}
                           </div>
-                          <div className={`rounded-lg border px-3 py-2 text-sm shadow-sm ${isStaff ? "bg-primary text-primary-foreground" : "bg-background text-foreground"}`}>
+                          <div className={`rounded-xl px-4 py-3 text-sm leading-5 shadow-2xs ${isStaff
+                            ? "bg-[#edfbf4] text-slate-800 rounded-tr-none border border-emerald-50/50"
+                            : "bg-[#f1f3f4] text-slate-800 rounded-tl-none"
+                            }`}>
                             {message.imageUrl && (
-                              <Image
-                                src={message.imageUrl}
-                                alt="Ảnh đính kèm"
-                                width={360}
-                                height={240}
-                                unoptimized
-                                className="mb-2 max-h-64 w-full rounded-md object-cover"
-                              />
+                              <div className="mb-2 overflow-hidden rounded-lg">
+                                <Image
+                                  src={message.imageUrl}
+                                  alt="Ảnh đính kèm"
+                                  width={360}
+                                  height={240}
+                                  unoptimized
+                                  className="max-h-64 w-full object-cover"
+                                />
+                              </div>
                             )}
-                            {message.content && <p className="whitespace-pre-wrap leading-5">{message.content}</p>}
+                            {message.content && <p className="whitespace-pre-wrap">{message.content}</p>}
+                          </div>
+
+                          {/* Time and checkmarks under message */}
+                          <div className="flex items-center gap-1 px-1 mt-0.5">
+                            <span className="text-[10px] text-slate-400">10:30 am</span>
+                            <CheckCheck className="size-3 text-slate-400" />
                           </div>
                         </div>
                         {isStaff && (
-                          <Avatar size="sm" className="mt-1">
+                          <Avatar className="size-8 mt-1 border border-slate-100 shadow-sm shrink-0">
                             <AvatarImage src={message.avatar || currentUserAvatar} alt={message.senderName} />
                             <AvatarFallback>{message.senderName.slice(0, 1)}</AvatarFallback>
                           </Avatar>
@@ -860,9 +924,13 @@ export default function SupportPage() {
                   })}
                 </div>
               </ScrollArea>
-            </CardContent>
+            </div>
 
-            <CardFooter className="block">
+
+
+
+            {/* Chat Input Footer */}
+            <div className="border-t border-slate-105 bg-white p-4 shrink-0">
               {chatImagePreview && (
                 <div className="mb-3 flex w-fit items-start gap-2 rounded-lg border bg-background p-2">
                   <Image
@@ -878,31 +946,9 @@ export default function SupportPage() {
                   </Button>
                 </div>
               )}
-              <div className="flex items-end gap-2">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" size="icon-lg" asChild>
-                        <label className="cursor-pointer">
-                          <ImagePlus className="size-4" />
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) => {
-                              const file = event.target.files?.[0];
-                              if (!file) return;
-                              setChatImagePreview(URL.createObjectURL(file));
-                              event.target.value = "";
-                            }}
-                          />
-                        </label>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Gửi ảnh</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <Textarea
+
+              <div className="flex flex-col gap-3">
+                <textarea
                   value={chatDraft}
                   onChange={(event) => setChatDraft(event.target.value)}
                   onKeyDown={(event) => {
@@ -911,57 +957,78 @@ export default function SupportPage() {
                       sendMessage();
                     }
                   }}
-                  placeholder="Nhập phản hồi cho khách hàng..."
-                  className="max-h-32 min-h-11 resize-none"
-                  rows={1}
+                  placeholder="Write a message..."
+                  className="w-full resize-none bg-transparent text-sm text-slate-750 placeholder-slate-400 focus:outline-none min-h-[50px] max-h-24 py-1"
                 />
-                <Button size="icon-lg" onClick={sendMessage} disabled={!chatDraft.trim() && !chatImagePreview}>
-                  <Send className="size-4" />
-                </Button>
-              </div>
-            </CardFooter>
-          </Card>
 
-          <Card className="hidden min-h-0 lg:flex" size="sm">
-            <CardHeader>
-              <CardTitle>Thông tin ticket</CardTitle>
-              <CardDescription>{activeChatTicket.phone}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              <div className="flex items-center gap-3">
-                <Avatar size="lg">
-                  <AvatarImage src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={activeChatTicket.customer} />
-                  <AvatarFallback>{activeChatTicket.customer.slice(0, 1)}</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-foreground">{activeChatTicket.customer}</p>
-                  <p className="truncate text-xs text-muted-foreground">{activeChatTicket.orderId}</p>
-                </div>
-              </div>
-              <Separator />
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Ngày giặt</p>
-                  <p className="mt-1 text-foreground">{formatReadableDate(activeChatTicket.washDate)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Phụ trách</p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <Avatar size="sm">
-                      <AvatarImage src={activeChatTicket.ownerAvatar || currentUserAvatar} alt={activeChatTicket.owner} />
-                      <AvatarFallback>{activeChatTicket.owner.slice(0, 1)}</AvatarFallback>
-                    </Avatar>
-                    <span className="truncate text-foreground">{activeChatTicket.owner}</span>
+                <div className="flex items-center justify-between border-t border-slate-50 pt-2.5">
+                  <div className="flex items-center gap-1.5 text-slate-400">
+
+                    {/* File Attachment */}
+                    <label className="flex items-center gap-1 shrink-0 cursor-pointer rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-100">
+                      <Paperclip className="size-3.5" />
+                      <span>File</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (!file) return;
+                          setChatImagePreview(URL.createObjectURL(file));
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+
+                    {/* Image Shortcut */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <label className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg hover:bg-slate-50 hover:text-slate-600 transition-colors">
+                            <ImagePlus className="size-4" />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                if (!file) return;
+                                setChatImagePreview(URL.createObjectURL(file));
+                                event.target.value = "";
+                              }}
+                            />
+                          </label>
+                        </TooltipTrigger>
+                        <TooltipContent>Gửi ảnh</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <button type="button" className="flex size-7 items-center justify-center rounded-lg hover:bg-slate-50 hover:text-slate-600 transition-colors" title="AI Assist">
+                      <span className="text-xs">✨</span>
+                    </button>
+                    <button type="button" className="flex size-7 items-center justify-center rounded-lg hover:bg-slate-50 hover:text-slate-600 transition-colors" title="Emojis">
+                      <span className="text-xs">😊</span>
+                    </button>
                   </div>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Nội dung ban đầu</p>
-                  <p className="mt-1 rounded-lg bg-muted p-3 text-xs leading-5 text-muted-foreground">{activeChatTicket.note}</p>
+
+                  {/* Send Button Green */}
+                  <button
+                    type="button"
+                    onClick={sendMessage}
+                    disabled={!chatDraft.trim() && !chatImagePreview}
+                    className="flex items-center gap-1.5 rounded-lg bg-[#0ebd85] px-4 py-2 text-xs font-bold text-white transition-all hover:bg-[#0ca977] hover:scale-[1.02] active:scale-[0.98] disabled:bg-slate-100 disabled:text-slate-400 disabled:scale-100 shadow-2xs"
+                  >
+                    <span>Send</span>
+                    <Send className="size-3" />
+                  </button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
           </div>
+
+
+        </div>
       </PageShell>
     );
   }
@@ -990,7 +1057,7 @@ export default function SupportPage() {
           onTableResizeModeChange={setTableResizeMode}
           selectedCount={selectedTicketIds.size}
           onOpenAddColumn={() => setOpenAddColumn(true)}
-          onOpenHistory={() => {}}
+          onOpenHistory={() => { }}
           onExport={handleExport}
           defaultExportFileName={`ho-tro-${new Date().toISOString().slice(0, 10)}`}
           onCreateClick={openCreateForm}
@@ -1090,6 +1157,8 @@ export default function SupportPage() {
         onSave={saveTicket}
         currentStaffName={currentUser}
         currentStaffAvatar={currentUserAvatar}
+        statusOptions={["Chưa xử lý", "Đang xử lý", "Đã giải quyết"]}
+        statusDotColors={statusDotColors}
         showCloseButton={false}
         showCloseButtonAtBottom={true}
       />

@@ -231,10 +231,10 @@ const emptyPromotionForm: PromotionForm = {
 };
 
 const selectClassName =
-  "!h-10 min-h-10 w-full rounded-lg border border-gray-200 bg-white text-sm text-slate-700 shadow-none focus-visible:ring-gray-200";
+  "!h-8 min-h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm text-slate-700 shadow-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 const selectContentClassName = "z-[2100]";
 const formDialogClassName =
-  "max-h-[90dvh] overflow-y-auto sm:max-w-3xl [&_input]:h-10 [&_input]:rounded-lg [&_input]:border [&_input]:border-gray-200 [&_input]:bg-white [&_input]:text-sm [&_input]:text-slate-700 [&_input]:shadow-none [&_input]:placeholder:text-slate-500 [&_input]:focus-visible:ring-gray-200 [&_textarea]:h-24 [&_textarea]:min-h-24 [&_textarea]:resize-none [&_textarea]:rounded-lg [&_textarea]:border [&_textarea]:border-gray-200 [&_textarea]:bg-white [&_textarea]:text-sm [&_textarea]:text-slate-700 [&_textarea]:shadow-none [&_textarea]:placeholder:text-slate-500 [&_textarea]:focus-visible:ring-gray-200";
+  "flex h-[min(86vh,680px)] w-[min(86vw,680px)] max-w-[min(86vw,680px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[680px] [&_input]:h-8 [&_input]:rounded-lg [&_input]:border-input [&_input]:bg-transparent [&_input]:px-2.5 [&_input]:py-1 [&_input]:text-sm [&_input]:text-slate-700 [&_input]:shadow-none [&_textarea]:h-24 [&_textarea]:min-h-24 [&_textarea]:resize-none [&_textarea]:rounded-lg [&_textarea]:border-input [&_textarea]:bg-transparent [&_textarea]:text-sm [&_textarea]:text-slate-700 [&_textarea]:shadow-none";
 const defaultAvatarUrl = "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif";
 
 const statusColor: Record<ServiceStatus | FinanceStatus | PromotionStatus, { text: string; bg: string }> = {
@@ -1271,10 +1271,10 @@ export default function ServicesFinancePage() {
 
       <Dialog open={openServiceForm} onOpenChange={setOpenServiceForm}>
         <DialogContent className={formDialogClassName} showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>{editingServiceId ? `Chỉnh sửa ${editingServiceId}` : "Thêm dịch vụ mới"}</DialogTitle>
+          <DialogHeader className="min-h-[61px] border-b border-slate-200 px-6 py-4">
+            <DialogTitle className="text-lg font-semibold leading-7 text-slate-950">{editingServiceId ? `Chỉnh sửa ${editingServiceId}` : "Thêm dịch vụ mới"}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-2 md:grid-cols-2">
+          <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-6 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Tên dịch vụ</Label>
                 <Input value={serviceForm.name} onChange={(event) => setServiceForm({ ...serviceForm, name: event.target.value })} placeholder="Giặt sấy nhanh" />
@@ -1352,14 +1352,14 @@ export default function ServicesFinancePage() {
               ))}
               <div className="space-y-2 md:col-span-2">
                 <Label>Ghi chú vận hành</Label>
-                <Textarea value={serviceForm.note} onChange={(event) => setServiceForm({ ...serviceForm, note: event.target.value })} placeholder="Điều kiện nhận đồ, hóa chất, phân loại..." />
+                <Textarea className="h-24 min-h-24 resize-none rounded-lg border-input bg-transparent px-2.5 py-2 text-sm text-slate-700 shadow-none" value={serviceForm.note} onChange={(event) => setServiceForm({ ...serviceForm, note: event.target.value })} placeholder="Điều kiện nhận đồ, hóa chất, phân loại..." />
               </div>
           </div>
-          <DialogFooter className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setOpenServiceForm(false)}>
-              Hủy
+          <DialogFooter className="m-0 flex flex-row items-center justify-end gap-2 border-t border-slate-200 bg-white px-6 py-4">
+            <Button type="button" variant="outline" className="w-full justify-center text-center sm:w-auto" onClick={() => setOpenServiceForm(false)}>
+              Đóng
             </Button>
-            <Button className="bg-slate-900 font-semibold text-white hover:bg-slate-800" onClick={saveService}>
+            <Button className="w-full justify-center bg-slate-900 text-center font-semibold text-white hover:bg-slate-800 sm:w-auto" onClick={saveService}>
               Lưu dịch vụ
             </Button>
           </DialogFooter>
@@ -1368,10 +1368,10 @@ export default function ServicesFinancePage() {
 
       <Dialog open={openFinanceForm} onOpenChange={setOpenFinanceForm}>
         <DialogContent className={formDialogClassName} showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>{editingFinanceId ? `Chỉnh sửa ${editingFinanceId}` : "Thêm giao dịch tài chính"}</DialogTitle>
+          <DialogHeader className="min-h-[61px] border-b border-slate-200 px-6 py-4">
+            <DialogTitle className="text-lg font-semibold leading-7 text-slate-950">{editingFinanceId ? `Chỉnh sửa ${editingFinanceId}` : "Thêm giao dịch tài chính"}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-2 md:grid-cols-2">
+          <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-6 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Ngày ghi nhận</Label>
                 <Popover>
@@ -1379,7 +1379,7 @@ export default function ServicesFinancePage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="h-10 w-full justify-start rounded-lg border border-gray-200 bg-white px-2.5 text-left text-sm font-normal text-slate-700 shadow-none hover:bg-slate-50 focus-visible:ring-gray-200"
+                      className="h-8 w-full justify-start rounded-lg border border-input bg-transparent px-2.5 text-left text-sm font-normal text-slate-700 shadow-none hover:bg-slate-50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
                       <CalendarDays className="mr-2 size-4 text-slate-400" />
                       {formatDisplayDate(financeForm.date)}
@@ -1460,7 +1460,7 @@ export default function ServicesFinancePage() {
               </div>
               <div className="space-y-2">
                 <Label>Phụ trách</Label>
-                <div className="flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-muted/40 px-2.5 text-sm text-slate-700">
+                <div className="flex h-8 items-center gap-2 rounded-lg border border-input bg-muted/30 px-2.5 text-sm text-slate-700">
                   <Image src={currentStaffAvatar} alt={currentStaffName} width={24} height={24} className="size-6 shrink-0 rounded-full object-cover" />
                   <span className="truncate">{currentStaffName}</span>
                 </div>
@@ -1473,14 +1473,14 @@ export default function ServicesFinancePage() {
               ))}
               <div className="space-y-2 md:col-span-2">
                 <Label>Ghi chú đối soát</Label>
-                <Textarea value={financeForm.note} onChange={(event) => setFinanceForm({ ...financeForm, note: event.target.value })} placeholder="Nội dung thu chi, nhắc nợ, lý do hoàn tiền..." />
+                <Textarea className="h-24 min-h-24 resize-none rounded-lg border-input bg-transparent px-2.5 py-2 text-sm text-slate-700 shadow-none" value={financeForm.note} onChange={(event) => setFinanceForm({ ...financeForm, note: event.target.value })} placeholder="Nội dung thu chi, nhắc nợ, lý do hoàn tiền..." />
               </div>
           </div>
-          <DialogFooter className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setOpenFinanceForm(false)}>
-              Hủy
+          <DialogFooter className="m-0 flex flex-row items-center justify-end gap-2 border-t border-slate-200 bg-white px-6 py-4">
+            <Button type="button" variant="outline" className="w-full justify-center text-center sm:w-auto" onClick={() => setOpenFinanceForm(false)}>
+              Đóng
             </Button>
-            <Button className="bg-slate-900 font-semibold text-white hover:bg-slate-800" onClick={saveFinanceRecord}>
+            <Button className="w-full justify-center bg-slate-900 text-center font-semibold text-white hover:bg-slate-800 sm:w-auto" onClick={saveFinanceRecord}>
               Lưu giao dịch
             </Button>
           </DialogFooter>
@@ -1489,10 +1489,10 @@ export default function ServicesFinancePage() {
 
       <Dialog open={openPromotionForm} onOpenChange={setOpenPromotionForm}>
         <DialogContent className={formDialogClassName} showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>{editingPromotionId ? `Chỉnh sửa ${editingPromotionId}` : "Thêm mã giảm giá"}</DialogTitle>
+          <DialogHeader className="min-h-[61px] border-b border-slate-200 px-6 py-4">
+            <DialogTitle className="text-lg font-semibold leading-7 text-slate-950">{editingPromotionId ? `Chỉnh sửa ${editingPromotionId}` : "Thêm mã giảm giá"}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-2 md:grid-cols-2">
+          <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-6 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Mã giảm giá</Label>
                 <Input value={promotionForm.code} onChange={(event) => setPromotionForm({ ...promotionForm, code: event.target.value })} placeholder="WELCOME10" />
@@ -1532,7 +1532,7 @@ export default function ServicesFinancePage() {
                         <Button
                           type="button"
                           variant="outline"
-                          className="h-10 w-full justify-between rounded-lg border border-gray-200 bg-white px-3 text-left text-sm font-normal text-slate-700 shadow-none hover:bg-slate-50 focus-visible:ring-gray-200"
+                          className="h-8 w-full justify-between rounded-lg border border-input bg-transparent px-2.5 text-left text-sm font-normal text-slate-700 shadow-none hover:bg-slate-50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                         >
                           <span className="truncate">{displayText}</span>
                           <ChevronDown className="ml-2 size-4 shrink-0 opacity-50" />
@@ -1609,7 +1609,7 @@ export default function ServicesFinancePage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="h-10 w-full justify-start rounded-lg border border-gray-200 bg-white px-2.5 text-left text-sm font-normal text-slate-700 shadow-none hover:bg-slate-50 focus-visible:ring-gray-200"
+	                      className="h-8 w-full justify-start rounded-lg border border-input bg-transparent px-2.5 text-left text-sm font-normal text-slate-700 shadow-none hover:bg-slate-50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
                       <CalendarDays className="mr-2 size-4 text-slate-400" />
                       {formatDisplayDate(promotionForm.startDate)}
@@ -1637,7 +1637,7 @@ export default function ServicesFinancePage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="h-10 w-full justify-start rounded-lg border border-gray-200 bg-white px-2.5 text-left text-sm font-normal text-slate-700 shadow-none hover:bg-slate-50 focus-visible:ring-gray-200"
+	                      className="h-8 w-full justify-start rounded-lg border border-input bg-transparent px-2.5 text-left text-sm font-normal text-slate-700 shadow-none hover:bg-slate-50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
                       <CalendarDays className="mr-2 size-4 text-slate-400" />
                       {promotionForm.endDate ? formatDisplayDate(promotionForm.endDate) : "Không giới hạn"}
@@ -1676,7 +1676,7 @@ export default function ServicesFinancePage() {
               </div>
               <div className="space-y-2">
                 <Label>Trạng thái</Label>
-                <div className="flex h-10 items-center rounded-lg border border-gray-200 bg-muted/40 px-2.5">
+                <div className="flex h-8 items-center rounded-lg border border-input bg-muted/30 px-2.5">
                   <StatusPill label={getPromotionStatusByDate(promotionForm.startDate, promotionForm.endDate)} />
                 </div>
               </div>
@@ -1688,14 +1688,14 @@ export default function ServicesFinancePage() {
               ))}
               <div className="space-y-2 md:col-span-2">
                 <Label>Điều kiện áp dụng</Label>
-                <Textarea value={promotionForm.note} onChange={(event) => setPromotionForm({ ...promotionForm, note: event.target.value })} placeholder="Dịch vụ áp dụng, hạng khách hàng, giá trị đơn tối thiểu..." />
+                <Textarea className="h-24 min-h-24 resize-none rounded-lg border-input bg-transparent px-2.5 py-2 text-sm text-slate-700 shadow-none" value={promotionForm.note} onChange={(event) => setPromotionForm({ ...promotionForm, note: event.target.value })} placeholder="Dịch vụ áp dụng, hạng khách hàng, giá trị đơn tối thiểu..." />
               </div>
           </div>
-          <DialogFooter className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setOpenPromotionForm(false)}>
-              Hủy
+          <DialogFooter className="m-0 flex flex-row items-center justify-end gap-2 border-t border-slate-200 bg-white px-6 py-4">
+            <Button type="button" variant="outline" className="w-full justify-center text-center sm:w-auto" onClick={() => setOpenPromotionForm(false)}>
+              Đóng
             </Button>
-            <Button className="bg-slate-900 font-semibold text-white hover:bg-slate-800" onClick={savePromotion}>
+            <Button className="w-full justify-center bg-slate-900 text-center font-semibold text-white hover:bg-slate-800 sm:w-auto" onClick={savePromotion}>
               Lưu mã giảm giá
             </Button>
           </DialogFooter>

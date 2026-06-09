@@ -49,6 +49,9 @@ import { InvoiceModal } from "./_components/invoice-modal";
 import { HistoryModal } from "../_components/history-modal";
 import { AddColumnDialog } from "../_components/add-column-dialog";
 
+const washerDeviceOptions = ["MG-01", "MG-02"];
+const dryerDeviceOptions = ["MS-01", "MS-02"];
+
 export default function OrdersPage() {
   /* ─── State ─── */
   const [orders, setOrders] = useState(seedOrders);
@@ -128,10 +131,6 @@ export default function OrdersPage() {
   );
   const exportColumns = useMemo(
     () => columns.filter((c) => c.visible && c.id !== "actions"),
-    [columns],
-  );
-  const visibleColumnIds = useMemo(
-    () => new Set(columns.filter((c) => c.visible).map((c) => c.id)),
     [columns],
   );
   const totalVisibleWidth = useMemo(
@@ -376,22 +375,32 @@ export default function OrdersPage() {
   };
 
   const orderFormFields = useMemo<FormField[]>(() => {
-    const baseFields: FormField[] = [
-      { id: "customer", label: "Khách hàng", type: "text", placeholder: "Tên khách" },
-      { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
-      { id: "service", label: "Dịch vụ", type: "text" },
-      { id: "quantity", label: "Số lượng", type: "text", placeholder: "5 kg / 3 món" },
-      { id: "washer", label: "Máy giặt", type: "text", placeholder: "MG-01" },
-      { id: "dryer", label: "Máy sấy", type: "text", placeholder: "MS-01" },
-      { id: "deliveryDate", label: "Ngày giao", type: "date" },
-      { id: "deliveryTime", label: "Giờ giao", type: "time" },
-      { id: "createdAt", label: "Ngày tạo đơn", type: "date" },
-      { id: "staff", label: "Nhân viên xử lý", type: "custom_staff" },
-      { id: "amount", label: "Giá tiền", type: "number" },
-      { id: "status", label: "Cập nhật trạng thái", type: "custom_status" },
-    ];
-    return baseFields.filter((f) => visibleColumnIds.has(f.id));
-  }, [visibleColumnIds]);
+    const fieldByColumnId: Record<string, FormField> = {
+      customer: { id: "customer", label: "Tên khách", type: "text", placeholder: "Tên khách" },
+      phone: { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
+      service: { id: "service", label: "Dịch vụ", type: "text" },
+      quantity: { id: "quantity", label: "Số lượng", type: "text", placeholder: "5 kg / 3 món" },
+      washer: { id: "washer", label: "Máy giặt", type: "select", options: washerDeviceOptions, placeholder: "Chọn mã máy giặt..." },
+      dryer: { id: "dryer", label: "Máy sấy", type: "select", options: dryerDeviceOptions, placeholder: "Chọn mã máy sấy..." },
+      deliveryDate: { id: "deliveryDate", label: "Ngày giao", type: "date" },
+      deliveryTime: { id: "deliveryTime", label: "Giờ giao", type: "time" },
+      createdAt: { id: "createdAt", label: "Ngày tạo đơn", type: "date" },
+      staff: { id: "staff", label: "Nhân viên xử lý", type: "custom_staff" },
+      amount: { id: "amount", label: "Giá tiền", type: "number" },
+      status: { id: "status", label: "Cập nhật trạng thái", type: "custom_status" },
+    };
+
+    return columns
+      .filter((column) => column.visible && column.id !== "id" && column.id !== "actions")
+      .map((column) => {
+        return fieldByColumnId[column.id] || {
+          id: column.id,
+          label: column.label,
+          type: "text",
+          placeholder: `Nhập ${column.label.toLowerCase()}`,
+        } satisfies FormField;
+      });
+  }, [columns]);
 
   const orderFilterOptions = useMemo(() => {
     return (["Tất cả", ...statuses] as const).map((status) => {
@@ -737,7 +746,7 @@ export default function OrdersPage() {
               draggedItemId={draggedOrderId}
               onDraggedItemIdChange={setDraggedOrderId}
               dragOverColumnId={dragOverStatus}
-              onDragOverColumnIdChange={(status) => setDragOverStatus(isOrderStatus(status) ? status : null)}
+              onDragOverColumnIdChange={(status) => setDragOverStatus(status && isOrderStatus(status) ? status : null)}
               onDropItem={(orderId, status) => {
                 if (!isOrderStatus(status)) return;
                 setOrders((prev) =>
@@ -765,10 +774,12 @@ export default function OrdersPage() {
         form={form}
         onFormChange={(newForm) => setForm({ ...emptyForm, ...newForm })}
         onSave={saveOrder}
-        customColumns={customColumns}
         currentStaffName={currentStaffName}
         statusOptions={statuses}
         statusDotColors={statusDotColor}
+        showCloseButton={false}
+        showCloseButtonAtBottom={true}
+        gridClassName="grid gap-4 md:grid-cols-2"
       />
 
       <InvoiceModal
