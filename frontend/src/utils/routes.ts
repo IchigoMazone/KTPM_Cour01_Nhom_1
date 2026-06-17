@@ -3,7 +3,6 @@ import {
   ClipboardList,
   CircleUser,
   BadgeCheck,
-  Truck,
   Package,
   MessageCircle,
 } from "lucide-react";
@@ -21,12 +20,6 @@ export const menus = [
     icon: ClipboardList,
     path: "/home/orders",
     description: "Tạo đơn, theo dõi trạng thái và in phiếu giặt",
-  },
-  {
-    label: "Giao nhận",
-    icon: Truck,
-    path: "/home/delivery",
-    description: "Lịch lấy/trả đồ, tài xế và trạng thái giao hàng",
   },
   {
     label: "Khách hàng",

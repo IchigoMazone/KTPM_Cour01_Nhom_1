@@ -28,13 +28,18 @@ export function AddColumnDialog({
 }: AddColumnDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Thêm cột tùy chỉnh</DialogTitle>
+      <DialogContent
+        showCloseButton={false}
+        className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-[425px]"
+      >
+        <DialogHeader className="flex-row items-center justify-between gap-3 border-b border-slate-200 px-6 py-4 min-h-[61px]">
+          <DialogTitle className="text-lg font-semibold leading-7 text-slate-950">
+            Thêm cột tùy chỉnh
+          </DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="min-h-0 flex-1 p-6">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="columnName" className="text-sm font-medium">Tên cột mới</Label>
+            <Label htmlFor="columnName" className="text-sm font-medium text-slate-700">Tên cột mới</Label>
             <Input
               id="columnName"
               value={newColumnName}
@@ -47,9 +52,21 @@ export function AddColumnDialog({
             />
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Hủy</Button>
-          <Button onClick={onAddColumn}>Thêm</Button>
+        <DialogFooter className="m-0 border-t border-slate-200 bg-white px-6 py-4 flex flex-row items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full justify-center text-center sm:w-auto"
+            onClick={() => onOpenChange(false)}
+          >
+            Hủy
+          </Button>
+          <Button
+            className="w-full justify-center bg-slate-900 text-center text-white hover:bg-slate-800 sm:w-auto"
+            onClick={onAddColumn}
+          >
+            Thêm cột
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

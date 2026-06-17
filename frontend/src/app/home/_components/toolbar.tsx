@@ -54,6 +54,7 @@ interface ToolbarProps<TColumn extends ToolbarColumn> {
   createLabel: string;
   defaultColumnIds?: string[];
   searchPlaceholder?: string;
+  showSearch?: boolean;
   showHistoryButton?: boolean;
   showAddColumnButton?: boolean;
 }
@@ -77,6 +78,7 @@ export function Toolbar<TColumn extends ToolbarColumn>({
   createLabel,
   defaultColumnIds,
   searchPlaceholder = "Tìm kiếm...",
+  showSearch = true,
   showHistoryButton = true,
   showAddColumnButton = true,
 }: ToolbarProps<TColumn>) {
@@ -98,15 +100,17 @@ export function Toolbar<TColumn extends ToolbarColumn>({
 
       {/* Right: search + actions */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] flex-1 xl:w-64 xl:flex-none">
-          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" />
-          <Input
-            className="h-8 rounded-md border-slate-200 bg-white pl-8 text-xs text-slate-700 shadow-none placeholder:text-slate-500 focus-visible:ring-slate-200"
-            placeholder={searchPlaceholder}
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
-          />
-        </div>
+        {showSearch && (
+          <div className="relative min-w-[220px] flex-1 xl:w-64 xl:flex-none">
+            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" />
+            <Input
+              className="h-8 rounded-md border-slate-200 bg-white pl-8 text-xs text-slate-700 shadow-none placeholder:text-slate-500 focus-visible:ring-slate-200"
+              placeholder={searchPlaceholder}
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+            />
+          </div>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs text-slate-700 transition-colors hover:bg-slate-50">

@@ -5,6 +5,7 @@ import {
   DayPicker,
   getDefaultClassNames,
   type DayButton,
+  type DropdownProps,
   type Locale,
 } from "react-day-picker"
 
@@ -69,15 +70,15 @@ function Calendar({
           defaultClassNames.month_caption
         ),
         dropdowns: cn(
-          "flex h-(--cell-size) w-full items-center justify-center gap-1.5 text-sm font-medium",
+          "flex h-(--cell-size) w-full items-center justify-center gap-2 text-sm font-medium",
           defaultClassNames.dropdowns
         ),
         dropdown_root: cn(
-          "relative rounded-(--cell-radius)",
+          "relative",
           defaultClassNames.dropdown_root
         ),
         dropdown: cn(
-          "absolute inset-0 bg-popover opacity-0",
+          "static h-8 appearance-none rounded-md border border-input bg-background py-1 pl-2.5 pr-8 text-sm font-medium text-foreground opacity-100 shadow-xs outline-none transition-[color,box-shadow] hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
           defaultClassNames.dropdown
         ),
         caption_label: cn(
@@ -134,6 +135,7 @@ function Calendar({
         ...classNames,
       }}
       components={{
+        Dropdown: CalendarDropdown,
         Root: ({ className, rootRef, ...props }) => {
           return (
             <div
@@ -177,6 +179,31 @@ function Calendar({
       }}
       {...props}
     />
+  )
+}
+
+function CalendarDropdown({
+  options,
+  className,
+  value,
+  ...props
+}: DropdownProps) {
+  const isYear = options?.some((option) => Number(option.value) > 100)
+  return (
+    <span className="relative inline-flex items-center">
+      <select
+        {...props}
+        value={value}
+        className={cn(className, isYear ? "w-[92px]" : "w-[116px]")}
+      >
+        {options?.map(({ value: optionValue, label, disabled }) => (
+          <option key={optionValue} value={optionValue} disabled={disabled}>
+            {label}
+          </option>
+        ))}
+      </select>
+      <ChevronDownIcon className="pointer-events-none absolute right-2.5 size-4 text-muted-foreground" />
+    </span>
   )
 }
 

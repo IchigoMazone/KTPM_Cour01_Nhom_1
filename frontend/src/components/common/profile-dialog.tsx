@@ -1,11 +1,14 @@
 "use client";
 
 import { API_BASE_URL } from "@/src/lib/config";
+import { DEFAULT_ACCOUNT_AVATAR_URL, emitAccountProfileUpdated } from "@/src/lib/account-profile";
+import AccountAvatar from "./account-avatar";
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Building2,
   Camera,
+  CalendarDays,
   CircleCheck,
   Mail,
   MapPin,
@@ -18,6 +21,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import {
@@ -39,7 +43,7 @@ type ProfileDialogProps = {
 };
 
 type UserProfile = {
-  profile_id: number;
+  profile_id: string | number;
   full_name: string;
   email?: string | null;
   phone?: string | null;
@@ -51,11 +55,28 @@ type UserProfile = {
 };
 
 type CurrentUser = {
-  user_id: number;
+  user_id: string;
   username: string;
   role: string;
   is_active: boolean;
   profile?: UserProfile | null;
+};
+
+type LinkedCustomer = {
+  customer_code: string;
+  full_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  birthday?: string | null;
+  rank?: string | null;
+  loyalty_points?: number;
+  total_orders?: number;
+  total_spent?: number;
+  note?: string | null;
+  image_url?: string | null;
+  account_id?: string | null;
+  account_username?: string | null;
 };
 
 type ProfileForm = {
@@ -83,6 +104,14 @@ const roleLabel: Record<string, string> = {
   customer: "Khách hàng",
 };
 
+function formatBirthday(dateStr?: string | null) {
+  if (!dateStr) return "-";
+  const value = dateStr.slice(0, 10);
+  const [y, m, d] = value.split("-");
+  if (!y || !m || !d) return value;
+  return `${d}/${m}/${y}`;
+}
+
 export default function ProfileDialog({
   accountName,
   isUserArea,
@@ -95,16 +124,33 @@ export default function ProfileDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [linkedCustomer, setLinkedCustomer] = useState<LinkedCustomer | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const accountType = isUserArea ? "Tài khoản khách hàng" : "Tài khoản nội bộ";
   const isProfileLoading = (isLoading && !currentUser) || isUploading;
-  const displayName = form.full_name || accountName;
-  const avatarUrl = currentUser?.profile?.image_url || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif";
+  const displayName = linkedCustomer?.full_name || form.full_name || accountName;
+  const avatarUrl = currentUser?.profile?.image_url || DEFAULT_ACCOUNT_AVATAR_URL;
   const displayRole = currentUser ? roleLabel[currentUser.role] || currentUser.role : accountType;
+  const displayMetaLabel = isUserArea ? "Khách hàng" : accountType;
+  const displaySubRole = isUserArea
+    ? (linkedCustomer?.rank || currentUser?.profile?.member_tier || "Thường")
+    : displayRole;
+  const displayUsername = isUserArea
+    ? (linkedCustomer?.account_username || currentUser?.username || "Chưa liên kết")
+    : (currentUser?.username || "");
+  const displayEmail = isUserArea ? (linkedCustomer?.email || form.email || "-") : form.email;
+  const displayPhone = isUserArea ? (linkedCustomer?.phone || form.phone || "-") : form.phone;
+  const displayAddress = isUserArea ? (linkedCustomer?.address || form.address || "-") : form.address;
+  const displayNotes = isUserArea ? (linkedCustomer?.note || "-") : form.special_notes;
   const accountCode = currentUser
-    ? `${isUserArea ? "KH" : "TK"}-${String(currentUser.user_id).padStart(4, "0")}`
+    ? currentUser.role === "admin"
+      ? "QL-0001"
+      : isUserArea
+        ? (linkedCustomer?.customer_code || "KH-0000")
+        : `TK-${String(currentUser.user_id).slice(0, 8)}`
     : "Đang tải";
+  const customerAvatarName = linkedCustomer?.full_name || displayName || "Khách hàng";
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -143,6 +189,7 @@ export default function ProfileDialog({
       toast.success("Cập nhật ảnh đại diện thành công!");
       if (data.image_url) {
         localStorage.setItem("accountImageUrl", data.image_url);
+        emitAccountProfileUpdated();
         setCurrentUser((prev) => {
           if (!prev) return null;
           return {
@@ -156,6 +203,7 @@ export default function ProfileDialog({
             }
           };
         });
+        setLinkedCustomer((prev) => (prev ? { ...prev, image_url: data.image_url } : prev));
         onProfileUpdated?.(displayName);
       }
     } catch (err) {
@@ -171,12 +219,15 @@ export default function ProfileDialog({
 
   const statusItems = useMemo(() => {
     const active = currentUser?.is_active ? "Đang hoạt động" : "Đã khóa";
-    const member = currentUser?.profile?.member_tier
-      ? `Hạng ${currentUser.profile.member_tier}`
-      : "Hồ sơ tiêu chuẩn";
-
-    return ["Đã xác minh", active, member];
-  }, [currentUser]);
+    if (!isUserArea) {
+      return ["Đã liên kết", active, displayRole];
+    }
+    return [
+      linkedCustomer?.account_id ? "Đã liên kết" : "Chưa liên kết",
+      `${Number(linkedCustomer?.total_orders || 0).toLocaleString("vi-VN")} đơn hàng`,
+      `${Number(linkedCustomer?.total_spent || 0).toLocaleString("vi-VN")}đ chi tiêu`,
+    ];
+  }, [currentUser, displayRole, isUserArea, linkedCustomer]);
 
   useEffect(() => {
     if (!open) return;
@@ -214,6 +265,25 @@ export default function ProfileDialog({
         }
 
         setCurrentUser(data);
+        if (isUserArea) {
+          try {
+            const customerResponse = await fetch(`${API_BASE_URL}/api/home/my-customer`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+            const customerData = await customerResponse.json();
+            if (customerResponse.ok) {
+              setLinkedCustomer(customerData);
+            } else {
+              setLinkedCustomer(null);
+            }
+          } catch {
+            setLinkedCustomer(null);
+          }
+        } else {
+          setLinkedCustomer(null);
+        }
         setForm({
           full_name: data.profile?.full_name || data.username || accountName,
           email: data.profile?.email || "",
@@ -221,11 +291,13 @@ export default function ProfileDialog({
           address: data.profile?.address || "",
           special_notes: data.profile?.special_notes || "",
         });
+        localStorage.setItem("accountName", data.profile?.full_name || data.username || accountName);
         localStorage.setItem("accountEmail", data.profile?.email || "");
         localStorage.setItem("accountAddress", data.profile?.address || "");
-        localStorage.setItem("accountImageUrl", data.profile?.image_url || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
+        localStorage.setItem("accountImageUrl", data.profile?.image_url || DEFAULT_ACCOUNT_AVATAR_URL);
         onProfileUpdated?.(data.profile?.full_name || data.username || accountName);
       } catch {
+        setLinkedCustomer(null);
         setForm((current) => ({
           ...current,
           full_name: current.full_name || storedAccountName || accountName,
@@ -237,7 +309,7 @@ export default function ProfileDialog({
     };
 
     fetchProfile();
-  }, [accountName, onProfileUpdated, open]);
+  }, [accountName, isUserArea, onProfileUpdated, open]);
 
   const updateField = (field: keyof ProfileForm, value: string) => {
     setForm((prev) => ({
@@ -284,9 +356,11 @@ export default function ProfileDialog({
         address: data.profile?.address || "",
         special_notes: data.profile?.special_notes || "",
       });
+      localStorage.setItem("accountName", data.profile?.full_name || data.username || accountName);
       localStorage.setItem("accountEmail", data.profile?.email || "");
       localStorage.setItem("accountAddress", data.profile?.address || "");
-      localStorage.setItem("accountImageUrl", data.profile?.image_url || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
+      localStorage.setItem("accountImageUrl", data.profile?.image_url || DEFAULT_ACCOUNT_AVATAR_URL);
+      emitAccountProfileUpdated();
       onProfileUpdated?.(data.profile?.full_name || data.username || accountName);
       toast.success("Đã lưu hồ sơ.");
       onOpenChange(false);
@@ -299,9 +373,9 @@ export default function ProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!w-[min(680px,calc(100vw-2rem))] !max-w-none gap-0 rounded-xl border border-black/10 bg-white p-0 shadow-[0_18px_60px_rgba(0,0,0,0.18)]" showCloseButton={false}>
-        <DialogHeader className="gap-3 px-5 pt-5">
-          <div className="flex items-center gap-4">
+      <DialogContent className="flex h-[min(86vh,680px)] w-[min(86vw,680px)] max-w-[min(86vw,680px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[680px]" showCloseButton={false}>
+        <DialogHeader className="border-b border-slate-200 px-6 py-3">
+          <div className="flex items-center gap-3">
             <div className="relative shrink-0">
               <input
                 type="file"
@@ -311,26 +385,27 @@ export default function ProfileDialog({
                 className="hidden"
               />
               {isProfileLoading ? (
-                <Skeleton className="h-16 w-16 rounded-full" />
+                <Skeleton className="size-10 rounded-full" />
               ) : (
-                <img
-                  src={avatarUrl}
-                  alt="avatar"
-                  className="h-16 w-16 rounded-full object-cover"
+                <AccountAvatar
+                  name={customerAvatarName}
+                  imageUrl={isUserArea ? linkedCustomer?.image_url : avatarUrl}
+                  size={40}
+                  className="shrink-0 after:border-slate-200"
                 />
               )}
               <button
                 type="button"
                 onClick={handleAvatarClick}
                 disabled={isProfileLoading || isSaving}
-                className="absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border border-black/10 bg-white shadow-sm transition-colors hover:bg-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                className="absolute -bottom-1 -right-1 flex size-6 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Đổi ảnh đại diện"
               >
-                <Camera className="size-3.5" />
+                <Camera className="size-3" />
               </button>
             </div>
             <div className="min-w-0">
-              <DialogTitle className={isProfileLoading ? "sr-only" : "truncate text-base font-semibold leading-6"}>
+              <DialogTitle className={isProfileLoading ? "sr-only" : "truncate text-base font-semibold leading-6 text-slate-950"}>
                 {displayName || "Hồ sơ tài khoản"}
               </DialogTitle>
               {isProfileLoading ? (
@@ -341,161 +416,171 @@ export default function ProfileDialog({
                 </div>
               ) : (
                 <>
-                  <DialogDescription className="text-sm text-muted-foreground">
-                    {accountType} · {accountCode}
+                  <DialogDescription className="text-sm text-slate-500">
+                    {displayMetaLabel} · {accountCode}
                   </DialogDescription>
-                  <p className="mt-1 text-xs text-muted-foreground">{displayRole}</p>
+                  <p className="mt-1 text-xs text-slate-400">{displaySubRole}</p>
                 </>
               )}
             </div>
           </div>
         </DialogHeader>
 
-        <div className="max-h-[65vh] overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 p-5">
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Họ tên</Label>
+            <div className="space-y-2">
+              <Label>Họ tên</Label>
               {isProfileLoading ? (
-                <Skeleton className="h-10 rounded-lg" />
+                <Skeleton className="h-8 rounded-lg" />
               ) : (
                 <div className="relative">
-                  <UserRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <UserRound className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   <Input
-                    value={form.full_name}
+                    value={isUserArea ? (linkedCustomer?.full_name || form.full_name || "-") : form.full_name}
                     onChange={(e) => updateField("full_name", e.target.value)}
-                    disabled={isLoading}
-                    className="h-10 rounded-lg pl-9"
+                    disabled={isLoading || isUserArea}
+                    className="h-8 rounded-lg border-input bg-transparent px-2.5 py-1 pl-8 text-sm text-slate-700 shadow-none disabled:bg-slate-50 disabled:text-slate-500"
                   />
                 </div>
               )}
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Tên đăng nhập</Label>
+            <div className="space-y-2">
+              <Label>Tên đăng nhập</Label>
               {isProfileLoading ? (
-                <Skeleton className="h-10 rounded-lg" />
+                <Skeleton className="h-8 rounded-lg" />
               ) : (
                 <div className="relative">
-                  <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <ShieldCheck className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   <Input
-                    value={currentUser?.username || ""}
+                    value={displayUsername}
                     disabled
-                    className="h-10 rounded-lg bg-muted/40 pl-9"
+                    className="h-8 rounded-lg border-input bg-slate-50 px-2.5 py-1 pl-8 text-sm text-slate-500 shadow-none"
                   />
                 </div>
               )}
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Email</Label>
+            <div className="space-y-2">
+              <Label>Email</Label>
               {isProfileLoading ? (
-                <Skeleton className="h-10 rounded-lg" />
+                <Skeleton className="h-8 rounded-lg" />
               ) : (
                 <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Mail className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   <Input
                     type="email"
-                    value={form.email}
+                    value={displayEmail}
                     onChange={(e) => updateField("email", e.target.value)}
-                    disabled={isLoading}
-                    className="h-10 rounded-lg pl-9"
+                    disabled={isLoading || isUserArea}
+                    className="h-8 rounded-lg border-input bg-transparent px-2.5 py-1 pl-8 text-sm text-slate-700 shadow-none disabled:bg-slate-50 disabled:text-slate-500"
                   />
                 </div>
               )}
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Số điện thoại</Label>
+            <div className="space-y-2">
+              <Label>Số điện thoại</Label>
               {isProfileLoading ? (
-                <Skeleton className="h-10 rounded-lg" />
+                <Skeleton className="h-8 rounded-lg" />
               ) : (
                 <div className="relative">
-                  <Phone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Phone className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   <Input
-                    value={form.phone}
+                    value={displayPhone}
                     onChange={(e) => updateField("phone", e.target.value)}
-                    disabled={isLoading}
-                    className="h-10 rounded-lg pl-9"
+                    disabled={isLoading || isUserArea}
+                    className="h-8 rounded-lg border-input bg-transparent px-2.5 py-1 pl-8 text-sm text-slate-700 shadow-none disabled:bg-slate-50 disabled:text-slate-500"
                   />
                 </div>
               )}
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Vai trò</Label>
+            <div className="space-y-2">
+              <Label>{isUserArea ? "Ngày sinh" : "Vai trò"}</Label>
               {isProfileLoading ? (
-                <Skeleton className="h-10 rounded-lg" />
-              ) : (
-                <div className="relative">
-                  <CircleCheck className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input value={displayRole} disabled className="h-10 rounded-lg bg-muted/40 pl-9" />
-                </div>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Điểm / hạng</Label>
-              {isProfileLoading ? (
-                <Skeleton className="h-10 rounded-lg" />
-              ) : (
-                <div className="relative">
-                  <Sparkles className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={
-                      currentUser?.profile
-                        ? `${currentUser.profile.loyalty_points} điểm · ${currentUser.profile.member_tier}`
-                        : "Chưa có dữ liệu"
-                    }
-                    disabled
-                    className="h-10 rounded-lg bg-muted/40 pl-9"
-                  />
-                </div>
-              )}
-            </div>
-            <div className="space-y-1.5 md:col-span-2">
-              <Label className="text-xs text-muted-foreground">
-                {isUserArea ? "Địa chỉ mặc định" : "Chi nhánh / địa chỉ"}
-              </Label>
-              {isProfileLoading ? (
-                <Skeleton className="h-10 rounded-lg" />
+                <Skeleton className="h-8 rounded-lg" />
               ) : (
                 <div className="relative">
                   {isUserArea ? (
-                    <MapPin className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <CalendarDays className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   ) : (
-                    <Building2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <CircleCheck className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   )}
                   <Input
-                    value={form.address}
-                    onChange={(e) => updateField("address", e.target.value)}
-                    disabled={isLoading}
-                    className="h-10 rounded-lg pl-9"
+                    value={isUserArea ? formatBirthday(linkedCustomer?.birthday) : displayRole}
+                    disabled
+                    className="h-8 rounded-lg border-input bg-slate-50 px-2.5 py-1 pl-8 text-sm text-slate-500 shadow-none"
                   />
                 </div>
               )}
             </div>
-            <div className="space-y-1.5 md:col-span-2">
-              <Label className="text-xs text-muted-foreground">Ghi chú</Label>
+            <div className="space-y-2">
+              <Label>Điểm / hạng</Label>
               {isProfileLoading ? (
-                <Skeleton className="h-10 rounded-lg" />
+                <Skeleton className="h-8 rounded-lg" />
               ) : (
-                <Input
-                  value={form.special_notes}
+                <div className="relative">
+                  <Sparkles className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    value={
+                      isUserArea
+                        ? `${Number(linkedCustomer?.loyalty_points || 0).toLocaleString("vi-VN")} điểm · ${linkedCustomer?.rank || "Thường"}`
+                        : currentUser?.profile
+                          ? `${currentUser.profile.loyalty_points} điểm · ${currentUser.profile.member_tier}`
+                          : "Chưa có dữ liệu"
+                    }
+                    disabled
+                    className="h-8 rounded-lg border-input bg-slate-50 px-2.5 py-1 pl-8 text-sm text-slate-500 shadow-none"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>
+                {isUserArea ? "Địa chỉ mặc định" : "Chi nhánh / địa chỉ"}
+              </Label>
+              {isProfileLoading ? (
+                <Skeleton className="h-8 rounded-lg" />
+              ) : (
+                <div className="relative">
+                  {isUserArea ? (
+                    <MapPin className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                  ) : (
+                    <Building2 className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                  )}
+                  <Input
+                    value={displayAddress}
+                    onChange={(e) => updateField("address", e.target.value)}
+                    disabled={isLoading || isUserArea}
+                    className="h-8 rounded-lg border-input bg-transparent px-2.5 py-1 pl-8 text-sm text-slate-700 shadow-none disabled:bg-slate-50 disabled:text-slate-500"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Ghi chú</Label>
+              {isProfileLoading ? (
+                <Skeleton className="h-16 rounded-lg" />
+              ) : (
+                <Textarea
+                  value={displayNotes}
                   onChange={(e) => updateField("special_notes", e.target.value)}
-                  disabled={isLoading}
+                  disabled={isLoading || isUserArea}
                   placeholder="Ví dụ: dị ứng hóa chất, yêu cầu riêng..."
-                  className="h-10 rounded-lg"
+                  className="h-16 min-h-16 resize-none rounded-lg border-input bg-transparent px-2.5 py-2 text-sm text-slate-700 shadow-none disabled:bg-slate-50 disabled:text-slate-500"
                 />
               )}
             </div>
           </div>
 
-          <div className="mt-4 rounded-lg border border-black/[0.06] bg-[#fafafa] p-3">
-            <p className="text-sm font-medium">Trạng thái tài khoản</p>
+          <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+            <p className="text-sm font-medium text-slate-950">Trạng thái tài khoản</p>
             <div className="mt-3 grid gap-2 md:grid-cols-3">
               {isProfileLoading
                 ? Array.from({ length: 3 }).map((_, index) => (
-                    <Skeleton key={index} className="h-9 rounded-lg" />
+                    <Skeleton key={index} className="h-8 rounded-lg" />
                   ))
                 : statusItems.map((item) => (
                     <div
                       key={item}
-                      className="rounded-lg border border-black/[0.06] bg-white px-3 py-2 text-xs font-medium"
+                      className="flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700"
                     >
                       {item}
                     </div>
@@ -504,9 +589,9 @@ export default function ProfileDialog({
           </div>
         </div>
 
-        <DialogFooter className="m-0 flex-row justify-end gap-2 rounded-b-xl border-t border-black/[0.06] bg-[#fafafa] px-4 py-4">
+        <DialogFooter className="m-0 flex-row justify-end gap-2 border-t border-slate-200 bg-white px-6 py-3">
           <DialogClose asChild>
-            <Button variant="outline" className="h-8 rounded-lg border-black/10 bg-white px-3 text-sm shadow-sm hover:bg-[#f5f5f5] sm:w-auto">
+            <Button variant="outline" className="h-8 rounded-lg bg-white px-3 text-sm shadow-none sm:w-auto">
               Đóng
             </Button>
           </DialogClose>
@@ -514,7 +599,7 @@ export default function ProfileDialog({
             type="button"
             disabled={isLoading || isSaving}
             onClick={handleSave}
-            className="h-8 rounded-lg bg-[#1f1f1f] px-3 text-sm text-white shadow-sm hover:bg-black disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+            className="h-8 rounded-lg bg-slate-900 px-3 text-sm font-semibold text-white shadow-none hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
           >
             {isSaving ? <SpokeSpinner /> : "Lưu thay đổi"}
           </Button>

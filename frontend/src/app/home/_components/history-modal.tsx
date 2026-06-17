@@ -14,6 +14,7 @@ interface HistoryModalProps<T> {
   renderDetail: (item: T) => React.ReactNode;
   itemLabel?: string;
   maxWidthClass?: string;
+  titleClassName?: string;
 }
 
 export function HistoryModal<T extends { id: string }>({
@@ -27,6 +28,7 @@ export function HistoryModal<T extends { id: string }>({
   renderDetail,
   itemLabel = "mục",
   maxWidthClass = "max-w-3xl",
+  titleClassName = "text-base font-semibold",
 }: HistoryModalProps<T>) {
   if (!open) return null;
 
@@ -37,7 +39,7 @@ export function HistoryModal<T extends { id: string }>({
       <Card className={`flex h-[620px] max-h-[86dvh] w-full ${maxWidthClass} flex-col overflow-hidden rounded-xl border-border bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10`}>
         <CardHeader className="flex flex-row items-start justify-between border-b border-border bg-popover px-4 py-3">
           <div>
-            <CardTitle className="text-base font-semibold">{title}</CardTitle>
+            <CardTitle className={titleClassName}>{title}</CardTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {items.length} {itemLabel} đang được chọn
             </p>

@@ -76,7 +76,7 @@ export function DashboardDataTable<T>({
   const visibleColumns = columns.filter((column) => column.visible !== false);
   const widthTotal =
     totalVisibleWidth || visibleColumns.reduce((sum, column) => sum + (column.width || 150), 0);
-  const showSelectAllInColumn = selectAll?.columnId || visibleColumns[0]?.id;
+  const showSelectAllInColumn = selectAll ? (selectAll.columnId || visibleColumns[0]?.id) : null;
 
 
   return (
@@ -97,6 +97,13 @@ export function DashboardDataTable<T>({
                   width={tableResizeMode === "fit" ? undefined : column.width}
                   autoWidth={tableResizeMode === "fit"}
                   style={fitStyle}
+                  onResize={(width) => {
+                    if (onColumnsChange) {
+                      onColumnsChange((prev: any) =>
+                        prev.map((c: any) => (c.id === column.id ? { ...c, width } : c))
+                      );
+                    }
+                  }}
                   className={`text-xs font-medium text-slate-600 group/head ${column.id === "actions" ? "text-left" : ""} ${columnDrag?.dragOverColumnId === column.id ? "bg-slate-200/50" : ""} ${columnDrag?.draggedColumnId === column.id ? "opacity-50" : ""}`}
                   draggable={canDragColumn}
                   onDragStart={(event) => {
@@ -119,7 +126,7 @@ export function DashboardDataTable<T>({
                   }}
                   onDragEnd={canDragColumn ? columnDrag?.onDragEnd : undefined}
                 >
-                  {selectAll && column.id === showSelectAllInColumn ? (
+                  {selectAll && showSelectAllInColumn && column.id === showSelectAllInColumn ? (
                     <span className="inline-flex items-center gap-2">
                       <input
                         ref={selectAll.ref}
@@ -161,26 +168,6 @@ export function DashboardDataTable<T>({
             ))
           )}
 
-          {rows.length > 0 &&
-            rows.length < pageSize &&
-            Array.from({ length: pageSize - rows.length }).map((_, rowIndex) => (
-              <TableRow key={`empty-${rowIndex}`} className="h-11 border-b border-slate-200">
-                {selectAll ? (
-                  <>
-                    <TableCell className="pl-4">
-                      <input type="checkbox" disabled className="size-4 rounded border-slate-200 opacity-0" />
-                    </TableCell>
-                    {Array.from({ length: Math.max(visibleColumns.length - 1, 0) }).map((__, cellIndex) => (
-                      <TableCell key={cellIndex}>&nbsp;</TableCell>
-                    ))}
-                  </>
-                ) : (
-                  Array.from({ length: visibleColumns.length }).map((__, cellIndex) => (
-                    <TableCell key={cellIndex}>&nbsp;</TableCell>
-                  ))
-                )}
-              </TableRow>
-            ))}
         </TableBody>
       </Table>
     </div>
@@ -222,8 +209,12 @@ export function DashboardSelectionBar({
   onToggle,
 }: DashboardSelectionBarProps) {
   return (
-    <div className="inline-flex flex-wrap items-center gap-2 text-xs text-slate-600">
-      <label className={`inline-flex items-center gap-2 font-medium ${disabled ? "text-slate-300" : "text-slate-700"}`}>
+    <div className="inline-flex flex-wrap items-center gap-2 text-xs">
+      <label
+        className={`inline-flex h-7 items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 font-medium transition-colors ${
+          disabled ? "cursor-not-allowed text-slate-300" : "cursor-pointer text-slate-700 hover:bg-slate-50"
+        }`}
+      >
         <input
           type="checkbox"
           aria-label={`Chọn tất cả ${itemLabel}`}
@@ -234,7 +225,7 @@ export function DashboardSelectionBar({
         />
         Chọn tất cả
       </label>
-      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-medium text-slate-500">
+      <span className="inline-flex h-7 items-center rounded-full bg-slate-100 px-2.5 font-medium text-slate-500">
         {selectedCount}/{totalCount} {itemLabel} đã chọn
       </span>
     </div>
@@ -281,11 +272,14 @@ export function DashboardTableFooter({
                 <div className="mt-1 flex gap-1.5">
                   <Input
                     id="dashboardCustomPageSize"
-                    type="number"
-                    min={1}
-                    max={500}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={customPageSize}
-                    onChange={(event) => onCustomPageSizeChange(event.target.value)}
+                    onChange={(event) => {
+                      const val = event.target.value.replace(/\D/g, "");
+                      onCustomPageSizeChange(val);
+                    }}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") onApplyCustomPageSize();
                     }}

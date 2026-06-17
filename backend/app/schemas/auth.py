@@ -93,6 +93,9 @@ class UserMeResponse(BaseModel):
     username: str
     role: str
     is_active: bool
+    page_size: Optional[int] = None
+    table_resize_mode: Optional[str] = None
+    columns_config: Optional[str] = None
     profile: Optional[ProfileResponse] = None
 
 
@@ -103,6 +106,9 @@ class UpdateMeRequest(BaseModel):
     address: Optional[str] = None
     image_url: Optional[str] = None
     special_notes: Optional[str] = None
+    page_size: Optional[int] = None
+    table_resize_mode: Optional[str] = None
+    columns_config: Optional[str] = None
 
     @field_validator("email")
     @classmethod
