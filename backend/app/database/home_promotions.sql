@@ -21,13 +21,3 @@ CREATE TABLE IF NOT EXISTS home_promotions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_home_promotions_code ON home_promotions(code);
-
--- Insert default seed promotions if the table is empty
-INSERT INTO home_promotions (code, name, type, value, applied_service, start_date, end_date, usage_limit, claimed, note)
-VALUES
-    ('WELCOME10', 'Khách mới', 'Phần trăm', '10', 'Tất cả dịch vụ', '2026-05-01', '2026-06-30', 120, 42, 'Áp dụng đơn đầu tiên'),
-    ('BIRTHDAY15', 'Sinh nhật', 'Phần trăm', '15', 'Tất cả dịch vụ', '2026-01-01', NULL, NULL, 18, 'Tự cấp theo ngày sinh khách hàng'),
-    ('COMBO-GIAT-SAY', 'Combo giặt sấy', 'Số tiền', '25000', 'Giặt sấy', '2026-05-15', '2026-06-15', 80, 68, 'Áp dụng dịch vụ giặt sấy từ 5kg'),
-    ('VIP5', 'Khách VIP', 'Phần trăm', '5', 'Giặt khô vest', '2026-04-01', '2026-12-31', NULL, 96, 'Chỉ áp dụng hạng Vàng trở lên'),
-    ('RAINY20', 'Ngày mưa', 'Số tiền', '20000', 'Giặt thường', '2026-05-20', '2026-05-31', 200, 137, 'Đã kết thúc do hết thời gian')
-ON CONFLICT (code) DO NOTHING;

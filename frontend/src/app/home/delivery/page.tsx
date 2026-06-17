@@ -89,55 +89,10 @@ type OtpRow = {
   event?: string;
 };
 
-const seedTrips: Trip[] = [
-  { id: "CY-201", time: "08:30", type: "Lấy đồ", customer: "Nguyễn Thị Hương", address: "12 Trần Phú, Q.1", driver: "Anh Minh", status: "Đã lấy", note: "Ưu tiên đồ trắng", phone: "0903123456", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:30:00" },
-  { id: "CY-207", time: "08:50", type: "Trả đồ", customer: "Bùi Thị Nga", address: "22 Đinh Tiên Hoàng, Q.Bình Thạnh", driver: "Anh Tuấn", status: "Đã lấy", note: "Đồ len xử lý đặc biệt", phone: "0909888001", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:50:00" },
-  { id: "CY-202", time: "09:15", type: "Trả đồ", customer: "Trần Văn Minh", address: "90 Lý Thường Kiệt, Q.5", driver: "Chị Lan", status: "Đang giao", note: "Thu COD 240.000đ", phone: "0912456789", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 09:15:00" },
-  { id: "CY-208", time: "09:40", type: "Lấy đồ", customer: "Vũ Minh Khoa", address: "74 Nguyễn Trãi, Q.5", driver: "Anh Minh", status: "Đang giao", note: "Gọi điện khi đến cổng", phone: "0933400211", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 09:40:00" },
-  { id: "CY-203", time: "10:00", type: "Lấy đồ", customer: "Công ty ABC", address: "55 Pasteur, Q.1", driver: "Anh Tuấn", status: "Chờ lấy", note: "8 túi đồ giặt là sấy", phone: "0283812345", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 10:00:00" },
-  { id: "CY-205", time: "16:00", type: "Lấy đồ", customer: "Lê Văn Nam", address: "45 Lê Lợi, Q.1", driver: "Chị Lan", status: "Chờ lấy", note: "Lấy đồ vest cao cấp", phone: "0967111222", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 16:00:00" },
-  { id: "CY-204", time: "14:30", type: "Trả đồ", customer: "Phạm Thị Lan", address: "18 Nguyễn Du, Q.3", driver: "Anh Minh", status: "Chờ giao", note: "Gọi trước khi giao 30p", phone: "0938123456", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 14:30:00" },
-  { id: "CY-206", time: "17:30", type: "Trả đồ", customer: "Hoàng Thị Mai", address: "112 Cách Mạng Tháng 8, Q.3", driver: "Anh Tuấn", status: "Chờ giao", note: "Giao đồ lụa giặt riêng", phone: "0988333444", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 17:30:00" },
-  { id: "CY-209", time: "18:15", type: "Trả đồ", customer: "Dương Quốc Toản", address: "8 Trường Sa, Q.Phú Nhuận", driver: "Chị Lan", status: "Chờ giao", note: "Giao sau 18h", phone: "0977600123", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 18:15:00" },
-];
-
-const seedDrivers: Driver[] = [
-  { id: "TX-301", name: "Anh Minh", phone: "0909555666", rating: "4.8/5", load: "3 lấy · 2 trả", status: "Đang giao", note: "Tuyến cố định Quận 1", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-304", name: "Anh Hùng", phone: "0901234567", rating: "4.6/5", load: "2 lấy · 2 trả", status: "Đang giao", note: "Chuyên tuyến Quận 7", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-302", name: "Chị Lan", phone: "0918777888", rating: "4.9/5", load: "1 lấy · 3 trả", status: "Rảnh 30 phút", note: "Phụ trách Quận 5 và Quận 3", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-305", name: "Chị Hoa", phone: "0927654321", rating: "4.8/5", load: "0 lấy · 1 trả", status: "Rảnh 30 phút", note: "Phụ trách Quận 2 & Thủ Đức", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-303", name: "Anh Tuấn", phone: "0934999000", rating: "4.7/5", load: "2 lấy · 1 trả", status: "Đang lấy", note: "Tuyến đường Quận 10", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-306", name: "Anh Long", phone: "0945112233", rating: "4.5/5", load: "1 lấy · 0 trả", status: "Đang lấy", note: "Tuyến Quận 6 & Bình Tân", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-307", name: "Chị Vân", phone: "0956001122", rating: "4.3/5", load: "0 lấy · 0 trả", status: "Nghỉ", note: "Nghỉ phép hôm nay", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-308", name: "Anh Đức", phone: "0968002233", rating: "4.4/5", load: "0 lấy · 0 trả", status: "Nghỉ", note: "Ca tối chưa lên", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-];
-
-const seedOtps = [
-  { order: "DH-1048", type: "OTP lấy đồ", otp: "482193", status: "Đã xác nhận" },
-  { order: "DH-1051", type: "OTP giao trả", otp: "203948", status: "Đã xác nhận" },
-  { order: "DH-1052", type: "OTP giao trả", otp: "739204", status: "Chờ khách xác nhận" },
-  { order: "DH-1055", type: "OTP lấy đồ", otp: "664831", status: "Chờ khách xác nhận" },
-  { order: "DH-1057", type: "OTP lấy đồ", otp: "118502", status: "Chưa gửi" },
-  { order: "DH-1061", type: "OTP khác", otp: "390021", status: "Chưa gửi" },
-];
-
-const seedTimeline = [
-  { time: "08:32", event: "Anh Minh đã lấy đồ đơn DH-1048 thành công" },
-  { time: "09:10", event: "Hệ thống gửi OTP xác nhận đơn DH-1051 cho khách" },
-  { time: "09:20", event: "Chị Lan bắt đầu đi giao hàng đơn DH-1052" },
-  { time: "10:04", event: "Anh Tuấn đang di chuyển đến điểm lấy đồ DH-1057" },
-  { time: "10:05", event: "Khách DH-1055 chưa xác nhận OTP sau 3 phút" },
-  { time: "14:02", event: "Hệ thống tự động nhắc nhở lịch giao trả đơn DH-1055" },
-];
-
-const seedRoutePlans: RoutePlan[] = [
-  { id: "LT-401", route: "Tuyến Q.1 gom 4 điểm", driver: "Anh Minh", orders: "DH-1048, DH-1055", eta: "58 phút", saving: "Giảm 18 phút", status: "Sẵn sàng áp dụng" },
-  { id: "LT-404", route: "Kết hợp 2 điểm Q.5 sáng sớm", driver: "Anh Hùng", orders: "DH-1061, DH-1063", eta: "35 phút", saving: "Giảm 12 phút", status: "Sẵn sàng áp dụng" },
-  { id: "LT-402", route: "Chuyển DH-1055 sang Chị Lan", driver: "Chị Lan", orders: "DH-1052, DH-1055", eta: "42 phút", saving: "Giảm tải 1 chuyến", status: "Cần duyệt" },
-  { id: "LT-405", route: "Phân bổ lại tuyến Q.7", driver: "Anh Long", orders: "DH-1058, DH-1059", eta: "50 phút", saving: "Giảm 8 phút", status: "Cần duyệt" },
-  { id: "LT-403", route: "Gom điểm Q.3 cuối ca", driver: "Anh Tuấn", orders: "DH-1057, DH-1061", eta: "64 phút", saving: "Giảm 1.2 lít xăng", status: "Đang theo dõi" },
-  { id: "LT-406", route: "Theo dõi tuyến Bình Thạnh", driver: "Chị Vân", orders: "DH-1065", eta: "30 phút", saving: "—", status: "Đang theo dõi" },
-];
+type TimelineRow = {
+  time: string;
+  event: string;
+};
 
 const tripStatusColor: Record<TripStatus, { text: string; bg: string }> = {
   "Đã lấy": { text: "#059669", bg: "rgba(5,150,105,0.09)" },
@@ -254,8 +209,8 @@ export default function DeliveryDashboardPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [routePlans, setRoutePlans] = useState<RoutePlan[]>([]);
-  const [otpsState, setOtpsState] = useState<typeof seedOtps>([]);
-  const [timeline] = useState<typeof seedTimeline>([]);
+  const [otpsState, setOtpsState] = useState<Array<Pick<OtpRow, "order" | "type" | "otp" | "status">>>([]);
+  const [timeline] = useState<TimelineRow[]>([]);
 
   const [query, setQuery] = useState("");
   const [selectedTripStatus, setSelectedTripStatus] = useState<string>("Tất cả");
@@ -1026,7 +981,7 @@ export default function DeliveryDashboardPage() {
     return <TableCell key={column.id} className={customValue ? "text-slate-600" : "text-slate-400 italic"}>{customValue || "Chưa có"}</TableCell>;
   };
 
-  const renderRouteCell = (item: (typeof seedRoutePlans)[number], column: any) => {
+  const renderRouteCell = (item: RoutePlan, column: any) => {
     if (column.id === "id") return (
       <TableCell key={column.id} className="pl-4 font-medium text-slate-900">
         <div className="flex items-center gap-2">
@@ -1448,7 +1403,7 @@ export default function DeliveryDashboardPage() {
   const renderCell = (row: any, column: any) => {
     if (tab === "Chuyến đi") return renderTripCell(row as Trip, column);
     if (tab === "Tài xế") return renderDriverCell(row as Driver, column);
-    if (tab === "Lộ trình") return renderRouteCell(row as (typeof seedRoutePlans)[number], column);
+    if (tab === "Lộ trình") return renderRouteCell(row as RoutePlan, column);
     return renderOtpCell(row, column);
   };
 

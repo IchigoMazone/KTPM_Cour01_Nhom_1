@@ -49,6 +49,7 @@ type MyOrderRow = {
   booking_code?: string;
   service?: string;
   quantity?: string;
+  service_unit?: string;
   delivery_date?: string;
   delivery_time?: string;
   appointment?: string;
@@ -81,6 +82,23 @@ type SupportTicketRow = {
   created_at?: string;
 };
 
+type MemoNote = {
+  memo_id: string;
+  content: string;
+  priority: string;
+};
+
+type UpcomingAppointmentItem = {
+  order_code: string;
+  service_name: string;
+  appointment_time: string;
+  date_label: string;
+  appointment_type: string;
+  subtitle: string;
+  sortValue: string;
+  isUpcoming: boolean;
+};
+
 const chartColors = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#06b6d4", "#f43f5e"];
 
 const orderStatusColors: Record<string, string> = {
@@ -109,22 +127,29 @@ const orderStatusProgress: Record<string, number> = {
   "Hoàn thành": 100,
 };
 
-const reminderItems = [
-  { text: "Đơn DH-1055 đang dùng nước xả thơm nhẹ theo ghi chú.", type: "Đơn hàng", color: "#3b82f6" },
-  { text: "Voucher PANDA20 còn hạn đến 30/06/2026.", type: "Ưu đãi", color: "#8b5cf6" },
-  { text: "Còn 250 điểm nữa để nâng hạng Vàng.", type: "Điểm thưởng", color: "#f59e0b" },
-  { text: "Ticket HT-0309 đang được nhân viên kiểm tra.", type: "Hỗ trợ", color: "#10b981" },
-];
+const loyaltyTiers = [
+  { name: "Bạc", points: 1500, color: "#94a3b8" },
+  { name: "Vàng", points: 3000, color: "#f59e0b" },
+  { name: "Kim Cương", points: 5000, color: "#8b5cf6" },
+] as const;
 
 const reminderTypeColors: Record<string, string> = {
-  "Đơn hàng": "#3b82f6",
-  "Ưu đãi": "#8b5cf6",
-  "Điểm thưởng": "#f59e0b",
-  "Hỗ trợ": "#10b981",
+  "Khẩn cấp": "#f43f5e",
+  "Quan trọng": "#f59e0b",
+  "Bình thường": "#0ea5e9",
+  "Ít quan trọng": "#22c55e",
+  "Theo dõi": "#a855f7",
 };
 
 function getReminderTypeColor(type: string) {
-  return reminderTypeColors[type] || "#0ea5e9";
+  if (reminderTypeColors[type]) return reminderTypeColors[type];
+  const customColors = ["#14b8a6", "#f97316", "#6366f1", "#06b6d4", "#ec4899"];
+  const hash = Array.from(type).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return customColors[hash % customColors.length];
+}
+
+function getNextLoyaltyTier(points: number) {
+  return loyaltyTiers.find((tier) => points < tier.points) ?? null;
 }
 
 function formatOrderDate(value?: string) {
@@ -137,6 +162,18 @@ function formatOrderDate(value?: string) {
     })();
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+}
+
+function formatOrderDateFull(value?: string) {
+  if (!value) return "";
+  const parsed = value.includes("-")
+    ? new Date(`${value}T00:00:00`)
+    : (() => {
+      const [day, month, year] = value.split("/").map(Number);
+      return new Date(year, month - 1, day);
+    })();
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("vi-VN");
 }
 
 function parseOrderDateValue(value?: string) {
@@ -202,17 +239,39 @@ function getClaimUsageStatus(claim: PromotionClaim) {
   return claim.claim_status === "Đã sử dụng" ? "Đã sử dụng" : "Chưa sử dụng";
 }
 
+function parseQuantityValue(quantity?: string | number) {
+  if (typeof quantity === "number") return quantity;
+  const normalized = String(quantity || "")
+    .replace(",", ".")
+    .match(/-?\d+(\.\d+)?/);
+  return normalized ? Number(normalized[0]) : 0;
+}
+
+function formatOverviewQuantity(order: Pick<MyOrderRow, "quantity" | "service_unit">) {
+  const quantity = String(order.quantity || "").trim();
+  const unit = String(order.service_unit || "").trim();
+  if (!quantity || quantity === "-") return "";
+  if (unit) return `${quantity} ${unit}`;
+  const numericQuantity = parseQuantityValue(quantity);
+  if (numericQuantity > 0) return `${quantity} kg`;
+  return "";
+}
+
 function normalizeOrderStatus(status?: string) {
   return mapHomeOrderStatus(String(status || "").trim() || "Tiếp nhận");
 }
 
 function mapOrderProgressItem(row: MyOrderRow) {
   const status = normalizeOrderStatus(row.status);
-  const service = [row.service || "Dịch vụ", row.quantity || ""].filter(Boolean).join(" · ");
-  const dateLabel = formatOrderDate(row.delivery_date);
-  const timeLabel = row.delivery_time && row.delivery_time !== "-"
-    ? `${dateLabel ? `${dateLabel} · ` : ""}${row.delivery_time}`
-    : dateLabel;
+  const quantityLabel = formatOverviewQuantity(row);
+  const service = [row.service || "Dịch vụ", quantityLabel].filter(Boolean).join(" · ");
+  const dateLabel = formatOrderDateFull(row.delivery_date);
+  const rawTime = row.delivery_time && row.delivery_time !== "-"
+    ? row.delivery_time
+    : (row.appointment && row.appointment !== "-" ? row.appointment : "");
+  const timeLabel = rawTime && dateLabel
+    ? `${rawTime}-${dateLabel}`
+    : (dateLabel || rawTime);
   return {
     code: row.id,
     service,
@@ -229,22 +288,17 @@ function mapUpcomingOrderItem(row: MyOrderRow, source: "order" | "booking") {
   const { date, time, sortValue } = getUpcomingDateTime(row);
   const isDelivery = source === "order" && ["Sẵn sàng giao", "Đang giao", "Hoàn thành"].includes(normalizedStatus);
   const type = source === "booking" ? "Lấy đồ" : isDelivery ? "Giao đồ" : "Theo dõi";
-  const color = source === "booking"
-    ? "#3b82f6"
-    : isDelivery
-      ? "#10b981"
-      : orderStatusColors[normalizedStatus] || "#f59e0b";
+  const quantityLabel = formatOverviewQuantity(row);
   return {
-    code: row.booking_code || row.id,
-    time,
-    date: formatUpcomingDateLabel(row.delivery_date),
-    title: row.service || "Dịch vụ",
-    subtitle: [row.quantity, normalizedStatus].filter(Boolean).join(" · "),
-    type,
-    color,
+    order_code: row.booking_code || row.id,
+    appointment_time: time,
+    date_label: formatUpcomingDateLabel(row.delivery_date),
+    service_name: row.service || "Dịch vụ",
+    subtitle: [quantityLabel, normalizedStatus].filter(Boolean).join(" · "),
+    appointment_type: type,
     sortValue,
     isUpcoming: date ? date >= new Date(new Date().setHours(0, 0, 0, 0)) : false,
-  };
+  } satisfies UpcomingAppointmentItem;
 }
 
 function formatCurrency(value: number) {
@@ -423,6 +477,12 @@ export default function UserOverviewPage() {
   const [maxDisplayedReminders, setMaxDisplayedReminders] = useState(4);
   const [maxDisplayedRemindersInput, setMaxDisplayedRemindersInput] = useState("4");
   const [reminderSettingsLoaded, setReminderSettingsLoaded] = useState(false);
+  const [maxDisplayedUpcoming, setMaxDisplayedUpcoming] = useState(6);
+  const [maxDisplayedUpcomingInput, setMaxDisplayedUpcomingInput] = useState("6");
+  const [upcomingSettingsLoaded, setUpcomingSettingsLoaded] = useState(false);
+  const [maxDisplayedOrderProgress, setMaxDisplayedOrderProgress] = useState(6);
+  const [maxDisplayedOrderProgressInput, setMaxDisplayedOrderProgressInput] = useState("6");
+  const [orderProgressSettingsLoaded, setOrderProgressSettingsLoaded] = useState(false);
   const [myOrders, setMyOrders] = useState<MyOrderRow[]>([]);
   const [myBookings, setMyBookings] = useState<MyOrderRow[]>([]);
   const [isOrderProgressLoading, setIsOrderProgressLoading] = useState(true);
@@ -431,6 +491,7 @@ export default function UserOverviewPage() {
   const [promotionClaims, setPromotionClaims] = useState<PromotionClaim[]>([]);
   const [isLoyaltyLoading, setIsLoyaltyLoading] = useState(true);
   const [supportTickets, setSupportTickets] = useState<SupportTicketRow[]>([]);
+  const [memoNotes, setMemoNotes] = useState<MemoNote[]>([]);
   const displayedSpendingGroupDays = spendingRangeDays <= 7
     ? 1
     : Math.min(spendingRangeDays, spendingGroupDays);
@@ -453,7 +514,8 @@ export default function UserOverviewPage() {
   const completionRate = totalOrders ? Math.round((completedOrders / totalOrders) * 100) : 0;
   const activeOrderRate = totalOrders ? Math.round((activeOrders / totalOrders) * 100) : 0;
   const loyaltyPoints = Number(customerProfile?.loyalty_points || 0);
-  const nextLoyaltyTarget = loyaltyPoints < 1500 ? 1500 : Math.ceil((loyaltyPoints + 1) / 500) * 500;
+  const nextLoyaltyTier = getNextLoyaltyTier(loyaltyPoints);
+  const nextLoyaltyTarget = nextLoyaltyTier?.points ?? loyaltyTiers[loyaltyTiers.length - 1].points;
   const loyaltyRate = nextLoyaltyTarget ? Math.min(100, Math.round((loyaltyPoints / nextLoyaltyTarget) * 100)) : 0;
   const usedServiceNames = new Set(ordersInDashboardRange.map((order) => order.service).filter(Boolean));
   const statusMix = useMemo(() => {
@@ -477,11 +539,12 @@ export default function UserOverviewPage() {
       .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
   }, [ordersInDashboardRange]);
   const reminders = useMemo(
-    () => reminderItems.map((note) => ({
-      ...note,
-      key: `${note.type}:${note.text}`,
+    () => memoNotes.map((note) => ({
+      text: note.content,
+      type: note.priority || "Bình thường",
+      key: `${note.priority || "Bình thường"}:${note.content}`,
     })),
-    [],
+    [memoNotes],
   );
   const visibleReminders = useMemo(() => {
     const visibleKeySet = visibleReminderKeys ? new Set(visibleReminderKeys) : null;
@@ -497,6 +560,10 @@ export default function UserOverviewPage() {
       .filter((item) => item.status !== "Hoàn thành"),
     [myOrders],
   );
+  const displayedOrderProgressItems = useMemo(
+    () => visibleOrderProgressItems.slice(0, maxDisplayedOrderProgress),
+    [maxDisplayedOrderProgress, visibleOrderProgressItems],
+  );
   const upcomingAppointmentItems = useMemo(
     () => [
       ...myBookings.map((row) => mapUpcomingOrderItem(row, "booking")),
@@ -506,24 +573,31 @@ export default function UserOverviewPage() {
     ]
       .filter((item) => item.isUpcoming)
       .sort((a, b) => a.sortValue.localeCompare(b.sortValue))
-      .slice(0, 6),
+    ,
     [myBookings, myOrders],
+  );
+  const displayedUpcomingAppointmentItems = useMemo(
+    () => upcomingAppointmentItems.slice(0, maxDisplayedUpcoming),
+    [maxDisplayedUpcoming, upcomingAppointmentItems],
   );
   const loyaltyItems = useMemo(() => {
     const points = Number(customerProfile?.loyalty_points || 0);
-    const targetPoints = points < 1500 ? 1500 : Math.ceil((points + 1) / 500) * 500;
-    const pointPct = targetPoints ? Math.min(100, Math.round((points / targetPoints) * 100)) : 0;
-    const pointItem = {
-      key: "loyalty-points",
-      name: customerProfile?.rank ? `Hạng ${customerProfile.rank}` : "Điểm thưởng",
-      detail: `${points.toLocaleString("vi-VN")} / ${targetPoints.toLocaleString("vi-VN")} điểm`,
-      pct: pointPct,
-      color: "#3b82f6",
-      showProgress: true,
-      discountLabel: "",
-    };
+    const tierItems = loyaltyTiers.map((tier) => {
+      const remainingPoints = Math.max(0, tier.points - points);
+      const pointPct = Math.min(100, Math.round((points / tier.points) * 100));
+      return {
+        key: `loyalty-tier-${tier.name}`,
+        name: `Hạng ${tier.name}`,
+        detail: remainingPoints > 0
+          ? `Còn ${remainingPoints.toLocaleString("vi-VN")} điểm để đạt`
+          : `Đã đạt ${tier.points.toLocaleString("vi-VN")} điểm`,
+        pct: pointPct,
+        color: tier.color,
+        showProgress: true,
+        discountLabel: "",
+      };
+    });
     const claimItems = promotionClaims.filter((claim) => getClaimUsageStatus(claim) === "Chưa sử dụng").slice(0, 3).map((claim) => {
-      const usageStatus = getClaimUsageStatus(claim);
       const color = "#10b981";
       return {
         key: claim.claim_id || claim.code,
@@ -535,7 +609,7 @@ export default function UserOverviewPage() {
         discountLabel: `Giảm ${formatPromotionValue(String(claim.value || ""), claim.type as PromotionType)}`,
       };
     });
-    return [pointItem, ...claimItems];
+    return [...tierItems, ...claimItems];
   }, [customerProfile, promotionClaims]);
 
   useEffect(() => {
@@ -559,6 +633,38 @@ export default function UserOverviewPage() {
       });
     return () => {
       alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+
+    const loadMemos = () => {
+      homeApi<MemoNote[]>("/memos", { cache: "no-store" })
+        .then((rows) => {
+          if (!alive) return;
+          setMemoNotes(Array.isArray(rows) ? rows : []);
+        })
+        .catch(() => {
+          if (!alive) return;
+          setMemoNotes([]);
+        });
+    };
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") loadMemos();
+    };
+
+    loadMemos();
+    window.addEventListener("home-memos-changed", loadMemos);
+    window.addEventListener("focus", loadMemos);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      alive = false;
+      window.removeEventListener("home-memos-changed", loadMemos);
+      window.removeEventListener("focus", loadMemos);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, []);
 
@@ -715,6 +821,72 @@ export default function UserOverviewPage() {
     setMaxDisplayedRemindersInput(String(nextValue));
   };
 
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("user-overview-upcoming-setup");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { maxItems?: number };
+        if (Number.isInteger(parsed.maxItems) && Number(parsed.maxItems) >= 1 && Number(parsed.maxItems) <= 9) {
+          const maxItems = Number(parsed.maxItems);
+          setMaxDisplayedUpcoming(maxItems);
+          setMaxDisplayedUpcomingInput(String(maxItems));
+        }
+      }
+    } finally {
+      setUpcomingSettingsLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!upcomingSettingsLoaded) return;
+    window.localStorage.setItem(
+      "user-overview-upcoming-setup",
+      JSON.stringify({ maxItems: maxDisplayedUpcoming }),
+    );
+  }, [maxDisplayedUpcoming, upcomingSettingsLoaded]);
+
+  const commitMaxDisplayedUpcoming = () => {
+    const parsed = Number(maxDisplayedUpcomingInput);
+    const nextValue = Number.isFinite(parsed)
+      ? Math.max(1, Math.min(9, Math.floor(parsed)))
+      : maxDisplayedUpcoming;
+    setMaxDisplayedUpcoming(nextValue);
+    setMaxDisplayedUpcomingInput(String(nextValue));
+  };
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("user-overview-order-progress-setup");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { maxItems?: number };
+        if (Number.isInteger(parsed.maxItems) && Number(parsed.maxItems) >= 1 && Number(parsed.maxItems) <= 9) {
+          const maxItems = Number(parsed.maxItems);
+          setMaxDisplayedOrderProgress(maxItems);
+          setMaxDisplayedOrderProgressInput(String(maxItems));
+        }
+      }
+    } finally {
+      setOrderProgressSettingsLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!orderProgressSettingsLoaded) return;
+    window.localStorage.setItem(
+      "user-overview-order-progress-setup",
+      JSON.stringify({ maxItems: maxDisplayedOrderProgress }),
+    );
+  }, [maxDisplayedOrderProgress, orderProgressSettingsLoaded]);
+
+  const commitMaxDisplayedOrderProgress = () => {
+    const parsed = Number(maxDisplayedOrderProgressInput);
+    const nextValue = Number.isFinite(parsed)
+      ? Math.max(1, Math.min(9, Math.floor(parsed)))
+      : maxDisplayedOrderProgress;
+    setMaxDisplayedOrderProgress(nextValue);
+    setMaxDisplayedOrderProgressInput(String(nextValue));
+  };
+
   const toggleReminder = (key: string, checked: boolean) => {
     setVisibleReminderKeys((prev) => {
       const current = new Set(prev ?? reminders.map((note) => note.key));
@@ -774,7 +946,11 @@ export default function UserOverviewPage() {
                 <KpiCard
                   title="Điểm thưởng"
                   value={loyaltyPoints.toLocaleString("vi-VN")}
-                  hint={`Còn ${Math.max(0, nextLoyaltyTarget - loyaltyPoints).toLocaleString("vi-VN")} điểm tới mốc kế tiếp`}
+                  hint={
+                    nextLoyaltyTier
+                      ? `Hạng ${customerProfile?.rank || "Thường"} · còn ${Math.max(0, nextLoyaltyTarget - loyaltyPoints).toLocaleString("vi-VN")} điểm tới ${nextLoyaltyTier.name}`
+                      : `Hạng ${customerProfile?.rank || "Kim Cương"} · đã đạt mốc cao nhất`
+                  }
                   detail={`${loyaltyRate}%`}
                   icon={Gift}
                   color="#3b82f6"
@@ -881,31 +1057,78 @@ export default function UserOverviewPage() {
                   <CalendarClock className="size-4 text-slate-500" />
                   <h2 className="text-sm font-semibold text-slate-900">Đơn sắp tới hẹn</h2>
                 </div>
-                <span className="text-xs font-medium text-slate-400">
-                  {upcomingAppointmentItems.length}/6 lịch hẹn
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-slate-400">
+                    {displayedUpcomingAppointmentItems.length}/{maxDisplayedUpcoming} lịch hẹn
+                  </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="inline-flex size-7 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                        aria-label="Thiết lập số lượng lịch hẹn hiển thị"
+                      >
+                        <Settings className="size-3.5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>Thiết lập lịch hẹn</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <div
+                        className="flex items-center justify-between gap-3 px-2 py-1.5"
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        <span className="text-sm text-slate-700">Số ô tối đa</span>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          value={maxDisplayedUpcomingInput}
+                          onChange={(event) => {
+                            const value = event.target.value.replace(/\D/g, "").slice(0, 1);
+                            setMaxDisplayedUpcomingInput(value);
+                            if (/^[1-9]$/.test(value)) setMaxDisplayedUpcoming(Number(value));
+                          }}
+                          onBlur={commitMaxDisplayedUpcoming}
+                          onKeyDown={(event) => {
+                            event.stopPropagation();
+                            if (event.key === "Enter") {
+                              commitMaxDisplayedUpcoming();
+                              event.currentTarget.blur();
+                            }
+                          }}
+                          className="h-7 w-16 appearance-none px-2 text-center text-xs"
+                        />
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
-              <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
-                {upcomingAppointmentItems.map((item) => (
-                  <div key={item.code} className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-slate-50/70">
+              <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-scroll [scrollbar-gutter:stable]">
+                {displayedUpcomingAppointmentItems.map((item, index) => {
+                  const isDelivery = item.appointment_type === "Giao đồ";
+                  const color = isDelivery ? "#10b981" : "#3b82f6";
+                  return (
+                  <div key={`${item.order_code}-${item.appointment_type}-${item.appointment_time}-${index}`} className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-slate-50/70">
                     <div className="w-11 shrink-0 text-center">
-                      <p className="text-xs font-semibold tabular-nums text-slate-900">{item.time}</p>
-                      <p className="mt-0.5 text-[10px] text-slate-400">{item.date}</p>
+                      <p className="text-xs font-semibold tabular-nums text-slate-900">{item.appointment_time}</p>
+                      <p className="mt-0.5 text-[10px] text-slate-400">{item.date_label}</p>
                     </div>
                     <span className="h-9 w-px shrink-0 bg-slate-200" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-slate-800">{item.code} · {item.title}</p>
+                      <p className="truncate text-xs font-semibold text-slate-800">{item.order_code} · {item.service_name}</p>
                       <p className="mt-1 truncate text-[11px] text-slate-400">{item.subtitle}</p>
                     </div>
                     <span
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium"
-                      style={{ color: item.color, backgroundColor: `${item.color}14` }}
+                      className="inline-flex max-w-full shrink-0 items-center gap-1.5 truncate rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium"
+                      style={{ color, backgroundColor: `${color}14` }}
                     >
-                      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
-                      {item.type}
+                      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                      <span className="truncate">{item.appointment_type}</span>
                     </span>
                   </div>
-                ))}
+                  );
+                })}
                 {(isUpcomingLoading || isOrderProgressLoading) && (
                   <div className="flex h-full items-center justify-center p-6 text-xs text-slate-400">
                     Đang tải lịch hẹn.
@@ -925,12 +1148,55 @@ export default function UserOverviewPage() {
                   <Sparkles className="size-4 text-slate-500" />
                   <h2 className="text-sm font-semibold text-slate-900">Tiến trình đơn</h2>
                 </div>
-                <span className="text-xs font-medium text-slate-400">
-                  {visibleOrderProgressItems.length} đơn đang xử lý
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-slate-400">
+                    {displayedOrderProgressItems.length}/{maxDisplayedOrderProgress} đơn
+                  </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="inline-flex size-7 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                        aria-label="Thiết lập số lượng tiến trình đơn hiển thị"
+                      >
+                        <Settings className="size-3.5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>Thiết lập tiến trình đơn</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <div
+                        className="flex items-center justify-between gap-3 px-2 py-1.5"
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        <span className="text-sm text-slate-700">Số ô tối đa</span>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          value={maxDisplayedOrderProgressInput}
+                          onChange={(event) => {
+                            const value = event.target.value.replace(/\D/g, "").slice(0, 1);
+                            setMaxDisplayedOrderProgressInput(value);
+                            if (/^[1-9]$/.test(value)) setMaxDisplayedOrderProgress(Number(value));
+                          }}
+                          onBlur={commitMaxDisplayedOrderProgress}
+                          onKeyDown={(event) => {
+                            event.stopPropagation();
+                            if (event.key === "Enter") {
+                              commitMaxDisplayedOrderProgress();
+                              event.currentTarget.blur();
+                            }
+                          }}
+                          className="h-7 w-16 appearance-none px-2 text-center text-xs"
+                        />
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
-              <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
-                {visibleOrderProgressItems.map((order) => {
+              <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-scroll [scrollbar-gutter:stable]">
+                {displayedOrderProgressItems.map((order) => {
                   const color = orderStatusColors[order.status] || "#64748b";
                   return (
                   <div key={order.code} className="px-3 py-3 transition-colors hover:bg-slate-50/70">
@@ -977,12 +1243,38 @@ export default function UserOverviewPage() {
                 </span>
               </div>
               <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
+                <div className="grid grid-cols-3 gap-2 px-3 py-3">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Điểm hiện tại</p>
+                    <p className="mt-1 text-sm font-bold text-slate-900">{loyaltyPoints.toLocaleString("vi-VN")}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Hạng hiện tại</p>
+                    <p className="mt-1 text-sm font-bold text-slate-900">{customerProfile?.rank || "Thường"}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Mốc tiếp theo</p>
+                    <p className="mt-1 text-sm font-bold text-slate-900">
+                      {nextLoyaltyTier ? nextLoyaltyTier.name : "Đã tối đa"}
+                    </p>
+                  </div>
+                </div>
                 {loyaltyItems.map((item) => (
                   <div key={item.key} className="flex min-h-[64px] flex-col justify-center px-3 py-3 transition-colors hover:bg-slate-50/70">
                     {item.showProgress ? (
                       <>
                         <div className="flex items-center justify-between gap-3 text-xs font-medium">
-                          <span className="truncate text-slate-800">{item.name}</span>
+                          <span
+                            className="inline-flex max-w-[45%] items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                            style={{
+                              color: item.color,
+                              borderColor: `${item.color}55`,
+                              backgroundColor: `${item.color}20`,
+                            }}
+                          >
+                            <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+                            <span className="truncate">{item.name}</span>
+                          </span>
                           <span className="truncate text-[11px] text-slate-400">{item.detail}</span>
                         </div>
                         <div className="mt-2.5 flex items-center gap-2">
@@ -995,7 +1287,17 @@ export default function UserOverviewPage() {
                     ) : (
                       <div className="flex min-h-[40px] items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="truncate text-xs font-semibold text-slate-800">{item.name}</p>
+                          <p
+                            className="inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                            style={{
+                              color: item.color,
+                              borderColor: `${item.color}55`,
+                              backgroundColor: `${item.color}20`,
+                            }}
+                          >
+                            <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+                            <span className="truncate">{item.name}</span>
+                          </p>
                           <p className="mt-1 truncate text-[11px] font-medium text-slate-400">{item.detail}</p>
                         </div>
                         <span className="shrink-0 text-[11px] font-medium leading-none text-slate-400">

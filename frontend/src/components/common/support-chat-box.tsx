@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, Image, Maximize2, Reply, RotateCcw, Send, Smile, ThumbsUp, Trash2, X } from "lucide-react";
 import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
+import AccountAvatar from "./account-avatar";
 
 export type SupportChatSender = "customer" | "staff";
 
@@ -43,6 +44,9 @@ type SupportChatBoxProps = {
   onSendImage?: (file: File, replyTo?: SupportChatMessage | null) => void | Promise<void>;
   onReactMessage?: (message: SupportChatMessage, reaction: string) => void | Promise<void>;
   onRevokeMessage?: (message: SupportChatMessage) => void | Promise<void>;
+  onDeleteMessage?: (message: SupportChatMessage) => void | Promise<void>;
+  onTypingChange?: (isTyping: boolean) => void;
+  typingLabel?: string | null;
 };
 
 const quickReactions = ["👍", "❤️", "😂", "😮", "😢", "😡"];
@@ -84,6 +88,9 @@ export default function SupportChatBox({
   onSendImage,
   onReactMessage,
   onRevokeMessage,
+  onDeleteMessage,
+  onTypingChange,
+  typingLabel,
 }: SupportChatBoxProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -92,6 +99,8 @@ export default function SupportChatBox({
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const messageTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const typingSentRef = useRef(false);
+  const shouldStickToBottomRef = useRef(true);
   const [draft, setDraft] = useState("");
   const [replyingTo, setReplyingTo] = useState<SupportChatMessage | null>(null);
   const [actionMessage, setActionMessage] = useState<SupportChatMessage | null>(null);
@@ -100,18 +109,28 @@ export default function SupportChatBox({
   const [inputExpanded, setInputExpanded] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, Partial<SupportChatMessage>>>({});
+  const [visibleCount, setVisibleCount] = useState(30);
 
-  const displayMessages = useMemo(
+  const allDisplayMessages = useMemo(
     () => (conversation?.messages || [])
       .map((message) => ({ ...message, ...(overrides[message.id] || {}) }))
       .filter((message) => !message.deletedForMe),
     [conversation?.messages, overrides],
   );
-  const initials = initialsOf(conversation?.name || fallbackName, currentSender === "staff" ? "KH" : "AD");
+  const displayMessages = useMemo(
+    () => allDisplayMessages.slice(-visibleCount),
+    [allDisplayMessages, visibleCount],
+  );
+
+  useEffect(() => {
+    setVisibleCount(30);
+    shouldStickToBottomRef.current = true;
+  }, [conversation?.id]);
 
   useEffect(() => {
     requestAnimationFrame(() => {
-      chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "smooth" });
+      if (!shouldStickToBottomRef.current) return;
+      chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: "auto" });
     });
   }, [displayMessages.length, conversation?.id]);
 
@@ -123,6 +142,35 @@ export default function SupportChatBox({
     textarea.style.height = `${nextHeight}px`;
     setInputExpanded(nextHeight > 44);
   }, [draft]);
+
+  useEffect(() => {
+    if (!onTypingChange) return;
+    const hasDraft = Boolean(draft.trim()) && !disabled && Boolean(conversation);
+    if (hasDraft && !typingSentRef.current) {
+      onTypingChange(true);
+      typingSentRef.current = true;
+    }
+    if (!hasDraft && typingSentRef.current) {
+      onTypingChange(false);
+      typingSentRef.current = false;
+      return;
+    }
+    if (!hasDraft) return;
+    const timeoutId = window.setTimeout(() => {
+      if (typingSentRef.current) {
+        onTypingChange(false);
+        typingSentRef.current = false;
+      }
+    }, 1200);
+    return () => window.clearTimeout(timeoutId);
+  }, [conversation, disabled, draft, onTypingChange]);
+
+  useEffect(() => () => {
+    if (typingSentRef.current && onTypingChange) {
+      onTypingChange(false);
+      typingSentRef.current = false;
+    }
+  }, [onTypingChange]);
 
   useEffect(() => {
     const closeOnOutsideClick = (event: MouseEvent) => {
@@ -187,14 +235,20 @@ export default function SupportChatBox({
   };
 
   const deleteMessageForMe = (messageId: string) => {
-    updateMessage(messageId, () => ({ deletedForMe: true }));
+    const message = displayMessages.find((item) => item.id === messageId);
+    if (!message) return;
+    if (onDeleteMessage) {
+      void onDeleteMessage(message);
+    } else {
+      updateMessage(messageId, () => ({ deletedForMe: true }));
+    }
     setActionMessage(null);
   };
 
   const scrollToRepliedMessage = (messageId: string) => {
     const element = document.getElementById(`chat-message-${messageId}`);
     if (!element) return;
-    element.scrollIntoView({ block: "center", behavior: "smooth" });
+    element.scrollIntoView({ block: "nearest", behavior: "smooth" });
     setHighlightedMessageId(messageId);
     window.setTimeout(() => setHighlightedMessageId((current) => current === messageId ? null : current), 1200);
   };
@@ -203,6 +257,10 @@ export default function SupportChatBox({
     const text = content.trim();
     if (!conversation || !text || disabled) return;
     setDraft("");
+    if (typingSentRef.current && onTypingChange) {
+      onTypingChange(false);
+      typingSentRef.current = false;
+    }
     setEmojiPickerOpen(false);
     await onSendMessage(text, replyingTo);
     setReplyingTo(null);
@@ -226,13 +284,26 @@ export default function SupportChatBox({
 
   return (
     <>
+      <style jsx>{`
+        @keyframes typing-bounce {
+          0%, 60%, 100% {
+            transform: translateY(0);
+            opacity: 0.45;
+          }
+          30% {
+            transform: translateY(-3px);
+            opacity: 1;
+          }
+        }
+      `}</style>
       <div ref={panelRef} className={className}>
         <div className="flex h-14 shrink-0 items-center gap-1 border-b border-slate-200 px-2.5">
-          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600">
-            {conversation?.avatarUrl ? (
-              <img src={conversation.avatarUrl} alt={conversation.name} className="size-full rounded-full object-cover" />
-            ) : initials}
-          </span>
+          <AccountAvatar
+            name={conversation?.name || fallbackName}
+            imageUrl={conversation?.avatarUrl}
+            size={32}
+            className="shrink-0"
+          />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13px] font-semibold text-slate-950">
               {conversation?.name || fallbackName}
@@ -258,13 +329,32 @@ export default function SupportChatBox({
           </button>
         </div>
 
-        <div ref={chatScrollRef} className="min-h-0 flex-1 overflow-y-auto bg-white px-3 py-3">
+        <div
+          ref={chatScrollRef}
+          className="relative min-h-0 flex-1 overflow-y-auto bg-white px-3 py-3"
+          onScroll={(event) => {
+            const target = event.currentTarget;
+            const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+            shouldStickToBottomRef.current = distanceToBottom < 48;
+          }}
+        >
           {!conversation ? (
             <div className="flex h-full items-center justify-center px-6 text-center text-xs text-slate-400">
               {emptyMessage}
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1 pb-3">
+              {allDisplayMessages.length > displayMessages.length ? (
+                <div className="pb-2 text-center">
+                  <button
+                    type="button"
+                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+                    onClick={() => setVisibleCount((current) => current + 30)}
+                  >
+                    Xem thêm tin nhắn cũ
+                  </button>
+                </div>
+              ) : null}
               {displayMessages.map((message, index, messages) => {
                 const previousMessage = messages[index - 1];
                 const currentTime = message.timestamp ? new Date(message.timestamp).getTime() : Number.NaN;
@@ -300,14 +390,13 @@ export default function SupportChatBox({
                     )}
                     <div className={`group flex items-end gap-1.5 ${isMine ? "justify-end" : "justify-start"}`}>
                       {!isMine && (
-                        <span className={`grid size-6 shrink-0 place-items-center rounded-full bg-slate-200 text-[8px] font-semibold text-slate-600 ${isLastInGroup ? "" : "invisible"}`}>
-                          {message.avatarUrl || conversation.avatarUrl ? (
-                            <img
-                              src={message.avatarUrl || conversation.avatarUrl}
-                              alt={conversation.name}
-                              className="size-full rounded-full object-cover"
-                            />
-                          ) : initials}
+                        <span className={`${isLastInGroup ? "" : "invisible"} shrink-0`}>
+                          <AccountAvatar
+                            name={conversation.name}
+                            imageUrl={message.avatarUrl || conversation.avatarUrl}
+                            size={24}
+                            className="shrink-0"
+                          />
                         </span>
                       )}
                       {message.imageUrl ? (
@@ -393,6 +482,11 @@ export default function SupportChatBox({
               })}
             </div>
           )}
+          {typingLabel ? (
+            <div className="pointer-events-none absolute bottom-2 left-3 z-20 rounded-full bg-white px-2.5 py-1 text-left text-[11px] font-medium text-slate-500 shadow-md ring-1 ring-slate-200">
+              {typingLabel}
+            </div>
+          ) : null}
         </div>
 
         {replyingTo && (

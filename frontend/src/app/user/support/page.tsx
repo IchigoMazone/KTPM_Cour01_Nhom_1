@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, useEffect, useRef } from "react";
-import { CalendarDays, Mail, MapPin, MessageSquare, Phone, Send, ShieldCheck, Sparkles, TicketCheck, HelpCircle, RotateCcw, UserRound, X } from "lucide-react";
+import { CalendarDays, Mail, MapPin, MessageSquare, Phone, Send, ShieldCheck, Sparkles, TicketCheck, HelpCircle, RotateCcw, Trash2, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,7 +21,7 @@ import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeS
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 import { homeApi } from "@/src/lib/home-api";
 import { API_BASE_URL } from "@/src/lib/config";
-import type { HomeSupportTicketRow } from "@/src/app/home/support/support-shared";
+import { getSupportWsUrl, type HomeSupportMessageRow, type HomeSupportTicketRow, type SupportSocketPayload } from "@/src/app/home/support/support-shared";
 
 type UserSupportTicketRow = HomeSupportTicketRow & {
   customer_image_url?: string;
@@ -46,9 +46,12 @@ type SupportCustomer = {
 };
 
 interface ChatMessage {
+  id: string;
   sender: "user" | "cskh";
   text: string;
   time: string;
+  revoked?: boolean;
+  deletedForMe?: boolean;
 }
 
 interface Ticket {
@@ -108,9 +111,12 @@ function formatReadableDate(dateStr?: string) {
 
 function mapUserTicket(row: UserSupportTicketRow): Ticket {
   const messages = (row.messages || []).map((message) => ({
+    id: message.message_id,
     sender: message.sender_role === "customer" ? "user" as const : "cskh" as const,
-    text: message.content,
+    text: message.revoked ? "Tin nhắn đã được thu hồi" : message.content,
     time: formatTicketTime(message.created_at),
+    revoked: message.revoked,
+    deletedForMe: message.deleted_for_me,
   }));
   return {
     id: row.ticket_code,
@@ -260,6 +266,14 @@ export default function UserSupportPage() {
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const supportWsRef = useRef<WebSocket | null>(null);
+  const pendingSupportWsPayloadsRef = useRef<string[]>([]);
+  const typingTimeoutRef = useRef<number | null>(null);
+  const shouldStickUserChatToBottomRef = useRef(true);
+  const currentUserIdRef = useRef("");
+  const [isAdminTyping, setIsAdminTyping] = useState(false);
+  const [visibleMessageCount, setVisibleMessageCount] = useState(30);
 
   const loadSupportData = useCallback((showError = false) => {
     Promise.all([
@@ -279,11 +293,110 @@ export default function UserSupportPage() {
       });
   }, []);
 
+  const sendSupportWsPayload = useCallback((payload: Record<string, unknown>) => {
+    const socket = supportWsRef.current;
+    const serializedPayload = JSON.stringify(payload);
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(serializedPayload);
+      return true;
+    }
+    if (socket?.readyState === WebSocket.CONNECTING) {
+      pendingSupportWsPayloadsRef.current.push(serializedPayload);
+      return true;
+    }
+    return false;
+  }, []);
+
+  const flushPendingSupportWsPayloads = useCallback((socket: WebSocket) => {
+    const pendingPayloads = pendingSupportWsPayloadsRef.current.splice(0);
+    pendingPayloads.forEach((payload) => socket.send(payload));
+  }, []);
+
+  const appendSupportMessage = useCallback((ticketId: string, ticketCode: string | undefined, message: HomeSupportMessageRow) => {
+    let found = false;
+    setTickets((current) =>
+      current.map((ticket) => {
+        const matchesTicket = ticket.dbId === ticketId || ticket.id === ticketCode;
+        if (!matchesTicket) return ticket;
+        found = true;
+        const nextMessage: ChatMessage = {
+          id: message.message_id,
+          sender: message.sender_role === "customer" ? "user" : "cskh",
+          text: message.revoked ? "Tin nhắn đã được thu hồi" : message.content,
+          time: formatTicketTime(message.created_at),
+          revoked: message.revoked,
+        };
+        const exists = ticket.messages.some((item) =>
+          item.id === nextMessage.id,
+        );
+        if (exists) return ticket;
+        return {
+          ...ticket,
+          status: message.sender_role === "customer" ? "Chưa xử lý" : "Đang xử lý",
+          messages: [...ticket.messages, nextMessage],
+        };
+      }),
+    );
+    return found;
+  }, []);
+
   useEffect(() => {
     loadSupportData(true);
     const intervalId = window.setInterval(() => loadSupportData(false), 10000);
     return () => window.clearInterval(intervalId);
   }, [loadSupportData]);
+
+  useEffect(() => {
+    currentUserIdRef.current = localStorage.getItem("user_id") || "";
+    const wsUrl = getSupportWsUrl("user");
+    if (!wsUrl) return;
+    const socket = new WebSocket(wsUrl);
+    supportWsRef.current = socket;
+    socket.onopen = () => flushPendingSupportWsPayloads(socket);
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as SupportSocketPayload;
+        if (payload.type === "support_message_created" && payload.ticket_id && payload.message) {
+          const appended = appendSupportMessage(payload.ticket_id, payload.ticket_code, payload.message);
+          if (!appended) loadSupportData(false);
+          window.dispatchEvent(new Event("support-tickets-changed"));
+          return;
+        }
+        if (payload.type === "support_message_updated") {
+          loadSupportData(false);
+          window.dispatchEvent(new Event("support-tickets-changed"));
+          return;
+        }
+        if (payload.type === "support_typing") {
+          const currentTicket = tickets.find((ticket) => ticket.id === activeTicketId);
+          const matchesActiveTicket = payload.ticket_id && (payload.ticket_id === currentTicket?.dbId || payload.ticket_id === currentTicket?.id);
+          const isAdminEvent = payload.sender_role === "staff";
+          const isOwnEvent = payload.sender_id && payload.sender_id === currentUserIdRef.current;
+          if (matchesActiveTicket && isAdminEvent && !isOwnEvent) {
+            setIsAdminTyping(Boolean(payload.is_typing));
+            if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
+            if (payload.is_typing) {
+              typingTimeoutRef.current = window.setTimeout(() => setIsAdminTyping(false), 1600);
+            }
+          }
+          return;
+        }
+        if (payload.type === "support_error") {
+          toast.error(typeof payload.error === "string" ? payload.error : "Không thể đồng bộ chat hỗ trợ.");
+        }
+      } catch {
+        loadSupportData(false);
+      }
+    };
+    socket.onclose = () => {
+      if (supportWsRef.current === socket) supportWsRef.current = null;
+    };
+    return () => {
+      if (supportWsRef.current === socket) supportWsRef.current = null;
+      pendingSupportWsPayloadsRef.current = [];
+      socket.close();
+    };
+  }, [activeTicketId, appendSupportMessage, flushPendingSupportWsPayloads, loadSupportData, tickets]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -341,12 +454,31 @@ export default function UserSupportPage() {
   }, [columns, isLayoutLoaded, pageSize, tableResizeMode]);
 
   const activeTicket = useMemo(() => tickets.find((t) => t.id === activeTicketId) || null, [tickets, activeTicketId]);
+  const allVisibleChatMessages = useMemo(
+    () => activeTicket?.messages.filter((message) => !message.deletedForMe) || [],
+    [activeTicket],
+  );
+  const visibleChatMessages = useMemo(
+    () => allVisibleChatMessages.slice(-visibleMessageCount),
+    [allVisibleChatMessages, visibleMessageCount],
+  );
 
   useEffect(() => {
-    if (chatOpen && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [chatOpen, activeTicket?.messages]);
+    setVisibleMessageCount(30);
+    shouldStickUserChatToBottomRef.current = true;
+  }, [activeTicketId]);
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    const scrollToBottom = () => {
+      if (!shouldStickUserChatToBottomRef.current) return;
+      if (chatScrollRef.current) {
+        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+      }
+      messagesEndRef.current?.scrollIntoView({ block: "end" });
+    };
+    window.requestAnimationFrame(scrollToBottom);
+  }, [chatOpen, activeTicketId, visibleChatMessages.length]);
 
   const filteredTickets = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -540,6 +672,14 @@ export default function UserSupportPage() {
     const userMsgText = replyText.trim();
     const ticket = tickets.find((item) => item.id === activeTicketId);
     if (!ticket) return;
+    if (sendSupportWsPayload({
+      type: "send_support_message",
+      ticket_id: ticket.dbId || ticket.id,
+      content: userMsgText,
+    })) {
+      setReplyText("");
+      return;
+    }
     try {
       const saved = await homeApi<{
         content: string;
@@ -556,7 +696,7 @@ export default function UserSupportPage() {
             return {
               ...t,
               status: "Chưa xử lý",
-              messages: [...t.messages, { sender: "user", text: saved.content, time: timeStr }],
+              messages: [...t.messages, { id: `${Date.now()}`, sender: "user", text: saved.content, time: timeStr }],
             };
           }
           return t;
@@ -567,6 +707,65 @@ export default function UserSupportPage() {
       toast.error(error instanceof Error ? error.message : "Không thể gửi tin nhắn.");
     }
   };
+
+  const handleRevokeReply = async (messageId: string) => {
+    if (!activeTicketId || !messageId) return;
+    if (sendSupportWsPayload({
+      type: "update_support_message",
+      message_id: messageId,
+      action: "revoke",
+    })) {
+      return;
+    }
+    try {
+      await homeApi(`/support-messages/${messageId}`, {
+        method: "PUT",
+        body: JSON.stringify({ action: "revoke" }),
+      });
+      loadSupportData(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể thu hồi tin nhắn lúc này.");
+    }
+  };
+
+  const handleDeleteReply = (messageId: string) => {
+    if (!activeTicketId || !messageId) return;
+    if (sendSupportWsPayload({
+      type: "update_support_message",
+      message_id: messageId,
+      action: "delete",
+    })) {
+      return;
+    }
+    void homeApi(`/support-messages/${messageId}`, {
+      method: "PUT",
+      body: JSON.stringify({ action: "delete" }),
+    }).then(() => {
+      loadSupportData(false);
+    }).catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Không thể xóa tin nhắn lúc này.");
+    });
+  };
+
+  useEffect(() => {
+    if (!chatOpen || !activeTicket) return;
+    const hasDraft = Boolean(replyText.trim());
+    if (hasDraft) {
+      sendSupportWsPayload({
+        type: "support_typing",
+        ticket_id: activeTicket.dbId || activeTicket.id,
+        is_typing: true,
+      });
+    }
+    const timeoutId = window.setTimeout(() => {
+      sendSupportWsPayload({
+        type: "support_typing",
+        ticket_id: activeTicket.dbId || activeTicket.id,
+        is_typing: false,
+      });
+    }, hasDraft ? 1200 : 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [activeTicket, chatOpen, replyText, sendSupportWsPayload]);
 
   const deleteTicket = async (id: string) => {
     const ticket = tickets.find((item) => item.id === id);
@@ -756,6 +955,18 @@ export default function UserSupportPage() {
 
   return (
     <PageShell fullHeight>
+      <style jsx>{`
+        @keyframes typing-bounce {
+          0%, 60%, 100% {
+            transform: translateY(0);
+            opacity: 0.45;
+          }
+          30% {
+            transform: translateY(-3px);
+            opacity: 1;
+          }
+        }
+      `}</style>
       <div className="grid shrink-0 gap-3 md:grid-cols-4">
         <MetricCard
           title="Tổng yêu cầu"
@@ -1099,20 +1310,62 @@ export default function UserSupportPage() {
             </button>
           </div>
 
-          <div className="h-[280px] overflow-y-auto bg-slate-50/50 p-4 space-y-3.5">
-            {activeTicket?.messages.map((msg, index) => {
+          <div
+            ref={chatScrollRef}
+            className="relative h-[280px] overflow-y-auto bg-slate-50/50 p-4 space-y-3.5"
+            onScroll={(event) => {
+              const target = event.currentTarget;
+              const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+              shouldStickUserChatToBottomRef.current = distanceToBottom < 48;
+            }}
+          >
+            {allVisibleChatMessages.length > visibleChatMessages.length ? (
+              <div className="pb-1 text-center">
+                <button
+                  type="button"
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+                  onClick={() => setVisibleMessageCount((current) => current + 30)}
+                >
+                  Xem thêm tin nhắn cũ
+                </button>
+              </div>
+            ) : null}
+            {visibleChatMessages.map((msg) => {
               const isUser = msg.sender === "user";
               return (
-                <div key={index} className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
-                  <span className="text-[9px] text-slate-400 mb-1 px-1">
-                    {isUser ? "Bạn" : "Hỗ trợ khách hàng"} · {msg.time}
-                  </span>
+                <div key={msg.id} className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
+                  <div className="mb-1 flex items-center gap-2 px-1 text-[9px] text-slate-400">
+                    <span>
+                      {isUser ? "Bạn" : "Hỗ trợ khách hàng"} · {msg.time}
+                    </span>
+                    {isUser ? (
+                      <>
+                        {!msg.revoked && activeTicket?.status !== "Đã giải quyết" ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeReply(msg.id)}
+                            className="rounded px-1.5 py-0.5 text-[9px] font-medium text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-700"
+                          >
+                            Thu hồi
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteReply(msg.id)}
+                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-medium text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-700"
+                        >
+                          <Trash2 className="size-2.5" />
+                          Xóa
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
                   <div
                     className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed shadow-sm ${
                       isUser
                         ? "bg-slate-900 text-white rounded-tr-none"
                         : "bg-white border border-slate-200/80 text-slate-800 rounded-tl-none"
-                    }`}
+                    } ${msg.revoked ? "!text-slate-400" : ""}`}
                   >
                     {msg.text}
                   </div>
@@ -1120,6 +1373,11 @@ export default function UserSupportPage() {
               );
             })}
             <div ref={messagesEndRef} />
+            {isAdminTyping ? (
+              <div className="pointer-events-none absolute bottom-2 left-3 z-20 rounded-full bg-white px-2.5 py-1 text-left text-[11px] font-medium text-slate-500 shadow-md ring-1 ring-slate-200">
+                đang soạn tin...
+              </div>
+            ) : null}
           </div>
 
           {activeTicket?.status !== "Đã giải quyết" ? (

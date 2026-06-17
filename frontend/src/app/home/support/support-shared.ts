@@ -1,3 +1,6 @@
+import { API_BASE_URL } from "@/src/lib/config";
+import { getAreaToken } from "@/src/lib/home-api";
+
 export type TicketStatus = "Chưa xử lý" | "Đang xử lý" | "Đã giải quyết";
 export type Priority = "Cao" | "Trung bình" | "Thấp";
 
@@ -66,7 +69,19 @@ export type HomeSupportMessageRow = {
   reply_to?: { id: string; sender: "customer" | "staff"; content: string };
   reaction?: string;
   revoked?: boolean;
+  deleted_for_me?: boolean;
   created_at: string;
+};
+
+export type SupportSocketPayload = {
+  type?: "support_message_created" | "support_message_updated" | "support_error" | "support_typing";
+  ticket_id?: string;
+  ticket_code?: string;
+  message?: HomeSupportMessageRow;
+  error?: string;
+  sender_role?: "customer" | "staff";
+  is_typing?: boolean;
+  sender_id?: string;
 };
 
 export function mapHomeTicket(row: HomeSupportTicketRow): Ticket {
@@ -96,11 +111,18 @@ export function mapHomeMessages(row: HomeSupportTicketRow): SupportMessage[] {
     sender: message.sender_role,
     senderName: message.sender_name,
     avatar: message.sender_avatar,
-    content: message.content,
+    content: message.revoked ? "Tin nhắn đã được thu hồi" : message.content,
     imageUrl: message.image_url,
     fileAttachment: message.file_attachment,
     createdAt: message.created_at,
   }));
+}
+
+export function getSupportWsUrl(area: "admin" | "user") {
+  const token = getAreaToken(area);
+  if (!token) return "";
+  const wsBase = API_BASE_URL.replace(/^https:/, "wss:").replace(/^http:/, "ws:");
+  return `${wsBase}/api/home/ws/support-chat?token=${encodeURIComponent(token)}`;
 }
 
 export const statusColor: Record<TicketStatus, { text: string; bg: string }> = {
