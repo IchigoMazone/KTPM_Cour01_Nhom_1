@@ -3,7 +3,18 @@
 import { useState } from "react";
 import { TableHead } from "@/components/ui/table";
 
-export function ResizableTableHead({ children, className, width: initialWidth, autoWidth, ...props }: React.ComponentProps<"th"> & { width?: number | string; autoWidth?: boolean }) {
+export function ResizableTableHead({
+  children,
+  className,
+  width: initialWidth,
+  autoWidth,
+  onResize,
+  ...props
+}: React.ComponentProps<"th"> & {
+  width?: number | string;
+  autoWidth?: boolean;
+  onResize?: (width: number) => void;
+}) {
   const [resizedWidth, setResizedWidth] = useState<number | string | undefined>();
   const width = resizedWidth ?? initialWidth;
 
@@ -59,16 +70,21 @@ export function ResizableTableHead({ children, className, width: initialWidth, a
     document.body.removeChild(clone);
 
     const startWidth = thElement.getBoundingClientRect().width;
+    let currentWidth = startWidth;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const newWidth = startWidth + (moveEvent.pageX - startX);
-      setResizedWidth(Math.max(minW, Math.min(newWidth, maxW)));
+      currentWidth = Math.max(minW, Math.min(newWidth, maxW));
+      setResizedWidth(currentWidth);
     };
 
     const onMouseUp = () => {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
       document.body.style.cursor = "";
+      if (onResize) {
+        onResize(currentWidth);
+      }
     };
 
     document.addEventListener("mousemove", onMouseMove);

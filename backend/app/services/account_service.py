@@ -162,8 +162,10 @@ class AccountService:
                 email=email,
                 phone=data.get('phone'),
                 address=data.get('address'),
-                image_url="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+                image_url=None
             )
+
+            repository.link_customer_profile(user_id, email, data.get('phone'))
             
             self.connect.commit()
             return {
@@ -208,6 +210,9 @@ class AccountService:
                 "username": account[1],
                 "role": account[2],
                 "is_active": account[3],
+                "page_size": account[4],
+                "table_resize_mode": account[5],
+                "columns_config": account[6],
                 "profile": profile
             }
         finally:
@@ -241,7 +246,12 @@ class AccountService:
                 address=data.get("address", profile.get("address")),
                 special_notes=data.get("special_notes", profile.get("special_notes")),
                 image_url=data.get("image_url", profile.get("image_url")),
+                page_size=data.get("page_size"),
+                table_resize_mode=data.get("table_resize_mode"),
+                columns_config=data.get("columns_config"),
             )
+            if "image_url" in data:
+                repository.sync_customer_avatar_by_account(user_id, data.get("image_url"))
             self.connect.commit()
             return self.get_me(user_id)
         except Exception as e:

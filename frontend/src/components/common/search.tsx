@@ -1,23 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Bell,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Menu,
+  MessageCircle,
   PackagePlus,
-  PackageSearch,
   RotateCcw,
-  SearchIcon,
   X,
 } from "lucide-react";
 import { vi } from "date-fns/locale";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
@@ -33,9 +30,10 @@ import {
 } from "@/components/ui/popover";
 import MemoPopover from "./memo-popover";
 import NotificationsDialog from "./notifications-dialog";
-import { useDashboardSettingsStore } from "@/src/context/useDashboardSettingsStore";
+import { GlobalOrderCreateDialog } from "./global-order-create-dialog";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { useNavbarStore } from "@/src/context/useNavbarStore";
+import { homeApi } from "@/src/lib/home-api";
 import {
   createRange,
   DateRange,
@@ -49,16 +47,6 @@ import {
   startOfDay,
   addDays,
 } from "@/src/utils/dashboard-time";
-
-const dashboardCommands = [
-  { label: "Tạo đơn giặt mới", path: "/home/orders", meta: "Đơn hàng" },
-  { label: "Lịch giao nhận hôm nay", path: "/home/delivery", meta: "Giao nhận" },
-  { label: "Tìm khách hàng thân thiết", path: "/home/customers", meta: "Khách hàng" },
-  { label: "Cấu hình bảng giá", path: "/home/services", meta: "Dịch vụ" },
-  { label: "Mã giảm giá & loyalty", path: "/home/services", meta: "Ưu đãi" },
-  { label: "Kho vật tư sắp hết", path: "/home/staff", meta: "Vận hành" },
-  { label: "Ticket hỗ trợ", path: "/home/support", meta: "Hỗ trợ" },
-];
 
 const pageTitles: Record<string, string> = {
   "/home": "Tổng quan",
@@ -115,10 +103,10 @@ function DashboardTimeRangeControl() {
         <Button
           type="button"
           variant="ghost"
-          className="flex h-8 min-w-0 shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800"
+          className="flex h-8 min-w-[194px] shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800"
         >
           <CalendarDays className="size-4" />
-          <span className="hidden max-w-[150px] truncate sm:inline">
+          <span className="hidden whitespace-nowrap sm:inline">
             {rangeLabel}
           </span>
         </Button>
@@ -319,21 +307,51 @@ export default function Search() {
   const { toggle } = useNavbarStore();
   const router = useRouter();
   const pathname = usePathname();
-  const [query, setQuery] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const deliveryEnabled = useDashboardSettingsStore((state) => state.deliveryEnabled);
+  const [messagesOpen, setMessagesOpen] = useState(false);
+  const [createOrderOpen, setCreateOrderOpen] = useState(false);
+  const [messageCount, setMessageCount] = useState(0);
+  const [notificationCount, setNotificationCount] = useState(0);
 
-  const results = useMemo(() => {
-    const commands = dashboardCommands.filter(
-      (item) => deliveryEnabled || item.path !== "/home/delivery",
-    );
+  const loadMessageCount = useCallback(() => {
+    Promise.allSettled([
+      homeApi<Array<{ status?: string }>>("/support-tickets/full", { cache: "no-store" }),
+      homeApi<{ appointments?: unknown[] }>("/dashboard/overview", { cache: "no-store" }),
+    ]).then(([ticketResult, overviewResult]) => {
+      const openTickets = ticketResult.status === "fulfilled"
+        ? ticketResult.value.filter((ticket) => ticket.status !== "Đã giải quyết").length
+        : 0;
+      const appointments = overviewResult.status === "fulfilled"
+        ? overviewResult.value.appointments?.length || 0
+        : 0;
+      setMessageCount(openTickets);
+      setNotificationCount(openTickets + appointments);
+    });
+  }, []);
 
-    if (!query.trim()) return commands.slice(0, 5);
-    return commands.filter((item) =>
-      `${item.label} ${item.meta}`.toLowerCase().includes(query.toLowerCase()),
-    );
-  }, [deliveryEnabled, query]);
+  useEffect(() => {
+    loadMessageCount();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") loadMessageCount();
+    };
+    const handleRefreshEvents = () => {
+      loadMessageCount();
+    };
+    window.addEventListener("focus", loadMessageCount);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("orders:created", handleRefreshEvents);
+    window.addEventListener("booking-request:created", handleRefreshEvents);
+    window.addEventListener("booking-requests-changed", handleRefreshEvents);
+    window.addEventListener("home-orders-changed", handleRefreshEvents);
+    return () => {
+      window.removeEventListener("focus", loadMessageCount);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("orders:created", handleRefreshEvents);
+      window.removeEventListener("booking-request:created", handleRefreshEvents);
+      window.removeEventListener("booking-requests-changed", handleRefreshEvents);
+      window.removeEventListener("home-orders-changed", handleRefreshEvents);
+    };
+  }, [loadMessageCount]);
 
   const title = pageTitles[pathname] ?? "Dashboard";
   const openCreateOrder = () => {
@@ -341,8 +359,7 @@ export default function Search() {
       window.dispatchEvent(new Event("orders:create"));
       return;
     }
-
-    router.push("/home/orders?create=1");
+    setCreateOrderOpen(true);
   };
 
   return (
@@ -363,100 +380,30 @@ export default function Search() {
           <span className="text-slate-800 font-semibold">{title}</span>
         </div>
 
-        <div className="ml-auto shrink-0">
-          <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
-            <DialogTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                className="size-8 rounded-md border border-slate-200 bg-white text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800"
-                aria-label="Tìm kiếm"
-              >
-                <SearchIcon className="size-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent
-              showCloseButton={false}
-              className="max-w-[min(92vw,520px)] gap-0 overflow-hidden rounded-2xl border-gray-200 bg-white p-0 shadow-2xl sm:max-w-[520px]"
-            >
-              <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-                <div className="min-w-0">
-                  <DialogTitle className="text-base font-semibold">
-                    Tìm kiếm nhanh
-                  </DialogTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Tìm đơn hàng, khách hàng và thao tác quản trị
-                  </p>
-                </div>
-                <DialogClose asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-9 shrink-0 rounded-lg border border-transparent text-muted-foreground hover:border-gray-200 hover:bg-gray-100 hover:text-black"
-                    aria-label="Đóng tìm kiếm"
-                  >
-                    <X className="size-4" />
-                  </Button>
-                </DialogClose>
-              </div>
-
-              <div className="border-b bg-gray-50/60 p-4">
-                <div className="relative">
-                  <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    className="h-11 min-w-0 rounded-lg border-gray-200 bg-white pl-9 text-sm shadow-sm focus-visible:border-gray-300 focus-visible:ring-gray-300/40"
-                    placeholder="Tìm đơn, khách, giao nhận..."
-                    autoFocus
-                  />
-                </div>
-              </div>
-              <div className="border-b px-4 py-2 text-xs font-medium text-muted-foreground">
-                Gợi ý thao tác nhanh
-              </div>
-              <div className="max-h-72 overflow-y-auto p-2">
-                {results.length === 0 ? (
-                  <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                    Không tìm thấy thao tác phù hợp.
-                  </div>
-                ) : (
-                  results.map((item) => (
-                    <button
-                      key={`${item.path}-${item.label}`}
-                      type="button"
-                      className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition hover:bg-[#f3f3f3]"
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => {
-                        setQuery("");
-                        setSearchOpen(false);
-                        router.push(item.path);
-                      }}
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <PackageSearch className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="truncate">{item.label}</span>
-                      </span>
-                      <Badge variant="secondary" className="shrink-0 rounded-full bg-[#f3f3f3]">
-                        {item.meta}
-                      </Badge>
-                    </button>
-                  ))
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+        <div className="ml-auto" />
 
         <DashboardTimeRangeControl />
         <Button
           variant="ghost"
           className="hidden h-8 shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800 md:flex"
-          onClick={() => setNotificationsOpen(true)}
+          onClick={() => {
+            setNotificationsOpen(false);
+            setMessagesOpen(true);
+          }}
+        >
+          <MessageCircle className="size-4" />
+          <span>{messageCount}</span>
+        </Button>
+        <Button
+          variant="ghost"
+          className="hidden h-8 shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800 md:flex"
+          onClick={() => {
+            setMessagesOpen(false);
+            setNotificationsOpen(true);
+          }}
         >
           <Bell className="size-4" />
-          <span>5</span>
+          <span>{notificationCount}</span>
         </Button>
         <MemoPopover className="hidden h-8 shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800 lg:flex" />
         <Button
@@ -473,6 +420,13 @@ export default function Search() {
         open={notificationsOpen}
         onOpenChange={setNotificationsOpen}
       />
+      <NotificationsDialog
+        isUserArea={false}
+        mode="messages"
+        open={messagesOpen}
+        onOpenChange={setMessagesOpen}
+      />
+      <GlobalOrderCreateDialog open={createOrderOpen} onOpenChange={setCreateOrderOpen} />
     </>
   );
 }

@@ -90,26 +90,26 @@ type OtpRow = {
 };
 
 const seedTrips: Trip[] = [
-  { id: "CY-201", time: "08:30", type: "Lấy đồ", customer: "Nguyễn Thị Hương", address: "12 Trần Phú, Q.1", driver: "Anh Minh", status: "Đã lấy", note: "Ưu tiên đồ trắng", phone: "0903123456", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:30:00" },
-  { id: "CY-207", time: "08:50", type: "Trả đồ", customer: "Bùi Thị Nga", address: "22 Đinh Tiên Hoàng, Q.Bình Thạnh", driver: "Anh Tuấn", status: "Đã lấy", note: "Đồ len xử lý đặc biệt", phone: "0909888001", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:50:00" },
-  { id: "CY-202", time: "09:15", type: "Trả đồ", customer: "Trần Văn Minh", address: "90 Lý Thường Kiệt, Q.5", driver: "Chị Lan", status: "Đang giao", note: "Thu COD 240.000đ", phone: "0912456789", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 09:15:00" },
-  { id: "CY-208", time: "09:40", type: "Lấy đồ", customer: "Vũ Minh Khoa", address: "74 Nguyễn Trãi, Q.5", driver: "Anh Minh", status: "Đang giao", note: "Gọi điện khi đến cổng", phone: "0933400211", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 09:40:00" },
-  { id: "CY-203", time: "10:00", type: "Lấy đồ", customer: "Công ty ABC", address: "55 Pasteur, Q.1", driver: "Anh Tuấn", status: "Chờ lấy", note: "8 túi đồ giặt là sấy", phone: "0283812345", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 10:00:00" },
-  { id: "CY-205", time: "16:00", type: "Lấy đồ", customer: "Lê Văn Nam", address: "45 Lê Lợi, Q.1", driver: "Chị Lan", status: "Chờ lấy", note: "Lấy đồ vest cao cấp", phone: "0967111222", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 16:00:00" },
-  { id: "CY-204", time: "14:30", type: "Trả đồ", customer: "Phạm Thị Lan", address: "18 Nguyễn Du, Q.3", driver: "Anh Minh", status: "Chờ giao", note: "Gọi trước khi giao 30p", phone: "0938123456", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 14:30:00" },
-  { id: "CY-206", time: "17:30", type: "Trả đồ", customer: "Hoàng Thị Mai", address: "112 Cách Mạng Tháng 8, Q.3", driver: "Anh Tuấn", status: "Chờ giao", note: "Giao đồ lụa giặt riêng", phone: "0988333444", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 17:30:00" },
-  { id: "CY-209", time: "18:15", type: "Trả đồ", customer: "Dương Quốc Toản", address: "8 Trường Sa, Q.Phú Nhuận", driver: "Chị Lan", status: "Chờ giao", note: "Giao sau 18h", phone: "0977600123", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 18:15:00" },
+  { id: "CY-201", time: "08:30", type: "Lấy đồ", customer: "Nguyễn Thị Hương", address: "12 Trần Phú, Q.1", driver: "Anh Minh", status: "Đã lấy", note: "Ưu tiên đồ trắng", phone: "0903123456", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:30:00" },
+  { id: "CY-207", time: "08:50", type: "Trả đồ", customer: "Bùi Thị Nga", address: "22 Đinh Tiên Hoàng, Q.Bình Thạnh", driver: "Anh Tuấn", status: "Đã lấy", note: "Đồ len xử lý đặc biệt", phone: "0909888001", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:50:00" },
+  { id: "CY-202", time: "09:15", type: "Trả đồ", customer: "Trần Văn Minh", address: "90 Lý Thường Kiệt, Q.5", driver: "Chị Lan", status: "Đang giao", note: "Thu COD 240.000đ", phone: "0912456789", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 09:15:00" },
+  { id: "CY-208", time: "09:40", type: "Lấy đồ", customer: "Vũ Minh Khoa", address: "74 Nguyễn Trãi, Q.5", driver: "Anh Minh", status: "Đang giao", note: "Gọi điện khi đến cổng", phone: "0933400211", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 09:40:00" },
+  { id: "CY-203", time: "10:00", type: "Lấy đồ", customer: "Công ty ABC", address: "55 Pasteur, Q.1", driver: "Anh Tuấn", status: "Chờ lấy", note: "8 túi đồ giặt là sấy", phone: "0283812345", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 10:00:00" },
+  { id: "CY-205", time: "16:00", type: "Lấy đồ", customer: "Lê Văn Nam", address: "45 Lê Lợi, Q.1", driver: "Chị Lan", status: "Chờ lấy", note: "Lấy đồ vest cao cấp", phone: "0967111222", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 16:00:00" },
+  { id: "CY-204", time: "14:30", type: "Trả đồ", customer: "Phạm Thị Lan", address: "18 Nguyễn Du, Q.3", driver: "Anh Minh", status: "Chờ giao", note: "Gọi trước khi giao 30p", phone: "0938123456", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 14:30:00" },
+  { id: "CY-206", time: "17:30", type: "Trả đồ", customer: "Hoàng Thị Mai", address: "112 Cách Mạng Tháng 8, Q.3", driver: "Anh Tuấn", status: "Chờ giao", note: "Giao đồ lụa giặt riêng", phone: "0988333444", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 17:30:00" },
+  { id: "CY-209", time: "18:15", type: "Trả đồ", customer: "Dương Quốc Toản", address: "8 Trường Sa, Q.Phú Nhuận", driver: "Chị Lan", status: "Chờ giao", note: "Giao sau 18h", phone: "0977600123", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 18:15:00" },
 ];
 
 const seedDrivers: Driver[] = [
-  { id: "TX-301", name: "Anh Minh", phone: "0909555666", rating: "4.8/5", load: "3 lấy · 2 trả", status: "Đang giao", note: "Tuyến cố định Quận 1", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-304", name: "Anh Hùng", phone: "0901234567", rating: "4.6/5", load: "2 lấy · 2 trả", status: "Đang giao", note: "Chuyên tuyến Quận 7", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-302", name: "Chị Lan", phone: "0918777888", rating: "4.9/5", load: "1 lấy · 3 trả", status: "Rảnh 30 phút", note: "Phụ trách Quận 5 và Quận 3", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-305", name: "Chị Hoa", phone: "0927654321", rating: "4.8/5", load: "0 lấy · 1 trả", status: "Rảnh 30 phút", note: "Phụ trách Quận 2 & Thủ Đức", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-303", name: "Anh Tuấn", phone: "0934999000", rating: "4.7/5", load: "2 lấy · 1 trả", status: "Đang lấy", note: "Tuyến đường Quận 10", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-306", name: "Anh Long", phone: "0945112233", rating: "4.5/5", load: "1 lấy · 0 trả", status: "Đang lấy", note: "Tuyến Quận 6 & Bình Tân", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-307", name: "Chị Vân", phone: "0956001122", rating: "4.3/5", load: "0 lấy · 0 trả", status: "Nghỉ", note: "Nghỉ phép hôm nay", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
-  { id: "TX-308", name: "Anh Đức", phone: "0968002233", rating: "4.4/5", load: "0 lấy · 0 trả", status: "Nghỉ", note: "Ca tối chưa lên", avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
+  { id: "TX-301", name: "Anh Minh", phone: "0909555666", rating: "4.8/5", load: "3 lấy · 2 trả", status: "Đang giao", note: "Tuyến cố định Quận 1", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
+  { id: "TX-304", name: "Anh Hùng", phone: "0901234567", rating: "4.6/5", load: "2 lấy · 2 trả", status: "Đang giao", note: "Chuyên tuyến Quận 7", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
+  { id: "TX-302", name: "Chị Lan", phone: "0918777888", rating: "4.9/5", load: "1 lấy · 3 trả", status: "Rảnh 30 phút", note: "Phụ trách Quận 5 và Quận 3", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
+  { id: "TX-305", name: "Chị Hoa", phone: "0927654321", rating: "4.8/5", load: "0 lấy · 1 trả", status: "Rảnh 30 phút", note: "Phụ trách Quận 2 & Thủ Đức", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
+  { id: "TX-303", name: "Anh Tuấn", phone: "0934999000", rating: "4.7/5", load: "2 lấy · 1 trả", status: "Đang lấy", note: "Tuyến đường Quận 10", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
+  { id: "TX-306", name: "Anh Long", phone: "0945112233", rating: "4.5/5", load: "1 lấy · 0 trả", status: "Đang lấy", note: "Tuyến Quận 6 & Bình Tân", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
+  { id: "TX-307", name: "Chị Vân", phone: "0956001122", rating: "4.3/5", load: "0 lấy · 0 trả", status: "Nghỉ", note: "Nghỉ phép hôm nay", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
+  { id: "TX-308", name: "Anh Đức", phone: "0968002233", rating: "4.4/5", load: "0 lấy · 0 trả", status: "Nghỉ", note: "Ca tối chưa lên", avatar: "", createdAt: "05/06/2026, 08:00:00", updatedAt: "05/06/2026, 08:00:00" },
 ];
 
 const seedOtps = [
@@ -251,11 +251,11 @@ const driverFormFields: FormField[] = [
 export default function DeliveryDashboardPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("Chuyến đi");
-  const [trips, setTrips] = useState<Trip[]>(seedTrips);
-  const [drivers, setDrivers] = useState<Driver[]>(seedDrivers);
-  const [routePlans, setRoutePlans] = useState(seedRoutePlans);
-  const [otpsState, setOtpsState] = useState(seedOtps);
-  const [timeline] = useState(seedTimeline);
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [routePlans, setRoutePlans] = useState<RoutePlan[]>([]);
+  const [otpsState, setOtpsState] = useState<typeof seedOtps>([]);
+  const [timeline] = useState<typeof seedTimeline>([]);
 
   const [query, setQuery] = useState("");
   const [selectedTripStatus, setSelectedTripStatus] = useState<string>("Tất cả");
@@ -367,6 +367,11 @@ export default function DeliveryDashboardPage() {
     }
     return result;
   }, [otpsState, timeline]);
+
+  const completedTrips = trips.filter((trip) => trip.status === "Đã lấy").length;
+  const onTimeRate = trips.length > 0 ? Math.round((completedTrips / trips.length) * 100) : 0;
+  const activeDrivers = drivers.filter((driver) => driver.status !== "Nghỉ").length;
+  const optimizedRoutes = routePlans.filter((route) => route.status === "Đã tối ưu").length;
 
   const filteredOtpRows = useMemo(() => {
     return combinedOtpRows.filter((item) => {
@@ -681,7 +686,7 @@ export default function DeliveryDashboardPage() {
       setTrips((prev) => [
         {
           id: newId,
-          avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif",
+          avatar: "",
           ...payload,
           createdAt: new Date().toLocaleString("vi-VN"),
           updatedAt: new Date().toLocaleString("vi-VN"),
@@ -736,7 +741,7 @@ export default function DeliveryDashboardPage() {
       setDrivers((prev) => [
         {
           id: newId,
-          avatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif",
+          avatar: "",
           ...payload,
           createdAt: new Date().toLocaleString("vi-VN"),
           updatedAt: new Date().toLocaleString("vi-VN"),
@@ -1538,10 +1543,10 @@ export default function DeliveryDashboardPage() {
       {deliveryEnabled && (
         <>
           <div className="grid shrink-0 gap-3 md:grid-cols-4">
-            <MetricCard title="Chuyến hôm nay" value="18 chuyến" hint="9 chuyến lấy · 9 chuyến trả" icon={Truck} color="#2563eb" />
-            <MetricCard title="Đúng hẹn" value="92%" hint="2 chuyến có nguy cơ trễ" icon={Clock} color="#059669" />
-            <MetricCard title="Tài xế hoạt động" value="3/4 tài xế" hint="1 tài xế dự phòng ca sau" icon={Users} color="#7c3aed" />
-            <MetricCard title="Tối ưu lộ trình" value="Đã tối ưu" hint="Thuật toán giảm 18% độ lệch" icon={TrendingUp} color="#f59e0b" />
+            <MetricCard title="Chuyến hôm nay" value={`${trips.length} chuyến`} hint={`${trips.filter((trip) => trip.type === "Lấy đồ").length} chuyến lấy · ${trips.filter((trip) => trip.type === "Trả đồ").length} chuyến trả`} icon={Truck} color="#2563eb" />
+            <MetricCard title="Đúng hẹn" value={`${onTimeRate}%`} hint={trips.length > 0 ? `${trips.length - completedTrips} chuyến chưa hoàn tất` : "Chưa có dữ liệu chuyến"} icon={Clock} color="#059669" />
+            <MetricCard title="Tài xế hoạt động" value={`${activeDrivers}/${drivers.length} tài xế`} hint={drivers.length > 0 ? `${drivers.length - activeDrivers} tài xế nghỉ` : "Chưa có dữ liệu tài xế"} icon={Users} color="#7c3aed" />
+            <MetricCard title="Tối ưu lộ trình" value={`${optimizedRoutes}/${routePlans.length}`} hint={routePlans.length > 0 ? "Lộ trình đã tối ưu" : "Chưa có dữ liệu lộ trình"} icon={TrendingUp} color="#f59e0b" />
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">

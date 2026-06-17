@@ -30,9 +30,12 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { API_BASE_URL } from "@/src/lib/config";
+import AccountAvatar from "./account-avatar";
 import Dropdown from "../ui/dropdown";
 import { GradientText } from "../ui/gradient-text";
 import SidebarMobile from "./sidebar-mobile";
+import { ACCOUNT_PROFILE_UPDATED_EVENT, DEFAULT_ACCOUNT_AVATAR_URL } from "@/src/lib/account-profile";
 
 type NavItem = {
   label: string;
@@ -43,6 +46,12 @@ type NavItem = {
 type NavGroup = {
   label: string;
   items: NavItem[];
+};
+
+type LinkedCustomer = {
+  customer_code?: string | null;
+  full_name?: string | null;
+  image_url?: string | null;
 };
 
 const navGroups: NavGroup[] = [
@@ -112,7 +121,7 @@ export default function Header() {
   const [isSessionReady, setIsSessionReady] = useState(false);
   const [accountName, setAccountName] = useState("");
   const [accountRole, setAccountRole] = useState("");
-  const [accountImageUrl, setAccountImageUrl] = useState("https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
+  const [accountImageUrl, setAccountImageUrl] = useState(DEFAULT_ACCOUNT_AVATAR_URL);
 
   const isLoggedIn = Boolean(accountRole);
 
@@ -145,25 +154,61 @@ export default function Header() {
   }, [pathname, scrollToHash]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    const syncStoredAccount = () => {
       const token = localStorage.getItem("token");
       const role = localStorage.getItem("role");
 
       if (!token || !role) {
         setAccountName("");
         setAccountRole("");
-        setAccountImageUrl("https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
+        setAccountImageUrl(DEFAULT_ACCOUNT_AVATAR_URL);
         setIsSessionReady(true);
         return;
       }
 
       setAccountName(localStorage.getItem("accountName") || localStorage.getItem("username") || "Tài khoản");
       setAccountRole(role);
-      setAccountImageUrl(localStorage.getItem("accountImageUrl") || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
+      setAccountImageUrl(localStorage.getItem("accountImageUrl") || DEFAULT_ACCOUNT_AVATAR_URL);
       setIsSessionReady(true);
+    };
+
+    const timer = window.setTimeout(() => {
+      syncStoredAccount();
     }, 0);
 
-    return () => window.clearTimeout(timer);
+    window.addEventListener(ACCOUNT_PROFILE_UPDATED_EVENT, syncStoredAccount);
+    window.addEventListener("storage", syncStoredAccount);
+
+    const token = localStorage.getItem("token");
+    const role = localStorage.getItem("role");
+    if (token && role === "customer") {
+      fetch(`${API_BASE_URL}/api/home/my-customer`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store",
+      })
+        .then(async (response) => {
+          if (!response.ok) return null;
+          return response.json() as Promise<LinkedCustomer>;
+        })
+        .then((customer) => {
+          if (!customer) return;
+          const customerName = customer.full_name?.trim() || localStorage.getItem("accountName") || "Khách hàng";
+          const customerImage = customer.image_url || localStorage.getItem("accountImageUrl") || DEFAULT_ACCOUNT_AVATAR_URL;
+          setAccountName(customerName);
+          setAccountImageUrl(customerImage);
+          localStorage.setItem("accountName", customerName);
+          localStorage.setItem("accountImageUrl", customerImage);
+        })
+        .catch(() => undefined);
+    }
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener(ACCOUNT_PROFILE_UPDATED_EVENT, syncStoredAccount);
+      window.removeEventListener("storage", syncStoredAccount);
+    };
   }, [pathname]);
 
   const handleHashNav = useCallback(
@@ -268,11 +313,7 @@ export default function Header() {
                       type="button"
                       className="flex max-w-[170px] items-center gap-2 rounded-lg px-1.5 py-1 text-sm font-medium text-slate-800 transition-colors hover:text-blue-700 sm:max-w-[210px]"
                     >
-                      <img
-                        src={accountImageUrl}
-                        alt=""
-                        className="size-6 shrink-0 rounded-full object-cover"
-                      />
+                      <AccountAvatar name={accountName || "Tài khoản"} imageUrl={accountImageUrl} size={24} className="shrink-0 after:border-slate-200" />
                       <span className="truncate">{accountName}</span>
                     </button>
                   }
@@ -315,11 +356,7 @@ export default function Header() {
                     Bắt đầu
                   </Button>
                   <div className="flex max-w-[170px] items-center gap-2 rounded-lg px-1.5 py-1 text-sm font-medium text-slate-800 sm:max-w-[210px]">
-                    <img
-                      src={accountImageUrl}
-                      alt=""
-                      className="size-6 shrink-0 rounded-full object-cover"
-                    />
+                    <AccountAvatar name={accountName || "Tài khoản"} imageUrl={accountImageUrl} size={24} className="shrink-0 after:border-slate-200" />
                     <span className="truncate">{accountName}</span>
                   </div>
                 </>

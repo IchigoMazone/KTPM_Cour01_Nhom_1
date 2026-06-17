@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Image from "next/image";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { MetricCard } from "../_components/metric-card";
 import { Toolbar } from "../_components/toolbar";
 import { FilterBar } from "../_components/filter-bar";
@@ -10,36 +10,13 @@ import { KanbanView } from "../_components/kanban-view";
 import { ListView } from "../_components/list-view";
 import { FormDialog, type FormField } from "../_components/form-dialog";
 import { AddColumnDialog } from "../_components/add-column-dialog";
-import {
-  Search,
-  Star,
-  Plus,
-  ChevronDown,
-  Clock,
-  Download,
-  EyeOff,
-  FileDown,
-  FileSpreadsheet,
-  FileText,
-  FileType,
-  History,
-  Settings,
-  X,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CalendarDays, Clock, History, Mail, MapPin, Phone, Search, ShieldCheck, Sparkles, Star, UserRound } from "lucide-react";
+import { TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TableCell } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DeleteConfirmDialog } from "@/src/components/common/delete-confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -52,14 +29,12 @@ import {
   ViewModeTabs,
   type DashboardViewMode,
 } from "../_components/dashboard-primitives";
-import {
-  DashboardDataTable,
-  DashboardSelectionBar,
-  DashboardTableFooter,
-  type DashboardTableColumn,
-} from "@/src/components/common/dashboard-data-table";
+import { DashboardTableFooter, type DashboardTableColumn } from "@/src/components/common/dashboard-data-table";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
+import { homeApi, listHomeResource } from "@/src/lib/home-api";
+import { API_BASE_URL } from "@/src/lib/config";
+import { HomeTableContentSkeleton } from "@/src/components/common/auth-guard";
 
 type CustomerFields = {
   name: string;
@@ -72,16 +47,40 @@ type CustomerFields = {
   note: string;
   email: string;
   birthday: string;
+  imageUrl?: string;
+  accountId?: string;
+  accountUsername?: string;
+  accountActive?: boolean;
   createdAt?: string;
 };
 
 type Customer = CustomerFields & {
   id: string;
-  [key: string]: string | number | undefined;
+  [key: string]: string | number | boolean | undefined;
 };
 
 type ExportFormat = "pdf" | "excel" | "csv";
 type CustomerColumn = DashboardTableColumn;
+type HomeCustomerRow = {
+  customer_id: string;
+  customer_code: string;
+  full_name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  rank?: string;
+  total_orders?: number;
+  total_spent?: number;
+  loyalty_points?: number;
+  note?: string;
+  created_at?: string;
+  birthday?: string;
+  image_url?: string;
+  account_id?: string;
+  account_username?: string;
+  account_active?: boolean;
+  extra_fields?: Record<string, string>;
+};
 type SaveFilePickerWindow = Window & {
   showSaveFilePicker?: (options: {
     suggestedName?: string;
@@ -96,21 +95,6 @@ type SaveFilePickerWindow = Window & {
     }>;
   }>;
 };
-
-const seedCustomers: Customer[] = [
-  { id: "KH-101", name: "Nguyễn Thị Hương", phone: "0903123456", address: "12 Trần Phú, Q.1, TP.HCM", totalOrders: 28, totalSpend: 6800000, points: 2400, rank: "Vàng", note: "Dị ứng hóa chất mạnh", email: "huong.nguyen@example.com", birthday: "1995-08-12", createdAt: "2026-05-29" },
-  { id: "KH-102", name: "Trần Văn Minh", phone: "0912456789", address: "90 Lý Thường Kiệt, Q.5, TP.HCM", totalOrders: 17, totalSpend: 4200000, points: 1200, rank: "Bạc", note: "Giao sau 18h", email: "minh.tran@example.com", birthday: "1990-11-20", createdAt: "2026-05-22" },
-  { id: "KH-103", name: "Phạm Thị Lan", phone: "0938123456", address: "18 Nguyễn Du, Q.3, TP.HCM", totalOrders: 12, totalSpend: 2900000, points: 860, rank: "Thường", note: "Không dùng nước xả", email: "lan.pham@example.com", birthday: "1998-03-05", createdAt: "2026-05-15" },
-  { id: "KH-104", name: "Công ty ABC", phone: "0283812345", address: "55 Pasteur, Q.1, TP.HCM", totalOrders: 45, totalSpend: 18600000, points: 4800, rank: "Kim cương", note: "Xuất hóa đơn cuối tháng", email: "contact@abc.com", birthday: "2010-05-15", createdAt: "2026-05-10" },
-  { id: "KH-105", name: "Lê Văn Nam", phone: "0967111222", address: "45 Lê Lợi, Q.1, TP.HCM", totalOrders: 5, totalSpend: 1200000, points: 300, rank: "Thường", note: "Gọi trước khi giao 30p", email: "nam.le@example.com", birthday: "1993-04-22", createdAt: "2026-05-29" },
-  { id: "KH-106", name: "Hoàng Thị Mai", phone: "0988333444", address: "112 Cách Mạng Tháng 8, Q.3, TP.HCM", totalOrders: 20, totalSpend: 5400000, points: 1800, rank: "Vàng", note: "Giặt sấy nước ấm", email: "mai.hoang@example.com", birthday: "1987-12-01", createdAt: "2026-05-28" },
-  { id: "KH-107", name: "Đỗ Minh Khang", phone: "0909555666", address: "33 Nguyễn Thị Minh Khai, Q.1, TP.HCM", totalOrders: 8, totalSpend: 2100000, points: 600, rank: "Bạc", note: "Không lấy móc nhựa", email: "khang.do@example.com", birthday: "1996-09-18", createdAt: "2026-05-28" },
-  { id: "KH-108", name: "Phan Thanh Sơn", phone: "0918777888", address: "88 Điện Biên Phủ, Bình Thạnh, TP.HCM", totalOrders: 32, totalSpend: 9200000, points: 3100, rank: "Vàng", note: "Khách VIP, giặt hấp vest", email: "son.phan@example.com", birthday: "1982-07-14", createdAt: "2026-05-27" },
-  { id: "KH-109", name: "Vũ Thị Hồng", phone: "0934999000", address: "202 Võ Văn Tần, Q.3, TP.HCM", totalOrders: 14, totalSpend: 3100000, points: 950, rank: "Bạc", note: "Đồ em bé giặt riêng", email: "hong.vu@example.com", birthday: "1991-02-28", createdAt: "2026-05-26" },
-  { id: "KH-110", name: "Bùi Anh Tuấn", phone: "0977222333", address: "15 Trần Hưng Đạo, Q.5, TP.HCM", totalOrders: 6, totalSpend: 1550000, points: 450, rank: "Thường", note: "Chỉ nhận hàng buổi sáng", email: "tuan.bui@example.com", birthday: "1994-06-10", createdAt: "2026-05-25" },
-  { id: "KH-111", name: "Lâm Mỹ Dung", phone: "0902888999", address: "64 Đồng Khởi, Q.1, TP.HCM", totalOrders: 50, totalSpend: 22000000, points: 5500, rank: "Kim cương", note: "Đơn giặt là cao cấp", email: "dung.lam@example.com", birthday: "1989-10-05", createdAt: "2026-05-24" },
-  { id: "KH-112", name: "Ngô Quốc Bảo", phone: "0915666777", address: "123 Lê Hồng Phong, Q.10, TP.HCM", totalOrders: 11, totalSpend: 2450000, points: 700, rank: "Bạc", note: "Không dùng hóa chất tẩy mạnh", email: "bao.ngo@example.com", birthday: "1992-05-15", createdAt: "2026-05-20" }
-];
 
 const rankColor: Record<string, { text: string; bg: string }> = {
   "Kim cương": { text: "#db2777", bg: "rgba(219,39,119,0.08)" },
@@ -127,6 +111,7 @@ const rankDotColors = Object.fromEntries(
 
 const initialPageSize = 10;
 const defaultColumns: CustomerColumn[] = [
+  { id: "id", label: "Mã KH", width: 132, visible: true },
   { id: "name", label: "Tên khách hàng", width: 208, visible: true },
   { id: "email", label: "Email", width: 176, visible: true },
   { id: "phone", label: "Số điện thoại", width: 112, visible: true },
@@ -135,6 +120,7 @@ const defaultColumns: CustomerColumn[] = [
   { id: "totalSpend", label: "Chi tiêu", width: 112, visible: true },
   { id: "points", label: "Điểm", width: 76, visible: true },
   { id: "rank", label: "Hạng", width: 92, visible: true },
+  { id: "linkedAccount", label: "Liên kết tài khoản", width: 150, visible: true },
   { id: "birthday", label: "Ngày sinh", width: 92, visible: true },
   { id: "createdAt", label: "Ngày tạo tài khoản", width: 128, visible: true },
   { id: "note", label: "Ghi chú", width: 150, visible: true },
@@ -142,6 +128,75 @@ const defaultColumns: CustomerColumn[] = [
 ];
 const defaultColumnIdSet = new Set(defaultColumns.map((column) => column.id));
 const rankOptions = ["Kim cương", "Vàng", "Bạc", "Thường"];
+
+function normalizeCustomerColumns(columns: CustomerColumn[]) {
+  const existingIds = new Set(columns.map((column) => column.id));
+  const next = [...columns];
+  defaultColumns.forEach((column) => {
+    if (existingIds.has(column.id)) return;
+    if (column.id === "id") {
+      next.unshift(column);
+      return;
+    }
+    const noteIndex = next.findIndex((item) => item.id === "note");
+    const actionIndex = next.findIndex((item) => item.id === "actions");
+    const insertIndex = column.id === "linkedAccount"
+      ? Math.max(0, next.findIndex((item) => item.id === "birthday"))
+      : noteIndex !== -1 ? noteIndex : actionIndex !== -1 ? actionIndex : next.length;
+    next.splice(insertIndex === -1 ? next.length : insertIndex, 0, column);
+  });
+  return next;
+}
+
+function mapHomeCustomer(row: HomeCustomerRow): Customer {
+  return {
+    ...(row.extra_fields || {}),
+    id: row.customer_code || row.customer_id,
+    name: row.full_name,
+    phone: row.phone,
+    address: row.address || "",
+    totalOrders: Number(row.total_orders || 0),
+    totalSpend: Number(row.total_spent || 0),
+    points: Number(row.loyalty_points || 0),
+    rank: row.rank || "Thường",
+    note: row.note || "",
+    email: row.email || "",
+    birthday: row.birthday?.slice(0, 10) || "",
+    imageUrl: row.image_url || "",
+    accountId: row.account_id || "",
+    accountUsername: row.account_username || "",
+    accountActive: row.account_active,
+    createdAt: row.created_at?.slice(0, 10) || "",
+    dbId: row.customer_id,
+  };
+}
+
+const avatarColors = ["#0f766e", "#2563eb", "#7c3aed", "#be123c", "#c2410c", "#047857"];
+
+function getInitials(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  return `${words[0][0]}${words.length > 1 ? words[words.length - 1][0] : ""}`.toUpperCase();
+}
+
+function getAvatarColor(name: string) {
+  const hash = Array.from(name).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return avatarColors[hash % avatarColors.length];
+}
+
+function CustomerAvatar({ customer, size = 28 }: { customer: Customer; size?: number }) {
+  return (
+    <Avatar className="after:border-slate-200" style={{ width: size, height: size }}>
+      {customer.imageUrl ? <AvatarImage src={customer.imageUrl} alt={customer.name} /> : null}
+      <AvatarFallback
+        className="font-semibold leading-none text-white"
+        style={{ backgroundColor: getAvatarColor(customer.name), fontSize: Math.max(10, size * 0.34) }}
+      >
+        <span className="block translate-y-px leading-none">{getInitials(customer.name)}</span>
+      </AvatarFallback>
+    </Avatar>
+  );
+}
 
 const formatBirthday = (dateStr?: string) => {
   if (!dateStr) return "-";
@@ -165,13 +220,23 @@ const emptyForm = {
 };
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>(seedCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [isLayoutLoaded, setIsLayoutLoaded] = useState(false);
+  const accountColumnsConfigRef = useRef<Record<string, unknown>>({});
   const [query, setQuery] = useState("");
   const [selectedRank, setSelectedRank] = useState<string | "Tất cả">("Tất cả");
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer>(seedCustomers[0]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(initialPageSize);
-  const [columns, setColumns] = useState<CustomerColumn[]>(defaultColumns);
+  const [columns, setColumns] = useState<CustomerColumn[]>(() => {
+    if (typeof window === "undefined") return defaultColumns;
+    try {
+      const saved = JSON.parse(localStorage.getItem("home_customers_columns") || "");
+      return normalizeCustomerColumns(saved || defaultColumns);
+    } catch {
+      return defaultColumns;
+    }
+  });
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<DashboardViewMode>("Bảng");
   const [tableResizeMode, setTableResizeMode] = useState<"fit" | "custom">("fit");
@@ -187,14 +252,89 @@ export default function CustomersPage() {
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
+  const [profileCustomer, setProfileCustomer] = useState<Customer | null>(null);
   const [form, setForm] = useState<typeof emptyForm & Record<string, string>>(emptyForm);
+
+  useEffect(() => {
+    let alive = true;
+    listHomeResource<HomeCustomerRow>("customers", { limit: 500 })
+      .then((response) => {
+        if (!alive) return;
+        const apiCustomers = response.items.map(mapHomeCustomer);
+        setCustomers(apiCustomers);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setCustomers([]);
+      })
+      .finally(() => {
+        if (alive) setIsDataLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setIsLayoutLoaded(true);
+      return;
+    }
+    fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error("Failed to load customers layout");
+        return response.json();
+      })
+      .then((data) => {
+        if (!data?.columns_config) return;
+        const parsed = JSON.parse(data.columns_config) as Record<string, unknown>;
+        accountColumnsConfigRef.current = parsed;
+        const layout = (parsed.customersLayout || {}) as {
+          columns?: CustomerColumn[];
+          tableResizeMode?: "fit" | "custom";
+          pageSize?: number;
+        };
+        if (layout.columns) setColumns(normalizeCustomerColumns(layout.columns));
+        if (layout.tableResizeMode) setTableResizeMode(layout.tableResizeMode);
+        if (layout.pageSize) setPageSize(layout.pageSize);
+      })
+      .catch((error) => console.error("Error loading customers layout:", error))
+      .finally(() => setIsLayoutLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("home_customers_columns", JSON.stringify(columns));
+    if (!isLayoutLoaded) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const timeoutId = window.setTimeout(() => {
+      const nextConfig = {
+        ...accountColumnsConfigRef.current,
+        customersLayout: { columns, tableResizeMode, pageSize },
+      };
+      accountColumnsConfigRef.current = nextConfig;
+      fetch(`${API_BASE_URL}/api/auth/me`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ columns_config: JSON.stringify(nextConfig) }),
+      }).catch((error) => console.error("Error saving customers layout:", error));
+    }, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [columns, isLayoutLoaded, pageSize, tableResizeMode]);
 
   const customerFormFields = useMemo<FormField[]>(() => {
     const fieldByColumnId: Record<string, FormField> = {
-      name: { id: "name", label: "Họ tên", type: "text", placeholder: "Họ và tên" },
+      name: { id: "name", label: "Họ tên", type: "text", placeholder: "Họ và tên", required: true },
       phone: { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
       email: { id: "email", label: "Email", type: "text", placeholder: "khachhang@example.com" },
-      birthday: { id: "birthday", label: "Ngày sinh", type: "date" },
+      birthday: { id: "birthday", label: "Ngày sinh", type: "date", yearDropdown: true },
       address: { id: "address", label: "Địa chỉ mặc định", type: "text", placeholder: "Số nhà, tên đường, quận/huyện..." },
       rank: { id: "rank", label: "Hạng khách hàng", type: "select", options: rankOptions, placeholder: "Chọn hạng", optionDotColors: rankDotColors },
       points: { id: "points", label: "Điểm tích lũy", type: "number" },
@@ -204,8 +344,16 @@ export default function CustomersPage() {
       note: { id: "note", label: "Ghi chú đặc biệt", type: "textarea", placeholder: "Dị ứng hóa chất, giờ giao hàng yêu thích..." },
     };
 
-    return columns
-      .filter((column) => column.visible && column.id !== "actions")
+    const sortedColumns = columns.filter(
+      (column) => column.id !== "id" && column.id !== "actions" && column.id !== "linkedAccount",
+    );
+    const noteIndex = sortedColumns.findIndex((column) => column.id === "note");
+    if (noteIndex !== -1) {
+      const [noteColumn] = sortedColumns.splice(noteIndex, 1);
+      sortedColumns.push(noteColumn);
+    }
+
+    return sortedColumns
       .map((column) => {
         return fieldByColumnId[column.id] || {
           id: column.id,
@@ -223,14 +371,14 @@ export default function CustomersPage() {
 
   const filteredCustomers = useMemo(() => {
     return customers.filter((c) => {
-      const source = `${c.name} ${c.phone} ${c.address} ${c.email}`;
+      const source = `${c.name} ${c.phone} ${c.address} ${c.email} ${c.accountUsername || ""}`;
       const matchQuery = source.toLowerCase().includes(query.toLowerCase());
       const matchRank = selectedRank === "Tất cả" || c.rank === selectedRank;
       return matchQuery && matchRank;
     });
   }, [customers, query, selectedRank]);
 
-  const pageCount = Math.ceil(filteredCustomers.length / pageSize);
+  const pageCount = Math.max(1, Math.ceil(filteredCustomers.length / pageSize));
   const paginatedCustomers = filteredCustomers.slice((page - 1) * pageSize, page * pageSize);
   const totalSpend = filteredCustomers.reduce((sum, customer) => sum + customer.totalSpend, 0);
   const vipCustomers = filteredCustomers.filter((customer) => ["Vàng", "Kim cương"].includes(customer.rank)).length;
@@ -258,6 +406,10 @@ export default function CustomersPage() {
     kanbanCustomerIds.length > 0 && kanbanCustomerIds.every((id) => selectedCustomerIds.has(id));
   const selectedVisibleCustomerCount = visibleCustomerIds.filter((id) => selectedCustomerIds.has(id)).length;
   const selectedKanbanCustomerCount = kanbanCustomerIds.filter((id) => selectedCustomerIds.has(id)).length;
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
 
   const toggleVisibleCustomers = () => {
     setSelectedCustomerIds((prev) => {
@@ -335,7 +487,8 @@ export default function CustomersPage() {
     if (columnId === "totalSpend") return `${customer.totalSpend.toLocaleString("vi-VN")}đ`;
     if (columnId === "totalOrders") return `${customer.totalOrders} đơn`;
     if (columnId === "points") return customer.points.toLocaleString("vi-VN");
-    return value === undefined || value === null || value === "" ? "Chưa có" : String(value);
+    if (columnId === "linkedAccount") return customer.accountUsername || "Chưa liên kết";
+    return value === undefined || value === null || value === "" ? "-" : String(value);
   };
 
   const downloadBlob = async (
@@ -491,8 +644,10 @@ export default function CustomersPage() {
 
     setColumns((prev) => {
       const next = [...prev];
+      const noteIndex = next.findIndex((column) => column.id === "note");
       const actionIndex = next.findIndex((column) => column.id === "actions");
-      next.splice(actionIndex === -1 ? next.length : actionIndex, 0, newColumn);
+      const insertIndex = noteIndex !== -1 ? noteIndex : actionIndex !== -1 ? actionIndex : next.length;
+      next.splice(insertIndex, 0, newColumn);
       return next;
     });
     setForm((prev) => ({ ...prev, [newColumn.id]: "" }));
@@ -523,9 +678,8 @@ export default function CustomersPage() {
       if (draggedIndex === -1 || dropIndex === -1) return prev;
 
       const next = [...prev];
-      const temp = next[draggedIndex];
-      next[draggedIndex] = next[dropIndex];
-      next[dropIndex] = temp;
+      const [draggedColumn] = next.splice(draggedIndex, 1);
+      next.splice(dropIndex, 0, draggedColumn);
       return next;
     });
 
@@ -570,82 +724,124 @@ export default function CustomersPage() {
     setDeleteConfirmOpen(true);
   };
 
-  const confirmDeleteCustomer = () => {
+  const confirmDeleteCustomer = async () => {
     if (!deleteTarget) return;
-
-    setCustomers((prev) => prev.filter((c) => c.id !== deleteTarget.id));
-    setSelectedCustomerIds((prev) => {
-      const next = new Set(prev);
-      next.delete(deleteTarget.id);
-      return next;
-    });
-    if (selectedCustomer.id === deleteTarget.id) {
-      const remaining = customers.filter((c) => c.id !== deleteTarget.id);
-      if (remaining.length > 0) setSelectedCustomer(remaining[0]);
+    setIsDeletingCustomer(true);
+    try {
+      await homeApi(`/customers/${String(deleteTarget.dbId || deleteTarget.id)}`, { method: "DELETE" });
+      setCustomers((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+      setSelectedCustomerIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTarget.id);
+        return next;
+      });
+      setDeleteConfirmOpen(false);
+      setDeleteTarget(null);
+      setPage(1);
+      toast.success("Đã xóa khách hàng.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể xóa khách hàng.");
+    } finally {
+      setIsDeletingCustomer(false);
     }
-    setDeleteConfirmOpen(false);
-    setDeleteTarget(null);
-    setPage(1);
   };
 
-  const saveCustomer = () => {
-    if (!form.name.trim() || !form.phone.trim()) return;
-
-    const payload: CustomerFields & Record<string, string | number | undefined> = {
-      ...getCustomFields(form),
-      name: form.name,
-      phone: form.phone,
-      email: form.email || "khachhang@example.com",
-      birthday: form.birthday || new Date().toISOString().slice(0, 10),
-      address: form.address,
-      note: form.note || "Không có",
-      rank: form.rank,
-      points: Number(form.points) || 0,
-      totalOrders: Number(form.totalOrders) || 0,
-      totalSpend: Number(form.totalSpend) || 0,
-      createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
-    };
-
-    if (editingCustomerId) {
-      setCustomers((prev) =>
-        prev.map((c) =>
-          c.id === editingCustomerId ? { ...c, ...payload } : c
-        )
-      );
-      const updatedCustomer = { id: editingCustomerId, ...payload };
-      if (selectedCustomer.id === editingCustomerId) setSelectedCustomer(updatedCustomer);
-    } else {
-      const newId = `KH-${Date.now().toString().slice(-3)}`;
-      const newCustomer = { id: newId, ...payload };
-      setCustomers((prev) => [newCustomer, ...prev]);
-      setSelectedCustomer(newCustomer);
+  const saveCustomer = async () => {
+    if (!form.name.trim()) {
+      toast.error("Vui lòng nhập đầy đủ các trường bắt buộc.");
+      return;
     }
 
-    setPage(1);
-    setOpenForm(false);
+    const apiPayload = {
+      full_name: form.name.trim(),
+      phone: form.phone.trim() || null,
+      email: form.email || null,
+      birthday: form.birthday || null,
+      address: form.address,
+      note: form.note || null,
+      rank: form.rank,
+      loyalty_points: Number(form.points) || 0,
+      total_orders: Number(form.totalOrders) || 0,
+      total_spent: Number(form.totalSpend) || 0,
+      extra_fields: getCustomFields(form),
+    };
+
+    try {
+      const editingCustomer = customers.find((customer) => customer.id === editingCustomerId);
+      const savedRow = editingCustomer
+        ? await homeApi<HomeCustomerRow>(`/customers/${String(editingCustomer.dbId || editingCustomer.id)}`, {
+            method: "PUT",
+            body: JSON.stringify(apiPayload),
+          })
+        : await homeApi<HomeCustomerRow>("/customers", {
+            method: "POST",
+            body: JSON.stringify(apiPayload),
+          });
+      const savedCustomer = mapHomeCustomer(savedRow);
+      setCustomers((prev) =>
+        editingCustomer
+          ? prev.map((customer) => customer.id === editingCustomer.id ? savedCustomer : customer)
+          : [savedCustomer, ...prev],
+      );
+      setPage(1);
+      setOpenForm(false);
+      toast.success(editingCustomer ? "Đã cập nhật khách hàng." : "Đã thêm khách hàng.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể lưu khách hàng.");
+    }
+  };
+
+  const updateCustomerRank = async (customerId: string, rank: string) => {
+    const customer = customers.find((item) => item.id === customerId);
+    if (!customer || customer.rank === rank) return;
+    try {
+      const savedRow = await homeApi<HomeCustomerRow>(
+        `/customers/${String(customer.dbId || customer.id)}`,
+        { method: "PUT", body: JSON.stringify({ rank }) },
+      );
+      const savedCustomer = mapHomeCustomer(savedRow);
+      setCustomers((prev) => prev.map((item) => item.id === customerId ? savedCustomer : item));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể cập nhật hạng khách hàng.");
+    }
   };
 
   const renderCustomerCell = (customer: Customer, column: CustomerColumn) => {
-    if (column.id === "name") {
+    if (column.id === "id") {
       return (
-        <TableCell key={column.id} className="pl-4">
-          <div className="flex min-w-0 items-center gap-2">
+        <TableCell key={column.id} className="pl-4 font-medium text-slate-700">
+          <div className="flex items-center gap-2">
             <input
               type="checkbox"
               aria-label={`Chọn ${customer.name}`}
               checked={selectedCustomerIds.has(customer.id)}
               onChange={() => toggleCustomer(customer.id)}
               onClick={(event) => event.stopPropagation()}
-              className={checkboxClass}
+              className={`shrink-0 ${checkboxClass}`}
             />
-            <Image
-              src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
-              alt={customer.name}
-              width={28}
-              height={28}
-              className="size-6 shrink-0 rounded-full object-cover"
-            />
-            <span className="truncate font-medium text-slate-900">{customer.name}</span>
+            <span className="truncate">{customer.id}</span>
+          </div>
+        </TableCell>
+      );
+    }
+    if (column.id === "name") {
+      return (
+        <TableCell key={column.id} className="pl-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setProfileCustomer(customer);
+              }}
+              className="flex min-w-0 items-center gap-2 text-left cursor-pointer"
+              title="Xem hồ sơ khách hàng"
+            >
+              <CustomerAvatar customer={customer} size={24} />
+              <span className="truncate font-medium text-slate-900 transition-colors hover:text-emerald-700">
+                {customer.name}
+              </span>
+            </button>
           </div>
         </TableCell>
       );
@@ -653,8 +849,8 @@ export default function CustomersPage() {
 
     if (column.id === "email") {
       return (
-        <TableCell key={column.id} className="max-w-0 truncate overflow-hidden text-slate-500" title={customer.email}>
-          {customer.email}
+        <TableCell key={column.id} className="max-w-0 truncate overflow-hidden text-slate-500" title={customer.email || "-"}>
+          {customer.email || "-"}
         </TableCell>
       );
     }
@@ -671,8 +867,8 @@ export default function CustomersPage() {
 
     if (column.id === "address") {
       return (
-        <TableCell key={column.id} className="max-w-0 truncate overflow-hidden text-slate-600" title={customer.address}>
-          {customer.address}
+        <TableCell key={column.id} className="max-w-0 truncate overflow-hidden text-slate-600" title={customer.address || "-"}>
+          {customer.address || "-"}
         </TableCell>
       );
     }
@@ -709,6 +905,25 @@ export default function CustomersPage() {
       );
     }
 
+    if (column.id === "linkedAccount") {
+      const linked = Boolean(customer.accountId);
+      return (
+        <TableCell key={column.id}>
+          <span
+            className={`inline-flex max-w-full items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-xs font-medium ${
+              linked
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-slate-200 bg-slate-50 text-slate-500"
+            }`}
+            title={linked ? `Tài khoản: ${customer.accountUsername || customer.accountId}` : "Khách hàng chưa có tài khoản đăng nhập"}
+          >
+            <span className={`size-1.5 shrink-0 rounded-full ${linked ? "bg-emerald-500" : "bg-slate-400"}`} />
+            <span className="truncate">{linked ? customer.accountUsername || "Đã liên kết" : "Chưa liên kết"}</span>
+          </span>
+        </TableCell>
+      );
+    }
+
     if (column.id === "birthday") {
       return <TableCell key={column.id} className="text-slate-500">{formatBirthday(customer.birthday)}</TableCell>;
     }
@@ -739,7 +954,7 @@ export default function CustomersPage() {
           </button>
           <button
             type="button"
-            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
+            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:border-red-100 hover:bg-red-50 hover:text-red-600"
             onClick={(event) => requestDeleteCustomer(customer, event)}
             title="Xóa"
           >
@@ -751,12 +966,13 @@ export default function CustomersPage() {
     }
 
     const customValue = customer[column.id];
-    const displayValue = customValue ? String(customValue) : "Chưa có";
+    const hasCustomValue = customValue !== undefined && customValue !== null && customValue !== "";
+    const displayValue = hasCustomValue ? String(customValue) : "-";
 
     return (
       <TableCell
         key={column.id}
-        className={`max-w-0 truncate overflow-hidden ${customValue ? "text-slate-600" : "text-slate-400 italic"}`}
+        className={`max-w-0 truncate overflow-hidden ${hasCustomValue ? "text-slate-600" : "text-slate-400 italic"}`}
         title={displayValue}
       >
         {displayValue}
@@ -810,21 +1026,25 @@ export default function CustomersPage() {
               onChange={() => toggleCustomer(customer.id)}
               className={`shrink-0 ${checkboxClass}`}
             />
-            <Image
-              src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
-              alt={customer.name}
-              width={32}
-              height={32}
-              className="size-8 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
-            />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-slate-700">{customer.name}</p>
+            <button
+              type="button"
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                setProfileCustomer(customer);
+              }}
+              className="flex min-w-0 items-center gap-2 text-left cursor-pointer"
+            >
+              <CustomerAvatar customer={customer} size={32} />
+              <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-slate-700 hover:text-emerald-700">{customer.name}</p>
               <p className="truncate text-[11px] text-slate-400">{customer.phone}</p>
-            </div>
+              </div>
+            </button>
           </div>
           <span className="shrink-0 text-[11px] font-semibold text-slate-400">{customer.id}</span>
         </div>
-        <p className="mt-2 truncate text-xs text-slate-500">{customer.email}</p>
+        <p className="mt-2 truncate text-xs text-slate-500">{customer.email || "-"}</p>
         <p className="mt-1 truncate text-xs text-slate-500">{customer.totalOrders} đơn · {customer.points.toLocaleString("vi-VN")} điểm</p>
         <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2">
           <span className="truncate text-[11px] text-slate-500">{formatBirthday(customer.birthday)}</span>
@@ -833,7 +1053,7 @@ export default function CustomersPage() {
         <div className="mt-2 flex justify-end">
           <button
             type="button"
-            onClick={() => openEditForm(customer)}
+            onClick={() => setProfileCustomer(customer)}
             className="inline-flex h-6 items-center rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200"
           >
             Chi tiết
@@ -855,16 +1075,16 @@ export default function CustomersPage() {
               onChange={() => toggleCustomer(customer.id)}
               className={`mt-1 shrink-0 ${checkboxClass}`}
             />
-            <Image
-              src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
-              alt={customer.name}
-              width={40}
-              height={40}
-              className="size-10 shrink-0 rounded-full object-cover"
-            />
+            <CustomerAvatar customer={customer} size={40} />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-semibold text-slate-950">{customer.name}</p>
+                <button
+                  type="button"
+                  onClick={() => setProfileCustomer(customer)}
+                  className="font-semibold text-slate-950 transition-colors hover:text-emerald-700 cursor-pointer"
+                >
+                  {customer.name}
+                </button>
                 <span className="text-xs font-medium text-slate-400">{customer.id}</span>
                 <span
                   className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium"
@@ -876,13 +1096,23 @@ export default function CustomersPage() {
                   <span className="size-1.5 rounded-full" style={{ backgroundColor: rankColor[customer.rank]?.text || "#475569" }} />
                   {customer.rank}
                 </span>
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-xs font-medium ${
+                    customer.accountId
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 bg-slate-50 text-slate-500"
+                  }`}
+                >
+                  <span className={`size-1.5 rounded-full ${customer.accountId ? "bg-emerald-500" : "bg-slate-400"}`} />
+                  {customer.accountId ? customer.accountUsername || "Đã liên kết" : "Chưa liên kết"}
+                </span>
               </div>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                 <span>{customer.phone}</span>
-                <span>{customer.email}</span>
+                <span>{customer.email || "-"}</span>
                 <span>{customer.totalOrders} đơn · {customer.points.toLocaleString("vi-VN")} điểm</span>
               </div>
-              <p className="mt-2 line-clamp-2 text-xs text-slate-400">{customer.address}</p>
+              <p className="mt-2 line-clamp-2 text-xs text-slate-400">{customer.address || "-"}</p>
             </div>
           </div>
 
@@ -909,6 +1139,10 @@ export default function CustomersPage() {
       </div>
     );
   };
+
+  if (isDataLoading) {
+    return <HomeTableContentSkeleton />;
+  }
 
   return (
     <PageShell fullHeight>
@@ -955,7 +1189,11 @@ export default function CustomersPage() {
             onToggleAll={viewMode === "Bảng kéo" ? toggleKanbanCustomers : toggleVisibleCustomers}
           />
 
-          {viewMode === "Bảng" ? (
+          {filteredCustomers.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center p-8 text-center">
+              <p className="text-sm text-slate-400">Không tìm thấy khách hàng nào phù hợp.</p>
+            </div>
+          ) : viewMode === "Bảng" ? (
             <TableView
               columns={columns}
               rows={paginatedCustomers}
@@ -993,23 +1231,146 @@ export default function CustomersPage() {
               onDraggedItemIdChange={setDraggedCustomerId}
               dragOverColumnId={dragOverRank}
               onDragOverColumnIdChange={setDragOverRank}
-              onDropItem={(customerId, rank) => {
-                setCustomers((prev) =>
-                  prev.map((c) => (c.id === customerId ? { ...c, rank } : c)),
-                );
-              }}
+              onDropItem={updateCustomerRank}
               renderCard={renderCustomerKanbanCard}
               tableResizeMode={tableResizeMode}
             />
           ) : (
-            <ListView
-              paginatedRows={paginatedCustomers}
-              emptyMessage="Không tìm thấy khách hàng phù hợp."
-              renderRow={renderCustomerListRow}
-            />
+            <div className="flex min-h-0 flex-1 flex-col">
+              <ListView
+                paginatedRows={paginatedCustomers}
+                emptyMessage="Không tìm thấy khách hàng phù hợp."
+                renderRow={renderCustomerListRow}
+              />
+              <DashboardTableFooter
+                page={page}
+                pageCount={pageCount}
+                pageSize={pageSize}
+                totalRows={filteredCustomers.length}
+                customPageSize={customPageSize}
+                openPageSizeMenu={openPageSizeMenu}
+                onOpenPageSizeMenuChange={setOpenPageSizeMenu}
+                onCustomPageSizeChange={setCustomPageSize}
+                onApplyCustomPageSize={applyCustomPageSize}
+                onUpdatePageSize={updatePageSize}
+                onPageChange={setPage}
+              />
+            </div>
           )}
         </div>
       </div>
+
+      <Dialog open={Boolean(profileCustomer)} onOpenChange={(open) => {
+        if (!open) setProfileCustomer(null);
+      }}>
+        <DialogContent
+          showCloseButton={false}
+          className="flex h-[min(86vh,680px)] w-[min(86vw,680px)] max-w-[min(86vw,680px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[680px]"
+        >
+          {profileCustomer && (
+            <>
+              <DialogHeader className="border-b border-slate-200 px-6 py-3">
+                <div className="flex items-center gap-3">
+                  <CustomerAvatar customer={profileCustomer} size={40} />
+                  <div className="min-w-0">
+                    <DialogTitle className="truncate text-base font-semibold leading-6 text-slate-950">
+                      {profileCustomer.name}
+                    </DialogTitle>
+                    <p className="text-sm text-slate-500">Khách hàng · {profileCustomer.id}</p>
+                    <p className="mt-1 text-xs text-slate-400">{profileCustomer.rank}</p>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="min-h-0 flex-1 p-5">
+                <div className="grid gap-3 md:grid-cols-2">
+                  {[
+                    [UserRound, "Họ tên", profileCustomer.name],
+                    [ShieldCheck, "Tên đăng nhập", profileCustomer.accountUsername || "Chưa liên kết"],
+                    [Mail, "Email", profileCustomer.email || "-"],
+                    [Phone, "Số điện thoại", profileCustomer.phone || "-"],
+                    [CalendarDays, "Ngày sinh", formatBirthday(profileCustomer.birthday)],
+                    [Sparkles, "Điểm / hạng", `${profileCustomer.points.toLocaleString("vi-VN")} điểm · ${profileCustomer.rank}`],
+                  ].map(([Icon, label, value]) => {
+                    const FieldIcon = Icon as typeof UserRound;
+                    return (
+                      <div key={String(label)} className="space-y-2">
+                        <Label>{String(label)}</Label>
+                        <div className="relative">
+                          <FieldIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                          <Input
+                            value={String(value)}
+                            disabled
+                            className="h-8 rounded-lg border-input bg-slate-50 px-2.5 py-1 pl-8 text-sm text-slate-500 shadow-none"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Địa chỉ mặc định</Label>
+                    <div className="relative">
+                      <MapPin className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        value={profileCustomer.address || "-"}
+                        disabled
+                        className="h-8 rounded-lg border-input bg-slate-50 px-2.5 py-1 pl-8 text-sm text-slate-500 shadow-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Ghi chú</Label>
+                    <Textarea
+                      value={profileCustomer.note || "-"}
+                      disabled
+                      className="h-16 min-h-16 resize-none rounded-lg border-input bg-slate-50 px-2.5 py-2 text-sm text-slate-500 shadow-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+                  <p className="text-sm font-medium text-slate-950">Trạng thái tài khoản</p>
+                  <div className="mt-3 grid gap-2 md:grid-cols-3">
+                    {[
+                      profileCustomer.accountId ? "Đã liên kết" : "Chưa liên kết",
+                      `${profileCustomer.totalOrders.toLocaleString("vi-VN")} đơn hàng`,
+                      `${profileCustomer.totalSpend.toLocaleString("vi-VN")}đ chi tiêu`,
+                    ].map((item) => (
+                      <div
+                        key={item}
+                        className="flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700"
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="m-0 flex-row justify-end gap-2 border-t border-slate-200 bg-white px-6 py-3">
+                <button
+                  type="button"
+                  className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-none hover:bg-slate-50 cursor-pointer"
+                  onClick={() => setProfileCustomer(null)}
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex h-8 items-center justify-center rounded-lg bg-slate-900 px-3 text-sm font-semibold text-white shadow-none hover:bg-slate-800 cursor-pointer"
+                  onClick={() => {
+                    const customer = profileCustomer;
+                    setProfileCustomer(null);
+                    openEditForm(customer);
+                  }}
+                >
+                  Chỉnh sửa
+                </button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <FormDialog
         open={openForm}
@@ -1032,35 +1393,18 @@ export default function CustomersPage() {
         onAddColumn={addCustomColumn}
       />
 
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent showCloseButton={false} className="rounded-xl border border-slate-200 bg-white p-6 shadow-xl sm:max-w-[400px]">
-          <DialogHeader className="border-b border-slate-100 pb-3">
-            <DialogTitle className="text-base font-semibold text-slate-900">Xác nhận xóa</DialogTitle>
-          </DialogHeader>
-          <div className="py-5 text-sm leading-6 text-slate-600">
-            Bạn có chắc chắn muốn xóa khách hàng {deleteTarget ? `"${deleteTarget.name}"` : "này"} không? Hành động này không thể hoàn tác.
-          </div>
-          <DialogFooter className="flex flex-row items-center justify-end gap-2 border-t border-slate-100 pt-3">
-            <button
-              type="button"
-              className="inline-flex h-9 w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
-              onClick={() => {
-                setDeleteConfirmOpen(false);
-                setDeleteTarget(null);
-              }}
-            >
-              Hủy
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-9 w-full items-center justify-center rounded-lg bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
-              onClick={confirmDeleteCustomer}
-            >
-              Xác nhận xóa
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={(open) => {
+          setDeleteConfirmOpen(open);
+          if (!open && !isDeletingCustomer) setDeleteTarget(null);
+        }}
+        onConfirm={confirmDeleteCustomer}
+        isLoading={isDeletingCustomer}
+      >
+        Bạn có chắc chắn muốn xóa khách hàng {deleteTarget ? `"${deleteTarget.name}"` : "này"} không?
+        Hành động này không thể hoàn tác.
+      </DeleteConfirmDialog>
 
     </PageShell>
   );

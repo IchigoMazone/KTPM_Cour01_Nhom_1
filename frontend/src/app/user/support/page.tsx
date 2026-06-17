@@ -1,23 +1,49 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
-import { MessageSquare, Phone, Send, ShieldCheck, TicketCheck, HelpCircle, ArrowUpRight, RotateCcw, X, Info } from "lucide-react";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
+import { CalendarDays, Mail, MapPin, MessageSquare, Phone, Send, ShieldCheck, Sparkles, TicketCheck, HelpCircle, RotateCcw, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { TableCell } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { PageShell } from "@/src/app/home/_components/dashboard-primitives";
+import { MetricCard } from "@/src/app/home/_components/metric-card";
 import { Toolbar } from "@/src/app/home/_components/toolbar";
 import { FilterBar, type FilterOption } from "@/src/app/home/_components/filter-bar";
 import { TableView } from "@/src/app/home/_components/table-view";
+import { FormDialog, type FormField } from "@/src/app/home/_components/form-dialog";
 import type { DashboardTableColumn } from "@/src/components/common/dashboard-data-table";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
-import { initialOrders } from "@/src/app/user/orders/data";
+import { homeApi } from "@/src/lib/home-api";
+import { API_BASE_URL } from "@/src/lib/config";
+import type { HomeSupportTicketRow } from "@/src/app/home/support/support-shared";
+
+type UserSupportTicketRow = HomeSupportTicketRow & {
+  customer_image_url?: string;
+};
+
+type SupportCustomer = {
+  customer_id?: string;
+  customer_code: string;
+  full_name: string;
+  phone?: string;
+  address?: string;
+  email?: string;
+  birthday?: string;
+  image_url?: string;
+  rank?: string;
+  loyalty_points?: number;
+  total_orders?: number;
+  total_spent?: number;
+  note?: string;
+  account_id?: string;
+  account_username?: string;
+};
 
 interface ChatMessage {
   sender: "user" | "cskh";
@@ -27,40 +53,85 @@ interface ChatMessage {
 
 interface Ticket {
   id: string;
+  dbId?: string;
+  customerCode: string;
+  customerName: string;
+  customerPhone: string;
+  customerImageUrl?: string;
+  assignedName?: string;
+  assignedAvatar?: string;
   topic: string;
   orderCode: string;
+  priority: string;
+  washDate: string;
+  note: string;
   time: string;
-  status: "Đang xử lý" | "Đã phản hồi" | "Đã đóng";
+  status: "Chưa xử lý" | "Đang xử lý" | "Đã giải quyết";
   type: string;
   messages: ChatMessage[];
 }
 
-const initialTickets: Ticket[] = [
-  {
-    id: "HT-309",
-    topic: "Giao trễ đơn hàng DH-1048",
-    orderCode: "DH-1048",
-    time: "08/06/2026 09:20",
-    status: "Đang xử lý",
-    type: "delivery",
-    messages: [
-      { sender: "user", text: "Chào shop, đơn DH-1048 hẹn giao sáng nay nhưng giờ vẫn chưa thấy shipper gọi điện.", time: "08/06/2026 09:20" },
-      { sender: "cskh", text: "Dạ BegauShop xin chào chị Hương! Shop đã nhận được yêu cầu và đang liên hệ điều phối tài xế giao hàng. Shop sẽ báo lại chị ngay khi có thông tin ạ.", time: "08/06/2026 09:25" }
-    ]
-  },
-  {
-    id: "HT-288",
-    topic: "Cập nhật lại địa chỉ giao nhận",
-    orderCode: "DH-1039",
-    time: "05/06/2026 15:40",
-    status: "Đã phản hồi",
-    type: "order",
-    messages: [
-      { sender: "user", text: "Mình muốn đổi địa chỉ nhận đồ đơn DH-1039 sang số 15 Lê Lợi nhé shop.", time: "05/06/2026 15:40" },
-      { sender: "cskh", text: "Dạ BegauShop đã cập nhật địa chỉ giao của đơn DH-1039 sang 15 Lê Lợi thành công rồi ạ! Shipper sẽ giao theo địa chỉ mới này nha chị.", time: "05/06/2026 15:45" }
-    ]
-  },
-];
+const avatarColors = ["#0f766e", "#2563eb", "#7c3aed", "#db2777", "#d97706", "#dc2626"];
+
+function getInitials(name: string) {
+  return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "KH";
+}
+
+function getAvatarColor(name: string) {
+  const hash = Array.from(name || "KH").reduce((total, char) => total + char.charCodeAt(0), 0);
+  return avatarColors[hash % avatarColors.length];
+}
+
+function formatTicketTime(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function parseTicketDate(value: string) {
+  const [datePart = ""] = value.replace(",", "").split(/\s+/);
+  const [day, month, year] = datePart.split("/").map(Number);
+  const ticketDate = new Date(year, month - 1, day);
+  return Number.isNaN(ticketDate.getTime()) ? null : ticketDate;
+}
+
+function formatReadableDate(dateStr?: string) {
+  if (!dateStr) return "-";
+  const value = dateStr.slice(0, 10);
+  if (value.includes("/")) return value;
+  const [y, m, d] = value.split("-");
+  if (!y || !m || !d) return value;
+  return `${d}/${m}/${y}`;
+}
+
+function mapUserTicket(row: UserSupportTicketRow): Ticket {
+  const messages = (row.messages || []).map((message) => ({
+    sender: message.sender_role === "customer" ? "user" as const : "cskh" as const,
+    text: message.content,
+    time: formatTicketTime(message.created_at),
+  }));
+  return {
+    id: row.ticket_code,
+    dbId: row.ticket_id,
+    customerCode: row.customer_code || "-",
+    customerName: row.customer_name || "Khách hàng",
+    customerPhone: row.customer_phone || "",
+    customerImageUrl: row.customer_image_url || "",
+    assignedName: row.assigned_name || "Người phụ trách",
+    assignedAvatar: row.assigned_avatar || "",
+    topic: row.subject,
+    orderCode: row.order_code || "Không có",
+    priority: row.priority || "Trung bình",
+    washDate: row.wash_date?.slice(0, 10) || "",
+    note: row.note || row.subject || "",
+    time: formatTicketTime(row.created_at),
+    status: row.status || "Chưa xử lý",
+    type: row.type,
+    messages,
+  };
+}
 
 const faqs = [
   { q: "Tôi có thể đổi lịch lấy đồ sau khi đặt không?", a: "Có thể đổi lịch trước giờ lấy đồ tối thiểu 2 tiếng qua mục Đặt lịch của tôi hoặc gọi trực tiếp tổng đài CSKH." },
@@ -70,108 +141,204 @@ const faqs = [
 ];
 
 const defaultColumns: DashboardTableColumn[] = [
-  { id: "id", label: "Mã yêu cầu", width: 120, visible: true },
-  { id: "topic", label: "Tiêu đề yêu cầu", width: 220, visible: true },
-  { id: "orderCode", label: "Đơn liên quan", width: 140, visible: true },
-  { id: "time", label: "Thời gian tạo", width: 150, visible: true },
+  { id: "id", label: "Mã", width: 120, visible: true },
+  { id: "customerCode", label: "Mã KH", width: 120, visible: true },
+  { id: "type", label: "Loại", width: 130, visible: true },
+  { id: "customerName", label: "Khách hàng", width: 170, visible: true },
+  { id: "customerPhone", label: "SĐT", width: 130, visible: true },
+  { id: "orderCode", label: "Đơn", width: 130, visible: true },
+  { id: "priority", label: "Ưu tiên", width: 120, visible: true },
   { id: "status", label: "Trạng thái", width: 130, visible: true },
+  { id: "washDate", label: "Ngày giặt", width: 120, visible: true },
+  { id: "time", label: "Ngày tạo", width: 150, visible: true },
+  { id: "note", label: "Ghi chú", width: 240, visible: true },
   { id: "actions", label: "Thao tác", width: 150, visible: true },
 ];
 
+function mergeDefaultColumns(savedColumns?: DashboardTableColumn[]) {
+  if (!Array.isArray(savedColumns) || savedColumns.length === 0) return defaultColumns;
+  const defaultById = new Map(defaultColumns.map((column) => [column.id, column]));
+  const merged = savedColumns
+    .filter((column) => defaultById.has(column.id))
+    .map((column) => ({ ...defaultById.get(column.id), ...column }));
+  defaultColumns.forEach((column) => {
+    if (!merged.some((item) => item.id === column.id)) {
+      merged.push(column);
+    }
+  });
+  return merged;
+}
+
+type UserSupportLayout = {
+  columns?: DashboardTableColumn[];
+  tableResizeMode?: "fit" | "custom";
+  pageSize?: number;
+};
+
+function loadSavedSupportLayout(): UserSupportLayout {
+  if (typeof window === "undefined") return {};
+  try {
+    const layout = JSON.parse(localStorage.getItem("user_support_layout") || "{}") as UserSupportLayout;
+    if (layout.columns) return layout;
+  } catch {
+    // Fall back to the legacy columns key below.
+  }
+  try {
+    const columns = JSON.parse(localStorage.getItem("user_support_columns") || "");
+    return { columns } as { columns?: DashboardTableColumn[] };
+  } catch {
+    return {};
+  }
+}
+
 const statusOptions: FilterOption[] = [
   { id: "Tất cả", label: "Tất cả", color: "#64748b", bgColor: "rgba(100,116,139,0.09)" },
+  { id: "Chưa xử lý", label: "Chưa xử lý", color: "#2563eb", bgColor: "rgba(37,99,235,0.09)" },
   { id: "Đang xử lý", label: "Đang xử lý", color: "#f59e0b", bgColor: "rgba(245,158,11,0.08)" },
-  { id: "Đã phản hồi", label: "Đã phản hồi", color: "#10b981", bgColor: "rgba(16,185,129,0.08)" },
-  { id: "Đã đóng", label: "Đã đóng", color: "#64748b", bgColor: "rgba(100,116,139,0.09)" },
+  { id: "Đã giải quyết", label: "Đã giải quyết", color: "#10b981", bgColor: "rgba(16,185,129,0.08)" },
 ];
 
 const checkboxClass =
   "relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all checked:border-emerald-300 checked:bg-emerald-300 after:absolute after:left-1/2 after:top-1/2 after:hidden after:h-[9px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-[58%] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block";
 
 const statusStyle: Record<string, { color: string; bg: string }> = {
+  "Chưa xử lý": { color: "#2563eb", bg: "rgba(37,99,235,0.09)" },
   "Đang xử lý": { color: "#f59e0b", bg: "rgba(245,158,11,0.08)" },
-  "Đã phản hồi": { color: "#10b981", bg: "rgba(16,185,129,0.08)" },
-  "Đã đóng": { color: "#64748b", bg: "rgba(100,116,139,0.09)" },
+  "Đã giải quyết": { color: "#10b981", bg: "rgba(16,185,129,0.08)" },
 };
 
-function KpiCard({
-  title,
-  value,
-  hint,
-  change,
-  icon: Icon,
-  color,
-  onClick,
-}: {
-  title: string;
-  value: string;
-  hint: string;
-  change: string;
-  icon: any;
-  color: string;
-  onClick?: () => void;
-}) {
-  return (
-    <div
-      onClick={onClick}
-      className={`rounded-lg border border-slate-200 bg-white p-3 ${
-        onClick ? "cursor-pointer transition-all hover:bg-slate-50 active:scale-[0.98]" : ""
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="grid size-7 place-items-center rounded-lg" style={{ color, backgroundColor: `${color}14` }}>
-            <Icon className="size-3.5" />
-          </span>
-          <p className="text-xs font-semibold text-slate-900">{title}</p>
-        </div>
-        <ArrowUpRight className="size-3.5 text-slate-400" />
-      </div>
-      <p className="mt-3 text-xl font-semibold tracking-tight text-slate-950">{value}</p>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="truncate text-xs text-slate-400">{hint}</span>
-        <span
-          className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
-          style={{ color, backgroundColor: `${color}12` }}
-        >
-          {change}
-        </span>
-      </div>
-    </div>
-  );
-}
+const priorityStyle: Record<string, { color: string; bg: string }> = {
+  "Cao": { color: "#dc2626", bg: "rgba(220,38,38,0.09)" },
+  "Trung bình": { color: "#d97706", bg: "rgba(217,119,6,0.09)" },
+  "Thấp": { color: "#2563eb", bg: "rgba(37,99,235,0.09)" },
+};
 
 export default function UserSupportPage() {
   const range = useDashboardTimeRangeStore((state) => state.range);
   const normalizedRange = normalizeRange(range);
   const rangeLabel = formatRange(normalizedRange);
-  const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
-  const [columns, setColumns] = useState<DashboardTableColumn[]>(defaultColumns);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [supportOrders, setSupportOrders] = useState<Array<{ order_code: string; status: string; wash_date?: string }>>([]);
+  const [columns, setColumns] = useState<DashboardTableColumn[]>(() => {
+    const layout = loadSavedSupportLayout();
+    return mergeDefaultColumns(layout.columns);
+  });
   const [query, setQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("Tất cả");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [tableResizeMode, setTableResizeMode] = useState<"fit" | "custom">("fit");
+  const [tableResizeMode, setTableResizeMode] = useState<"fit" | "custom">(() => {
+    const layout = loadSavedSupportLayout();
+    return layout.tableResizeMode === "custom" ? "custom" : "fit";
+  });
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize, setPageSize] = useState(() => {
+    const layout = loadSavedSupportLayout();
+    return layout.pageSize && layout.pageSize > 0 ? layout.pageSize : 5;
+  });
   const [customPageSize, setCustomPageSize] = useState("");
   const [openPageSizeMenu, setOpenPageSizeMenu] = useState(false);
+  const [isLayoutLoaded, setIsLayoutLoaded] = useState(false);
+  const accountColumnsConfigRef = useRef<Record<string, unknown>>({});
 
   // Modals
   const [newRequestOpen, setNewRequestOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
-  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [viewingTicketId, setViewingTicketId] = useState<string | null>(null);
+  const [profileCustomer, setProfileCustomer] = useState<SupportCustomer | null>(null);
 
   // Form states
-  const [type, setType] = useState("order");
-  const [orderCode, setOrderCode] = useState("none");
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const [supportForm, setSupportForm] = useState<Record<string, string>>({
+    type: "Mất đồ",
+    orderId: "",
+    priority: "Cao",
+    washDate: "",
+    note: "",
+  });
 
   // Chat conversation
   const [chatOpen, setChatOpen] = useState(false);
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const loadSupportData = useCallback((showError = false) => {
+    Promise.all([
+      homeApi<UserSupportTicketRow[]>("/support-tickets/full"),
+      homeApi<Array<{ order_code: string; status: string; wash_date?: string }>>("/support-tickets/orders"),
+    ])
+      .then(([rows, orders]) => {
+        setTickets(rows.map(mapUserTicket));
+        setSupportOrders(orders);
+      })
+      .catch((error) => {
+        setTickets([]);
+        setSupportOrders([]);
+        if (showError) {
+          toast.error(error instanceof Error ? error.message : "Không thể tải yêu cầu hỗ trợ.");
+        }
+      });
+  }, []);
+
+  useEffect(() => {
+    loadSupportData(true);
+    const intervalId = window.setInterval(() => loadSupportData(false), 10000);
+    return () => window.clearInterval(intervalId);
+  }, [loadSupportData]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setIsLayoutLoaded(true);
+      return;
+    }
+    fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((response) => {
+        if (!response.ok) return null;
+        return response.json();
+      })
+      .then((data) => {
+        if (!data?.columns_config) return;
+        const parsed = JSON.parse(data.columns_config) as Record<string, unknown>;
+        accountColumnsConfigRef.current = parsed;
+        const layout = (parsed.userSupportLayout || {}) as {
+          columns?: DashboardTableColumn[];
+          tableResizeMode?: "fit" | "custom";
+          pageSize?: number;
+        };
+        if (layout.columns) setColumns(mergeDefaultColumns(layout.columns));
+        if (layout.tableResizeMode) setTableResizeMode(layout.tableResizeMode);
+        if (layout.pageSize && layout.pageSize > 0) setPageSize(layout.pageSize);
+      })
+      .catch(() => undefined)
+      .finally(() => setIsLayoutLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    const layout = { columns, tableResizeMode, pageSize };
+    localStorage.setItem("user_support_columns", JSON.stringify(columns));
+    localStorage.setItem("user_support_layout", JSON.stringify(layout));
+    if (!isLayoutLoaded) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const timeoutId = window.setTimeout(() => {
+      const nextConfig = {
+        ...accountColumnsConfigRef.current,
+        userSupportLayout: layout,
+      };
+      accountColumnsConfigRef.current = nextConfig;
+      fetch(`${API_BASE_URL}/api/auth/me`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ columns_config: JSON.stringify(nextConfig) }),
+      }).catch(() => undefined);
+    }, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [columns, isLayoutLoaded, pageSize, tableResizeMode]);
 
   const activeTicket = useMemo(() => tickets.find((t) => t.id === activeTicketId) || null, [tickets, activeTicketId]);
 
@@ -187,15 +354,12 @@ export default function UserSupportPage() {
       const matchesStatus = selectedStatus === "Tất cả" || ticket.status === selectedStatus;
       const matchesQuery =
         !normalizedQuery ||
-        [ticket.id, ticket.topic, ticket.orderCode, ticket.time, ticket.status]
+        [ticket.id, ticket.customerCode, ticket.type, ticket.customerName, ticket.customerPhone, ticket.orderCode, ticket.priority, ticket.washDate, ticket.note, ticket.time, ticket.status]
           .filter(Boolean)
           .some((val) => String(val).toLowerCase().includes(normalizedQuery));
 
-      // Parse ticket date "DD/MM/YYYY HH:mm"
-      const [datePart] = ticket.time.split(" ");
-      const [day, month, year] = datePart.split("/").map(Number);
-      const ticketDate = new Date(year, month - 1, day);
-      const matchRange = ticketDate >= normalizedRange.start && ticketDate <= normalizedRange.end;
+      const ticketDate = parseTicketDate(ticket.time);
+      const matchRange = !ticketDate || (ticketDate >= normalizedRange.start && ticketDate <= normalizedRange.end);
 
       return matchesStatus && matchesQuery && matchRange;
     });
@@ -208,6 +372,43 @@ export default function UserSupportPage() {
   const selectedVisibleCount = visibleIds.filter((id) => selectedIds.has(id)).length;
   const allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
   const totalVisibleWidth = columns.filter((col) => col.visible !== false).reduce((sum, col) => sum + (col.width || 150), 0);
+  const createSupportFields = useMemo<FormField[]>(() => [
+    { id: "type", label: "Loại hỗ trợ", type: "select", options: ["Mất đồ", "Giao trễ", "Hỏng đồ", "Thanh toán"], required: true },
+    { id: "orderId", label: "Mã đơn", type: "select", options: supportOrders.map((order) => order.order_code), required: true, allowCustom: false },
+    {
+      id: "priority",
+      label: "Độ ưu tiên",
+      type: "select",
+      options: ["Cao", "Trung bình", "Thấp"],
+      optionDotColors: { "Cao": "#dc2626", "Trung bình": "#d97706", "Thấp": "#2563eb" },
+      allowCustom: false,
+    },
+    { id: "note", label: "Nội dung phản ánh", type: "textarea", placeholder: "Ví dụ: Tôi bị mất áo trắng trong đơn này...", required: true },
+  ], [supportOrders]);
+
+  const viewSupportFields = useMemo<FormField[]>(() => [
+    { id: "ticketCode", label: "Mã yêu cầu", type: "text", readOnly: true },
+    { id: "customerCode", label: "Mã khách hàng", type: "text", readOnly: true },
+    { id: "customerName", label: "Khách hàng", type: "text", readOnly: true },
+    { id: "customerPhone", label: "Số điện thoại", type: "text", readOnly: true },
+    { id: "type", label: "Loại hỗ trợ", type: "text", readOnly: true },
+    { id: "orderId", label: "Mã đơn", type: "text", readOnly: true },
+    { id: "priority", label: "Độ ưu tiên", type: "text", readOnly: true },
+    { id: "status", label: "Trạng thái", type: "text", readOnly: true },
+    { id: "washDate", label: "Ngày giặt", type: "text", readOnly: true },
+    { id: "createdAt", label: "Ngày tạo", type: "text", readOnly: true },
+    { id: "assignee", label: "Người phụ trách", type: "text", readOnly: true },
+    { id: "note", label: "Nội dung phản ánh", type: "textarea", readOnly: true, className: "md:col-span-2" },
+  ], []);
+
+  const handleSupportFormChange = (nextForm: Record<string, string>) => {
+    const selectedOrder = supportOrders.find((order) => order.order_code === nextForm.orderId);
+    const orderChanged = nextForm.orderId !== supportForm.orderId;
+    setSupportForm({
+      ...nextForm,
+      washDate: orderChanged ? selectedOrder?.wash_date?.slice(0, 10) || "" : supportForm.washDate || "",
+    });
+  };
 
   const toggleTicket = (id: string) => {
     setSelectedIds((prev) => {
@@ -227,106 +428,191 @@ export default function UserSupportPage() {
     });
   };
 
-  const getFormattedTime = () => {
-    const now = new Date();
-    const pad = (v: number) => String(v).padStart(2, "0");
-    return `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const resetSupportForm = () => {
+    setSupportForm({
+      type: "Mất đồ",
+      orderId: "",
+      priority: "Cao",
+      washDate: "",
+      note: "",
+    });
   };
 
-  const submitRequest = () => {
-    if (!title.trim() || !content.trim()) {
-      toast.error("Vui lòng nhập đầy đủ tiêu đề và mô tả chi tiết.");
-      setSubmitConfirmOpen(false);
+  const openCreateSupportForm = () => {
+    setViewingTicketId(null);
+    resetSupportForm();
+    setNewRequestOpen(true);
+  };
+
+  const openViewSupportForm = (ticket: Ticket) => {
+    setViewingTicketId(ticket.id);
+    setSupportForm({
+      ticketCode: ticket.id,
+      customerCode: ticket.customerCode || "-",
+      customerName: ticket.customerName || "Khách hàng",
+      customerPhone: ticket.customerPhone || "-",
+      type: ticket.type || "Mất đồ",
+      orderId: ticket.orderCode === "Không có" ? "" : ticket.orderCode,
+      priority: ticket.priority || "Trung bình",
+      status: ticket.status || "-",
+      washDate: formatReadableDate(ticket.washDate),
+      createdAt: ticket.time || "-",
+      assignee: ticket.assignedName || "Người phụ trách",
+      note: ticket.note || ticket.topic || "",
+    });
+    setNewRequestOpen(true);
+  };
+
+  const openCustomerProfile = async (ticket: Ticket) => {
+    const fallbackCustomer: SupportCustomer = {
+      customer_code: ticket.customerCode,
+      full_name: ticket.customerName,
+      phone: ticket.customerPhone,
+      image_url: ticket.customerImageUrl,
+      rank: "Thường",
+    };
+    setProfileCustomer(fallbackCustomer);
+    if (!ticket.customerCode || ticket.customerCode === "-") return;
+
+    try {
+      const result = await homeApi<{ items: SupportCustomer[] }>(`/customers?q=${encodeURIComponent(ticket.customerCode)}&limit=5&include_count=false`);
+      const matched = result.items.find((customer) => customer.customer_code === ticket.customerCode) || result.items[0];
+      if (matched) setProfileCustomer(matched);
+    } catch {
+      // Keep the fallback profile from the ticket row.
+    }
+  };
+
+  const submitRequest = async () => {
+    if (viewingTicketId) return;
+    const type = supportForm.type?.trim() || "";
+    const orderCode = supportForm.orderId?.trim() || "";
+    const priority = supportForm.priority?.trim() || "Cao";
+    const washDate = supportForm.washDate?.trim() || "";
+    const note = supportForm.note?.trim() || "";
+
+    if (!type || !orderCode || !note) {
+      toast.error("Vui lòng nhập đầy đủ các trường bắt buộc.");
       return;
     }
 
-    const ticketId = `HT-${Math.floor(Math.random() * 900) + 100}`;
-    const newTicket: Ticket = {
-      id: ticketId,
-      topic: title.trim(),
-      orderCode: orderCode === "none" ? "Không có" : orderCode,
-      time: getFormattedTime(),
-      status: "Đang xử lý",
-      type,
-      messages: [{ sender: "user", text: content.trim(), time: getFormattedTime() }],
-    };
-
+    let saved: HomeSupportTicketRow;
+    try {
+      const payload = {
+        type,
+        subject: note.slice(0, 200) || `${type} · ${orderCode}`,
+        order_code: orderCode,
+        priority,
+        wash_date: washDate || null,
+        note,
+      };
+      saved = await homeApi<HomeSupportTicketRow>("/support-tickets", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể lưu yêu cầu hỗ trợ.");
+      return;
+    }
+    const newTicket = mapUserTicket({
+      ...saved,
+      created_at: saved.created_at || new Date().toISOString(),
+      messages: [{
+        message_id: `${saved.ticket_id}-initial`,
+        sender_role: "customer",
+        sender_name: "Bạn",
+        content: `Tôi là ${saved.customer_name || "Khách hàng"} mã ${saved.customer_code || "-"}, đây là tin nhắn của yêu cầu hỗ trợ ${saved.ticket_code} về đơn hàng ${orderCode} tôi phản ánh về việc ${type.toLowerCase()} của tôi: ${note}`,
+        created_at: saved.created_at || new Date().toISOString(),
+      }],
+    });
     setTickets((prev) => [newTicket, ...prev]);
-    setType("order");
-    setOrderCode("none");
-    setTitle("");
-    setContent("");
-    setSubmitConfirmOpen(false);
+    setQuery("");
+    setSelectedStatus("Tất cả");
+    setPage(1);
+    resetSupportForm();
+    setViewingTicketId(null);
     setNewRequestOpen(false);
-    toast.success(`Gửi yêu cầu thành công! Mã yêu cầu: ${ticketId}`);
+    toast.success(`Gửi yêu cầu thành công! Mã yêu cầu: ${newTicket.id}`);
   };
 
-  const handleSendReply = () => {
+  const handleSendReply = async () => {
     if (!replyText.trim() || !activeTicketId) return;
     const userMsgText = replyText.trim();
-    const timeStr = getFormattedTime();
+    const ticket = tickets.find((item) => item.id === activeTicketId);
+    if (!ticket) return;
+    try {
+      const saved = await homeApi<{
+        content: string;
+        created_at: string;
+      }>(`/support-tickets/${ticket.dbId || ticket.id}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ content: userMsgText }),
+      });
+      const timeStr = formatTicketTime(saved.created_at);
 
-    setTickets((prev) =>
-      prev.map((t) => {
-        if (t.id === activeTicketId) {
-          return {
-            ...t,
-            status: "Đang xử lý",
-            messages: [...t.messages, { sender: "user", text: userMsgText, time: timeStr }],
-          };
-        }
-        return t;
-      })
-    );
-    setReplyText("");
-
-    setTimeout(() => {
       setTickets((prev) =>
         prev.map((t) => {
           if (t.id === activeTicketId) {
             return {
               ...t,
-              status: "Đã phản hồi",
-              messages: [
-                ...t.messages,
-                {
-                  sender: "cskh",
-                  text: "Dạ BegauShop đã nhận được phản hồi từ chị. Shop đã chuyển yêu cầu này sang nhân viên xử lý đơn, shop sẽ phản hồi chi tiết lại cho chị ngay sau ít phút nhé.",
-                  time: getFormattedTime(),
-                },
-              ],
+              status: "Chưa xử lý",
+              messages: [...t.messages, { sender: "user", text: saved.content, time: timeStr }],
             };
           }
           return t;
         })
       );
-    }, 1200);
+      setReplyText("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể gửi tin nhắn.");
+    }
   };
 
-  const closeTicket = (id: string) => {
-    setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, status: "Đã đóng" } : t)));
-    toast.success(`Đã đóng yêu cầu hỗ trợ ${id}.`);
+  const deleteTicket = async (id: string) => {
+    const ticket = tickets.find((item) => item.id === id);
+    if (!ticket) return;
+    try {
+      await homeApi(`/support-tickets/${ticket.dbId || ticket.id}`, { method: "DELETE" });
+      setTickets((prev) => prev.filter((item) => item.id !== id));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      toast.success(`Đã xóa yêu cầu hỗ trợ ${id}.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể xóa yêu cầu.");
+    }
   };
 
   const handleBulkClose = () => {
-    const selectedActive = tickets.filter((t) => selectedIds.has(t.id) && t.status !== "Đã đóng");
+    const selectedActive = tickets.filter((t) => selectedIds.has(t.id) && t.status !== "Đã giải quyết");
     if (selectedActive.length === 0) {
       toast.error("Không có yêu cầu nào đang mở để đóng.");
       return;
     }
-    setTickets((prev) => prev.map((t) => (selectedIds.has(t.id) ? { ...t, status: "Đã đóng" } : t)));
-    toast.success(`Đã đóng thành công ${selectedActive.length} yêu cầu hỗ trợ.`);
-    setSelectedIds(new Set());
+    void Promise.all(selectedActive.map((ticket) =>
+      homeApi(`/support-tickets/${ticket.dbId || ticket.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status: "Đã giải quyết" }),
+      })
+    )).then(() => {
+      setTickets((prev) => prev.map((ticket) => selectedIds.has(ticket.id) ? { ...ticket, status: "Đã giải quyết" } : ticket));
+      toast.success(`Đã đóng thành công ${selectedActive.length} yêu cầu hỗ trợ.`);
+      setSelectedIds(new Set());
+    }).catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Không thể đóng các yêu cầu đã chọn.");
+    });
   };
 
   const renderCell = (ticket: Ticket, column: DashboardTableColumn) => {
     if (column.id === "id") {
       return (
-        <TableCell key={column.id} className="pl-4 font-semibold text-slate-800">
-          <div className="flex items-center gap-3">
+        <TableCell key={column.id} className="pl-4 font-medium text-slate-900">
+          <div className="flex items-center gap-2">
             <input
               type="checkbox"
-              className={checkboxClass}
+              className={`shrink-0 ${checkboxClass}`}
               checked={selectedIds.has(ticket.id)}
               onChange={() => toggleTicket(ticket.id)}
               onClick={(e) => e.stopPropagation()}
@@ -336,21 +622,90 @@ export default function UserSupportPage() {
         </TableCell>
       );
     }
-    if (column.id === "topic") {
+    if (column.id === "type") {
       return (
-        <TableCell key={column.id} className="font-semibold text-slate-900 truncate">
-          {ticket.topic}
+        <TableCell key={column.id}>
+          {ticket.type || "-"}
+        </TableCell>
+      );
+    }
+    if (column.id === "customerCode") {
+      return (
+        <TableCell key={column.id} className="font-medium text-slate-700">
+          {ticket.customerCode || "-"}
+        </TableCell>
+      );
+    }
+    if (column.id === "customerName") {
+      return (
+        <TableCell key={column.id}>
+          <div className="flex items-center gap-2.5">
+            <Avatar size="sm" className="shrink-0">
+              {ticket.customerImageUrl ? <AvatarImage src={ticket.customerImageUrl} alt={ticket.customerName} /> : null}
+              <AvatarFallback
+                className="text-[10px] font-semibold text-white"
+                style={{ backgroundColor: getAvatarColor(ticket.customerName) }}
+              >
+                {getInitials(ticket.customerName)}
+              </AvatarFallback>
+            </Avatar>
+            <button
+              type="button"
+              className="truncate text-left text-slate-900 hover:text-slate-600"
+              onClick={() => openCustomerProfile(ticket)}
+            >
+              {ticket.customerName || "-"}
+            </button>
+          </div>
+        </TableCell>
+      );
+    }
+    if (column.id === "customerPhone") {
+      return (
+        <TableCell key={column.id}>
+          {ticket.customerPhone ? <a href={`tel:${ticket.customerPhone}`} className="text-slate-500 hover:text-slate-800">{ticket.customerPhone}</a> : "-"}
         </TableCell>
       );
     }
     if (column.id === "orderCode") {
       return (
-        <TableCell key={column.id} className="font-mono text-xs text-slate-600">
-          {ticket.orderCode !== "Không có" ? (
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium">{ticket.orderCode}</span>
-          ) : (
-            <span className="text-slate-400">Không liên kết</span>
-          )}
+        <TableCell key={column.id}>
+          {ticket.orderCode !== "Không có" ? ticket.orderCode : <span className="text-slate-400">Không liên kết</span>}
+        </TableCell>
+      );
+    }
+    if (column.id === "priority") {
+      const style = priorityStyle[ticket.priority] || priorityStyle["Trung bình"];
+      return (
+        <TableCell key={column.id}>
+          <span
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-1.5 py-0.5 text-xs font-medium"
+            style={{ color: style.color, backgroundColor: style.bg }}
+          >
+            <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: style.color }} />
+            <span>{ticket.priority || "Trung bình"}</span>
+          </span>
+        </TableCell>
+      );
+    }
+    if (column.id === "washDate") {
+      return (
+        <TableCell key={column.id} className="text-slate-500">
+          {ticket.washDate ? ticket.washDate.split("-").reverse().join("/") : "-"}
+        </TableCell>
+      );
+    }
+    if (column.id === "note") {
+      return (
+        <TableCell key={column.id} className="max-w-[240px] truncate text-slate-500" title={ticket.note}>
+          {ticket.note || "-"}
+        </TableCell>
+      );
+    }
+    if (column.id === "time") {
+      return (
+        <TableCell key={column.id} className="text-slate-500">
+          {ticket.time ? ticket.time.split(" ")[0] : "-"}
         </TableCell>
       );
     }
@@ -374,21 +729,18 @@ export default function UserSupportPage() {
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => {
-                setActiveTicketId(ticket.id);
-                setChatOpen(true);
-              }}
+              onClick={() => openViewSupportForm(ticket)}
               className="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
-              Trò chuyện
+              Xem
             </button>
-            {ticket.status !== "Đã đóng" && (
+            {ticket.status === "Đã giải quyết" && (
               <button
                 type="button"
-                onClick={() => closeTicket(ticket.id)}
+                onClick={() => deleteTicket(ticket.id)}
                 className="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600"
               >
-                Đóng
+                Xóa
               </button>
             )}
           </div>
@@ -404,49 +756,47 @@ export default function UserSupportPage() {
 
   return (
     <PageShell fullHeight>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
-        <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 pt-5 pb-0">
-          {/* KPI Dashboard Card Grid */}
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <KpiCard
-              title="Tổng yêu cầu"
-              value={String(tickets.length)}
-              hint="Lịch sử hỗ trợ"
-              change="Yêu cầu"
-              icon={TicketCheck}
-              color="#3b82f6"
-            />
-            <KpiCard
-              title="Đang xử lý"
-              value={String(tickets.filter((t) => t.status === "Đang xử lý").length)}
-              hint="Đang tiếp nhận giải quyết"
-              change="Tiến trình"
-              icon={RotateCcw}
-              color="#f59e0b"
-            />
-            <KpiCard
-              title="Đã phản hồi"
-              value={String(tickets.filter((t) => t.status === "Đã phản hồi").length)}
-              hint="BegauShop phản hồi"
-              change="Phản hồi"
-              icon={MessageSquare}
-              color="#10b981"
-            />
-            <KpiCard
-              title="Đường dây nóng"
-              value="1900 8989"
-              hint="Hotline hỗ trợ 24/7"
-              change="Gọi ngay"
-              icon={Phone}
-              color="#ec4899"
-              onClick={() => {
-                toast.success("Đang kết nối cuộc gọi thoại đến Hotline 1900 8989...");
-              }}
-            />
-          </div>
+      <div className="grid shrink-0 gap-3 md:grid-cols-4">
+        <MetricCard
+          title="Tổng yêu cầu"
+          value={String(tickets.length)}
+          hint="Lịch sử hỗ trợ"
+          icon={TicketCheck}
+          color="#3b82f6"
+        />
+        <MetricCard
+          title="Đang xử lý"
+          value={String(tickets.filter((t) => t.status === "Đang xử lý").length)}
+          hint="Đang tiếp nhận giải quyết"
+          icon={RotateCcw}
+          color="#f59e0b"
+        />
+        <MetricCard
+          title="Đã giải quyết"
+          value={String(tickets.filter((t) => t.status === "Đã giải quyết").length)}
+          hint="Đã đóng ticket"
+          icon={MessageSquare}
+          color="#10b981"
+        />
+        <button
+          type="button"
+          className="rounded-lg text-left transition-colors hover:bg-slate-50"
+          onClick={() => {
+            toast.success("Đang kết nối cuộc gọi thoại đến Hotline 1900 8989...");
+          }}
+        >
+          <MetricCard
+            title="Đường dây nóng"
+            value="1900 8989"
+            hint="Hotline hỗ trợ 24/7"
+            icon={Phone}
+            color="#ec4899"
+          />
+        </button>
+      </div>
 
-          {/* Full-width Ticket Table View */}
-          <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
             <Toolbar
               leftContent={
                 <div className="flex flex-wrap items-center gap-3">
@@ -479,10 +829,11 @@ export default function UserSupportPage() {
               onOpenAddColumn={() => toast.info("Bảng hỗ trợ sử dụng bộ cột cố định.")}
               onExport={() => toast.info("Không hỗ trợ xuất file cho Yêu cầu hỗ trợ.")}
               defaultExportFileName="support-tickets"
-              onCreateClick={() => setNewRequestOpen(true)}
+              onCreateClick={openCreateSupportForm}
               createLabel="Gửi yêu cầu"
               defaultColumnIds={defaultColumns.map((col) => col.id)}
-              searchPlaceholder="Tìm mã yêu cầu, tiêu đề..."
+              searchPlaceholder="Tìm mã yêu cầu, loại hỗ trợ, mã đơn..."
+              showSearch={false}
               showAddColumnButton={false}
               showHistoryButton={false}
               onOpenHistory={() => {}}
@@ -504,147 +855,169 @@ export default function UserSupportPage() {
               checkboxClass={checkboxClass}
               onToggleAll={toggleAll}
             />
-            <TableView
-              columns={columns}
-              rows={paginatedTickets}
-              pageSize={pageSize}
-              emptyMessage="Không tìm thấy yêu cầu hỗ trợ nào."
-              tableResizeMode={tableResizeMode}
-              totalVisibleWidth={totalVisibleWidth}
-              renderCell={renderCell}
-              page={safePage}
-              pageCount={pageCount}
-              totalRows={filteredTickets.length}
-              totalLabel="Tổng yêu cầu"
-              customPageSize={customPageSize}
-              openPageSizeMenu={openPageSizeMenu}
-              onOpenPageSizeMenuChange={setOpenPageSizeMenu}
-              onCustomPageSizeChange={setCustomPageSize}
-              onApplyCustomPageSize={() => {
-                const val = Number(customPageSize);
-                if (val > 0) {
-                  setPageSize(val);
+            {filteredTickets.length === 0 ? (
+              <div className="flex min-h-0 flex-1 items-center justify-center p-8 text-center">
+                <p className="text-sm text-slate-400">Không tìm thấy yêu cầu hỗ trợ nào.</p>
+              </div>
+            ) : (
+              <TableView
+                columns={columns}
+                rows={paginatedTickets}
+                pageSize={pageSize}
+                emptyMessage="Không tìm thấy yêu cầu hỗ trợ nào."
+                tableResizeMode={tableResizeMode}
+                totalVisibleWidth={totalVisibleWidth}
+                renderCell={renderCell}
+                page={safePage}
+                pageCount={pageCount}
+                totalRows={filteredTickets.length}
+                totalLabel="Tổng yêu cầu"
+                customPageSize={customPageSize}
+                openPageSizeMenu={openPageSizeMenu}
+                onOpenPageSizeMenuChange={setOpenPageSizeMenu}
+                onCustomPageSizeChange={setCustomPageSize}
+                onApplyCustomPageSize={() => {
+                  const val = Number(customPageSize);
+                  if (val > 0) {
+                    setPageSize(val);
+                    setPage(1);
+                    setOpenPageSizeMenu(false);
+                  }
+                }}
+                onUpdatePageSize={(size) => {
+                  setPageSize(size);
                   setPage(1);
-                  setOpenPageSizeMenu(false);
-                }
-              }}
-              onUpdatePageSize={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
-              onPageChange={setPage}
-            />
-          </div>
+                }}
+                onPageChange={setPage}
+              />
+            )}
         </div>
       </div>
 
-      {/* Dialog Gửi Yêu Cầu Mới */}
-      <Dialog open={newRequestOpen} onOpenChange={setNewRequestOpen}>
-        <DialogContent className="max-w-[460px] gap-0 rounded-xl border border-slate-200 bg-white p-0 shadow-lg">
-          <DialogHeader className="gap-2 px-5 pb-3 pt-5">
-            <DialogTitle className="text-base font-semibold text-slate-900">Gửi yêu cầu hỗ trợ mới</DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
-              Điền các thông tin dưới đây để được hỗ trợ giải quyết nhanh nhất.
-            </DialogDescription>
-          </DialogHeader>
+      <FormDialog
+        open={newRequestOpen}
+        onClose={() => {
+          setNewRequestOpen(false);
+          setViewingTicketId(null);
+          resetSupportForm();
+        }}
+        title={viewingTicketId ? `Xem yêu cầu ${viewingTicketId}` : "Gửi yêu cầu hỗ trợ mới"}
+        fields={viewingTicketId ? viewSupportFields : createSupportFields}
+        form={supportForm}
+        onFormChange={handleSupportFormChange}
+        onSave={viewingTicketId ? undefined : submitRequest}
+        showCloseButton={false}
+        showCloseButtonAtBottom={true}
+        showSaveButton={!viewingTicketId}
+        saveLabel="Gửi yêu cầu"
+      />
 
-          <div className="space-y-4 px-5 py-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold text-slate-700">Loại yêu cầu</Label>
-                <Select value={type} onValueChange={setType}>
-                  <SelectTrigger className="h-9 border-slate-200 bg-white text-xs rounded-lg">
-                    <SelectValue placeholder="Chọn loại" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="order">Vấn đề đơn hàng</SelectItem>
-                    <SelectItem value="delivery">Giao nhận đồ</SelectItem>
-                    <SelectItem value="payment">Thanh toán</SelectItem>
-                    <SelectItem value="quality">Chất lượng giặt</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold text-slate-700">Đơn hàng liên quan</Label>
-                <Select value={orderCode} onValueChange={setOrderCode}>
-                  <SelectTrigger className="h-9 border-slate-200 bg-white text-xs rounded-lg">
-                    <SelectValue placeholder="Chọn đơn hàng" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Không liên kết</SelectItem>
-                    {initialOrders.map((order) => (
-                      <SelectItem key={order.id} value={order.id}>
-                        {order.id} ({order.status})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold text-slate-700">Tiêu đề yêu cầu</Label>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="VD: Không áp dụng được voucher..."
-                className="h-9 border-slate-200 text-xs rounded-lg"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold text-slate-700">Nội dung chi tiết</Label>
-              <Textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Mô tả cụ thể sự cố hoặc yêu cầu cần BegauShop hỗ trợ..."
-                className="min-h-[100px] border-slate-200 text-xs rounded-lg"
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="m-0 flex-row justify-end gap-2 rounded-b-xl border-t border-slate-100 bg-slate-50 px-4 py-3">
-            <DialogClose asChild>
-              <Button variant="outline" className="h-8 border-slate-200 text-xs">
-                Huỷ
-              </Button>
-            </DialogClose>
-            <Button
-              className="h-8 bg-slate-950 text-xs text-white hover:bg-slate-800"
-              onClick={() => setSubmitConfirmOpen(true)}
-            >
-              Gửi yêu cầu
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Confirmation Dialog for Submission */}
-      <Dialog open={submitConfirmOpen} onOpenChange={setSubmitConfirmOpen}>
+      <Dialog open={Boolean(profileCustomer)} onOpenChange={(open) => {
+        if (!open) setProfileCustomer(null);
+      }}>
         <DialogContent
-          className="max-w-[400px] gap-0 rounded-xl border border-slate-200 bg-white p-0 shadow-lg"
           showCloseButton={false}
+          className="flex h-[min(86vh,680px)] w-[min(86vw,680px)] max-w-[min(86vw,680px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[680px]"
         >
-          <DialogHeader className="gap-3 px-5 pb-4 pt-5">
-            <div className="flex items-center gap-2 text-slate-900">
-              <Info className="size-5 text-indigo-500" />
-              <DialogTitle className="text-base font-semibold">Xác nhận gửi</DialogTitle>
-            </div>
-            <DialogDescription className="text-sm text-slate-500">
-              Yêu cầu hỗ trợ sẽ được chuyển trực tiếp đến hệ thống chăm sóc khách hàng BegauShop.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="m-0 flex-row justify-end gap-2 rounded-b-xl border-t border-slate-100 bg-slate-50 px-4 py-3">
-            <DialogClose asChild>
-              <Button variant="outline" className="h-8 border-slate-200 text-xs">
-                Huỷ
-              </Button>
-            </DialogClose>
-            <Button className="h-8 bg-slate-950 text-xs text-white hover:bg-slate-800" onClick={submitRequest}>
-              Xác nhận
-            </Button>
-          </DialogFooter>
+          {profileCustomer && (
+            <>
+              <DialogHeader className="border-b border-slate-200 px-6 py-3">
+                <div className="flex items-center gap-3">
+                  <Avatar className="shrink-0 after:border-slate-200" style={{ width: 40, height: 40 }}>
+                    {profileCustomer.image_url ? <AvatarImage src={profileCustomer.image_url} alt={profileCustomer.full_name} /> : null}
+                    <AvatarFallback
+                      className="font-semibold leading-none text-white"
+                      style={{ backgroundColor: getAvatarColor(profileCustomer.full_name), fontSize: 14 }}
+                    >
+                      {getInitials(profileCustomer.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <DialogTitle className="truncate text-base font-semibold leading-6 text-slate-950">
+                      {profileCustomer.full_name}
+                    </DialogTitle>
+                    <p className="text-sm text-slate-500">Khách hàng · {profileCustomer.customer_code}</p>
+                    <p className="mt-1 text-xs text-slate-400">{profileCustomer.rank || "Thường"}</p>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="min-h-0 flex-1 p-5">
+                <div className="grid gap-3 md:grid-cols-2">
+                  {[
+                    [UserRound, "Họ tên", profileCustomer.full_name],
+                    [ShieldCheck, "Tên đăng nhập", profileCustomer.account_username || "Chưa liên kết"],
+                    [Mail, "Email", profileCustomer.email || "-"],
+                    [Phone, "Số điện thoại", profileCustomer.phone || "-"],
+                    [CalendarDays, "Ngày sinh", formatReadableDate(profileCustomer.birthday)],
+                    [Sparkles, "Điểm / hạng", `${Number(profileCustomer.loyalty_points || 0).toLocaleString("vi-VN")} điểm · ${profileCustomer.rank || "Thường"}`],
+                  ].map(([Icon, label, value]) => {
+                    const FieldIcon = Icon as typeof UserRound;
+                    return (
+                      <div key={String(label)} className="space-y-2">
+                        <Label>{String(label)}</Label>
+                        <div className="relative">
+                          <FieldIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                          <Input
+                            value={String(value)}
+                            disabled
+                            className="h-8 rounded-lg border-input bg-slate-50 px-2.5 py-1 pl-8 text-sm text-slate-500 shadow-none"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Địa chỉ mặc định</Label>
+                    <div className="relative">
+                      <MapPin className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        value={profileCustomer.address || "-"}
+                        disabled
+                        className="h-8 rounded-lg border-input bg-slate-50 px-2.5 py-1 pl-8 text-sm text-slate-500 shadow-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Ghi chú</Label>
+                    <Textarea
+                      value={profileCustomer.note || "-"}
+                      disabled
+                      className="h-16 min-h-16 resize-none rounded-lg border-input bg-slate-50 px-2.5 py-2 text-sm text-slate-500 shadow-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+                  <p className="text-sm font-medium text-slate-950">Trạng thái tài khoản</p>
+                  <div className="mt-3 grid gap-2 md:grid-cols-3">
+                    {[
+                      profileCustomer.account_id ? "Đã liên kết" : "Chưa liên kết",
+                      `${Number(profileCustomer.total_orders || 0).toLocaleString("vi-VN")} đơn hàng`,
+                      `${Number(profileCustomer.total_spent || 0).toLocaleString("vi-VN")}đ chi tiêu`,
+                    ].map((item) => (
+                      <div
+                        key={item}
+                        className="flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700"
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="m-0 flex-row justify-end gap-2 border-t border-slate-200 bg-white px-6 py-3">
+                <button
+                  type="button"
+                  className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-none hover:bg-slate-50"
+                  onClick={() => setProfileCustomer(null)}
+                >
+                  Đóng
+                </button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -749,7 +1122,7 @@ export default function UserSupportPage() {
             <div ref={messagesEndRef} />
           </div>
 
-          {activeTicket?.status !== "Đã đóng" ? (
+          {activeTicket?.status !== "Đã giải quyết" ? (
             <div className="border-t border-slate-100 bg-white p-3 flex gap-2">
               <Input
                 value={replyText}

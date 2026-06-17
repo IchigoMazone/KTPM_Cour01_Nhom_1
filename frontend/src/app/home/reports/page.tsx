@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CalendarClock,
   ChevronDown,
@@ -26,6 +26,8 @@ import {
 } from "@/src/components/common/dashboard-data-table";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
+import { listHomeResource } from "@/src/lib/home-api";
+import { HomeTableContentSkeleton } from "@/src/components/common/auth-guard";
 
 type ReportStatus = "Bật" | "Tắt";
 type ReportCategory = "Doanh thu" | "Tài chính" | "Kho" | "CRM" | "Vận hành";
@@ -40,6 +42,16 @@ type ReportRow = {
   schedule: string;
   status: ReportStatus;
   note: string;
+};
+
+type HomeDailyReportRow = {
+  report_id: string;
+  report_date: string;
+  total_orders: number;
+  completed_orders: number;
+  open_tickets: number;
+  revenue: number;
+  expense: number;
 };
 
 const pageSize = 10;
@@ -64,6 +76,21 @@ const seedReports: ReportRow[] = [
   { id: "BC-104", name: "Top khách hàng", category: "CRM", range: "30 ngày", owner: "Admin", format: "PDF", schedule: "Thủ công", status: "Tắt", note: "Dùng cho khuyến mãi" },
   { id: "BC-105", name: "Hiệu suất nhân viên", category: "Vận hành", range: "Tuần này", owner: "Quản lý", format: "Excel", schedule: "Chủ nhật", status: "Bật", note: "Theo đơn hoàn thành" },
 ];
+
+function mapHomeDailyReport(row: HomeDailyReportRow): ReportRow {
+  const reportDate = row.report_date?.slice(0, 10) || "";
+  return {
+    id: `BC-${reportDate.replaceAll("-", "") || row.report_id.slice(0, 6)}`,
+    name: `Báo cáo ngày ${reportDate || "mới nhất"}`,
+    category: "Vận hành",
+    range: reportDate,
+    owner: "Hệ thống",
+    format: "Excel",
+    schedule: "22:00 mỗi ngày",
+    status: "Bật",
+    note: `${Number(row.completed_orders || 0)}/${Number(row.total_orders || 0)} đơn hoàn thành, ${Number(row.open_tickets || 0)} ticket mở, doanh thu ${Number(row.revenue || 0).toLocaleString("vi-VN")}đ`,
+  };
+}
 
 const emptyReportForm = {
   name: "",
@@ -115,7 +142,8 @@ function MetricCard({ title, value, hint, icon: Icon, color }: { title: string; 
 }
 
 export default function ReportsPage() {
-  const [reports, setReports] = useState(seedReports);
+  const [reports, setReports] = useState<ReportRow[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<ReportStatus | "Tất cả">("Tất cả");
   const [page, setPage] = useState(1);
@@ -126,6 +154,24 @@ export default function ReportsPage() {
   const [customPageSize, setCustomPageSize] = useState("");
   const range = useDashboardTimeRangeStore((state) => state.range);
   const rangeLabel = formatRange(normalizeRange(range));
+
+  useEffect(() => {
+    let alive = true;
+    listHomeResource<HomeDailyReportRow>("daily-reports", { limit: 500 })
+      .then((response) => {
+        if (!alive) return;
+        setReports(response.items.map(mapHomeDailyReport));
+      })
+      .catch(() => {
+        if (alive) setReports([]);
+      })
+      .finally(() => {
+        if (alive) setIsDataLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const filteredReports = useMemo(() => {
     return reports.filter((report) => {
@@ -212,6 +258,10 @@ export default function ReportsPage() {
       </TableCell>
     );
   };
+
+  if (isDataLoading) {
+    return <HomeTableContentSkeleton />;
+  }
 
   return (
     <PageShell fullHeight>

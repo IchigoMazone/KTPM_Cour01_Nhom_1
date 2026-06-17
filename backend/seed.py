@@ -1,5 +1,15 @@
 import os
-import psycopg2
+try:
+    import psycopg2
+except ModuleNotFoundError as exc:
+    raise SystemExit(
+        "Thiếu thư viện psycopg2. Hãy cài dependencies backend trước:\n"
+        "  cd backend\n"
+        "  python3 -m venv .venv\n"
+        "  source .venv/bin/activate\n"
+        "  pip install -r requirements.txt\n"
+        "  python seed.py"
+    ) from exc
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,6 +38,12 @@ def seed_database():
         print(f"Đang seed dữ liệu từ: {data_path}")
         with open(data_path, "r", encoding="utf-8") as f:
             cursor.execute(f.read())
+
+        home_schema_path = os.path.join(os.path.dirname(__file__), "app", "database", "website_database.sql")
+        if os.path.exists(home_schema_path):
+            print(f"Đang tạo các bảng /home từ: {home_schema_path}")
+            with open(home_schema_path, "r", encoding="utf-8") as f:
+                cursor.execute(f.read())
 
         conn.commit()
         print("==================================================")
