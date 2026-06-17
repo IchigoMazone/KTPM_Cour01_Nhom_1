@@ -771,7 +771,6 @@ export default function UserOrdersPage() {
     if (column.id === "actions") {
       const canInvoice = order.status === "Chờ thanh toán";
       const canDelete = order.status === "Hoàn thành";
-      const invoiceDisabled = parseQuantityValue(order.quantity) <= 0;
 
       return (
         <TableCell key={column.id} className="px-4" onClick={(event) => event.stopPropagation()}>
@@ -784,8 +783,7 @@ export default function UserOrdersPage() {
                 type="button"
                 className="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
                 onClick={() => setInvoiceOrder(order)}
-                disabled={invoiceDisabled}
-                title={invoiceDisabled ? "Đơn chưa có số lượng để mở hóa đơn" : "Xem hóa đơn"}
+                title="Xem hóa đơn"
               >
                 Hóa đơn
               </button>
@@ -1208,7 +1206,7 @@ export default function UserOrdersPage() {
         showCloseButtonAtBottom={true}
         gridClassName="grid gap-4 md:grid-cols-2"
         extraAction={
-          selectedOrder && selectedOrder.status === "Chờ thanh toán" && parseQuantityValue(selectedOrder.quantity) > 0 ? (
+          selectedOrder && selectedOrder.status === "Chờ thanh toán" ? (
             <Button
               className="w-full justify-center bg-slate-900 text-center text-white hover:bg-slate-800 sm:w-auto text-xs h-9 font-semibold"
               onClick={() => setInvoiceOrder(selectedOrder)}

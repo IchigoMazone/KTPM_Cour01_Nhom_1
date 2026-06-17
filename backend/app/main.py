@@ -22,14 +22,14 @@ def startup_db_init():
     try:
         db_dir = os.path.join(os.path.dirname(__file__), "database")
         migrations = (
+            ("accounts", "accounts_bootstrap.sql", False),
             ("home_inventory_items", "home_staff_inventory_machines.sql", False),
-            ("home_inventory_items", "seed_inventory_demo_item.sql", True),
-            ("home_services", "home_services.sql", True),
-            ("home_orders", "home_orders.sql", True),
+            ("home_services", "home_services.sql", False),
+            ("home_orders", "home_orders.sql", False),
             ("home_promotions", "home_promotions.sql", False),
-            ("home_finance_records", "home_finance_records.sql", True),
-            ("home_support_tickets", "home_support_tickets.sql", True),
-            ("home_memos", "home_memos.sql", True),
+            ("home_finance_records", "home_finance_records.sql", False),
+            ("home_support_tickets", "home_support_tickets.sql", False),
+            ("home_memos", "home_memos.sql", False),
         )
         for table_name, file_name, always_run in migrations:
             cursor.execute("SELECT to_regclass(%s)", (table_name,))

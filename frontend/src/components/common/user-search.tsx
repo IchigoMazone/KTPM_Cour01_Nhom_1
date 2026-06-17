@@ -36,6 +36,7 @@ import NotificationsDialog from "./notifications-dialog";
 import SupportChatBox, { type SupportChatConversation, type SupportChatMessage } from "./support-chat-box";
 import { useNavbarStore } from "@/src/context/useNavbarStore";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
+import { uploadSupportChatImage } from "@/src/lib/support-chat-upload";
 import {
   addDays,
   createRange,
@@ -67,6 +68,7 @@ type HeaderSupportMessage = {
   reply_to?: { id: string; sender: "customer" | "staff"; content: string };
   reaction?: string;
   revoked?: boolean;
+  deleted_for_me?: boolean;
   created_at?: string;
 };
 
@@ -148,10 +150,10 @@ function UserTimeRangeControl() {
         <Button
           type="button"
           variant="ghost"
-          className="flex h-8 min-w-0 shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800"
+          className="flex h-8 min-w-[250px] shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800"
         >
           <CalendarDays className="size-4" />
-          <span className="hidden max-w-[150px] truncate sm:inline">
+          <span className="hidden whitespace-nowrap sm:inline">
             {rangeLabel}
           </span>
         </Button>
@@ -359,8 +361,11 @@ export default function UserSearch() {
   const [supportTickets, setSupportTickets] = useState<HeaderSupportTicket[]>([]);
   const [supportOrders, setSupportOrders] = useState<HeaderSupportOrder[]>([]);
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
+  const currentUserIdRef = useRef("");
   const supportWsRef = useRef<WebSocket | null>(null);
   const pendingSupportWsPayloadsRef = useRef<string[]>([]);
+  const typingTimeoutRef = useRef<number | null>(null);
+  const [isAdminTyping, setIsAdminTyping] = useState(false);
 
   const loadMessageCount = useCallback(() => {
     Promise.allSettled([
@@ -438,6 +443,14 @@ export default function UserSearch() {
     });
   }, [sendSupportWsPayload]);
 
+  const sendSupportTyping = useCallback((ticketId: string, isTyping: boolean) => {
+    return sendSupportWsPayload({
+      type: "support_typing",
+      ticket_id: ticketId,
+      is_typing: isTyping,
+    });
+  }, [sendSupportWsPayload]);
+
   const appendSupportMessage = useCallback((ticketId: string, message: HeaderSupportMessage) => {
     let found = false;
     setSupportTickets((current) =>
@@ -500,6 +513,7 @@ export default function UserSearch() {
   }, [loadMessageCount]);
 
   useEffect(() => {
+    currentUserIdRef.current = localStorage.getItem("user_id") || "";
     const wsUrl = getSupportWsUrl();
     if (!wsUrl) return;
     const socket = new WebSocket(wsUrl);
@@ -507,7 +521,14 @@ export default function UserSearch() {
     socket.onopen = () => flushPendingSupportWsPayloads(socket);
     socket.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data) as { type?: string; ticket_id?: string; message?: HeaderSupportMessage };
+        const payload = JSON.parse(event.data) as {
+          type?: string;
+          ticket_id?: string;
+          message?: HeaderSupportMessage;
+          sender_role?: "customer" | "staff";
+          is_typing?: boolean;
+          sender_id?: string;
+        };
         if (payload.type === "support_message_created") {
           if (payload.ticket_id && payload.message) {
             const appended = appendSupportMessage(payload.ticket_id, payload.message);
@@ -517,11 +538,16 @@ export default function UserSearch() {
           window.dispatchEvent(new Event("support-tickets-changed"));
         }
         if (payload.type === "support_message_updated") {
-          if (payload.ticket_id && payload.message) {
-            const updated = updateSupportMessage(payload.ticket_id, payload.message);
-            if (!updated && messagesOpen) void loadSupportChat();
-          }
+          if (messagesOpen) void loadSupportChat();
           window.dispatchEvent(new Event("support-tickets-changed"));
+        }
+        const isOwnEvent = payload.sender_id && payload.sender_id === currentUserIdRef.current;
+        if (payload.type === "support_typing" && payload.sender_role === "staff" && payload.ticket_id === activeTicketId && !isOwnEvent) {
+          setIsAdminTyping(Boolean(payload.is_typing));
+          if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
+          if (payload.is_typing) {
+            typingTimeoutRef.current = window.setTimeout(() => setIsAdminTyping(false), 1600);
+          }
         }
       } catch {
         loadMessageCount();
@@ -535,7 +561,7 @@ export default function UserSearch() {
       pendingSupportWsPayloadsRef.current = [];
       socket.close();
     };
-  }, [appendSupportMessage, flushPendingSupportWsPayloads, getSupportWsUrl, loadMessageCount, loadSupportChat, messagesOpen, updateSupportMessage]);
+  }, [activeTicketId, appendSupportMessage, flushPendingSupportWsPayloads, getSupportWsUrl, loadMessageCount, loadSupportChat, messagesOpen, updateSupportMessage]);
 
   const title = pageTitles[pathname] ?? "Khu vực khách hàng";
   const activeTicket = useMemo(() => {
@@ -551,12 +577,15 @@ export default function UserSearch() {
       .flatMap((ticket) => (ticket.messages || []).map((message): SupportChatMessage => ({
         id: message.message_id,
         sender: message.sender_role === "staff" ? "staff" : "customer",
-        content: message.content || "",
-        avatarUrl: message.sender_avatar || (message.sender_role === "staff" ? ticket.assigned_avatar || "" : ""),
+        content: message.revoked ? "Tin nhắn đã được thu hồi" : (message.content || ""),
+        avatarUrl: message.sender_role === "staff"
+          ? (message.sender_avatar || ticket.assigned_avatar || latestTicket.assigned_avatar || "")
+          : (message.sender_avatar || ""),
         imageUrl: message.image_url,
         replyTo: message.reply_to,
         reaction: message.reaction,
         revoked: message.revoked,
+        deletedForMe: message.deleted_for_me,
         timestamp: message.created_at,
         time: message.created_at
           ? new Date(message.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
@@ -632,6 +661,50 @@ export default function UserSearch() {
     }
   };
 
+  const sendSupportImage = async (file: File, replyTo?: SupportChatMessage | null) => {
+    if (!activeTicket) return;
+    const optimisticMessage: HeaderSupportMessage = {
+      message_id: `local-image-${Date.now()}`,
+      sender_role: "customer",
+      content: "",
+      image_url: "",
+      reply_to: replyTo
+        ? {
+            id: replyTo.id,
+            sender: replyTo.sender,
+            content: replyTo.imageUrl ? "Ảnh" : replyTo.content,
+          }
+        : undefined,
+      created_at: new Date().toISOString(),
+    };
+
+    try {
+      const uploadResult = await uploadSupportChatImage(file, "user");
+      optimisticMessage.image_url = uploadResult.image_url;
+      appendSupportMessage(activeTicket.ticket_id, optimisticMessage);
+
+      const sentByWs = sendSupportWsPayload({
+        type: "send_support_message",
+        ticket_id: activeTicket.ticket_id,
+        content: "",
+        image_url: optimisticMessage.image_url,
+        reply_to: optimisticMessage.reply_to,
+      });
+      if (!sentByWs) {
+        throw new Error("Support chat websocket is not ready.");
+      }
+      window.dispatchEvent(new Event("support-tickets-changed"));
+    } catch {
+      setSupportTickets((current) =>
+        current.map((ticket) =>
+          ticket.ticket_id === activeTicket.ticket_id
+            ? { ...ticket, messages: (ticket.messages || []).filter((item) => item.message_id !== optimisticMessage.message_id) }
+            : ticket,
+        ),
+      );
+    }
+  };
+
   const reactToSupportMessage = async (message: SupportChatMessage, reaction: string) => {
     if (!sendSupportWsMessageUpdate(message.id, "react", reaction)) {
       console.error("Support chat websocket is not ready.");
@@ -641,6 +714,24 @@ export default function UserSearch() {
   const revokeSupportMessage = async (message: SupportChatMessage) => {
     if (!sendSupportWsMessageUpdate(message.id, "revoke")) {
       console.error("Support chat websocket is not ready.");
+    }
+  };
+
+  const deleteSupportMessage = async (message: SupportChatMessage) => {
+    if (!sendSupportWsPayload({
+      type: "update_support_message",
+      message_id: message.id,
+      action: "delete",
+    })) {
+      try {
+        await homeApi(`/support-messages/${message.id}`, {
+          method: "PUT",
+          body: JSON.stringify({ action: "delete" }),
+        });
+        await loadSupportChat();
+      } catch {
+        console.error("Không thể xóa tin nhắn hỗ trợ.");
+      }
     }
   };
 
@@ -681,7 +772,7 @@ export default function UserSearch() {
             <Bell className="size-4" />
             <span>{notificationCount}</span>
           </Button>
-          <MemoPopover className="hidden h-8 shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800 lg:flex" />
+          <MemoPopover className="hidden h-8 shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800 md:flex" />
           <Button
             className="hidden h-8 shrink-0 gap-1.5 rounded-md bg-slate-900 px-3 text-xs font-medium text-white transition-colors hover:bg-slate-800 sm:flex"
             onClick={() => router.push("/user/bookings")}
@@ -700,10 +791,14 @@ export default function UserSearch() {
           disabled={!activeTicket}
           disabledPlaceholder="Không thể gửi tin nhắn"
           showMeta={false}
+          typingLabel={isAdminTyping ? "đang soạn tin..." : null}
           onClose={() => setMessagesOpen(false)}
           onSendMessage={(content, replyTo) => sendSupportMessage(content, replyTo)}
+          onSendImage={(file, replyTo) => sendSupportImage(file, replyTo)}
           onReactMessage={reactToSupportMessage}
           onRevokeMessage={revokeSupportMessage}
+          onDeleteMessage={deleteSupportMessage}
+          onTypingChange={(isTyping) => activeTicket && sendSupportTyping(activeTicket.ticket_id, isTyping)}
         />
       )}
       <NotificationsDialog

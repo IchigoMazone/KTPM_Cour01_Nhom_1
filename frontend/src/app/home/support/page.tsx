@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef, type DragEvent } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef, type DragEvent } from "react";
 import {
   ImagePlus,
   MessageCircle,
@@ -64,6 +64,8 @@ import {
   Ticket,
   SupportMessage,
   HomeSupportTicketRow,
+  SupportSocketPayload,
+  getSupportWsUrl,
   mapHomeTicket,
   mapHomeMessages,
   statusColor,
@@ -228,6 +230,7 @@ export default function SupportPage() {
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [isLayoutLoaded, setIsLayoutLoaded] = useState(false);
   const accountColumnsConfigRef = useRef<Record<string, unknown>>({});
+  const supportWsRef = useRef<WebSocket | null>(null);
   const [currentUser] = useState(() => {
     if (typeof window !== "undefined") {
       const username = localStorage.getItem("username");
@@ -282,14 +285,15 @@ export default function SupportPage() {
     customer_code: string;
   }>>([]);
 
+  const refreshSupportData = useCallback(async (showError = true) => {
+    const rows = await homeApi<HomeSupportTicketRow[]>("/support-tickets/full");
+    setTickets(rows.map(mapHomeTicket));
+    setTicketMessages(Object.fromEntries(rows.map((row) => [row.ticket_code, mapHomeMessages(row)])));
+  }, []);
+
   useEffect(() => {
     let alive = true;
-    homeApi<HomeSupportTicketRow[]>("/support-tickets/full")
-      .then((rows) => {
-        if (!alive) return;
-        setTickets(rows.map(mapHomeTicket));
-        setTicketMessages(Object.fromEntries(rows.map((row) => [row.ticket_code, mapHomeMessages(row)])));
-      })
+    refreshSupportData()
       .catch((error) => {
         if (!alive) return;
         setTickets([]);
@@ -302,7 +306,49 @@ export default function SupportPage() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [refreshSupportData]);
+
+  useEffect(() => {
+    const handleRefreshEvents = () => {
+      void refreshSupportData(false).catch(() => undefined);
+    };
+    window.addEventListener("support-tickets-changed", handleRefreshEvents);
+    return () => {
+      window.removeEventListener("support-tickets-changed", handleRefreshEvents);
+    };
+  }, [refreshSupportData]);
+
+  useEffect(() => {
+    const wsUrl = getSupportWsUrl("admin");
+    if (!wsUrl) return;
+    const socket = new WebSocket(wsUrl);
+    supportWsRef.current = socket;
+
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as SupportSocketPayload;
+        if (payload.type === "support_message_created" || payload.type === "support_message_updated") {
+          void refreshSupportData(false).catch(() => undefined);
+          window.dispatchEvent(new Event("support-tickets-changed"));
+        }
+      } catch {
+        // Ignore malformed websocket payloads.
+      }
+    };
+
+    socket.onclose = () => {
+      if (supportWsRef.current === socket) {
+        supportWsRef.current = null;
+      }
+    };
+
+    return () => {
+      if (supportWsRef.current === socket) {
+        supportWsRef.current = null;
+      }
+      socket.close();
+    };
+  }, [refreshSupportData]);
 
   useEffect(() => {
     Promise.all([

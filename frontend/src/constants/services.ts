@@ -58,23 +58,6 @@ export const typeColor: Record<string, string> = {
   "Hoàn tiền": "#dc2626",
 };
 
-export const seedServices: Service[] = [
-  { id: "DV-101", name: "Giặt thường", category: "Giặt theo kg", unit: "kg", price: 15000, turnaround: "Trong ngày", status: "Đang hoạt động", promotion: "Không", inventoryItems: "", note: "Áo quần hằng ngày" },
-  { id: "DV-102", name: "Giặt sấy", category: "Giặt theo kg", unit: "kg", price: 25000, turnaround: "6 giờ", status: "Đang hoạt động", promotion: "Có", inventoryItems: "", note: "Tách đồ trắng theo yêu cầu" },
-  { id: "DV-103", name: "Giặt khô vest", category: "Giặt theo món", unit: "món", price: 80000, turnaround: "24 giờ", status: "Đang hoạt động", promotion: "Có", inventoryItems: "", note: "Vest, áo khoác, đồ công sở" },
-  { id: "DV-104", name: "Chăn màn", category: "Đồ cồng kềnh", unit: "kg", price: 35000, turnaround: "24 giờ", status: "Đang hoạt động", promotion: "Không", inventoryItems: "", note: "Chăn, ga, rèm cửa" },
-  { id: "DV-105", name: "Vệ sinh rèm", category: "Tại nhà", unit: "bộ", price: 180000, turnaround: "48 giờ", status: "Đang hoạt động", promotion: "Có", inventoryItems: "", note: "Có lịch khảo sát trước" },
-  { id: "DV-106", name: "Giặt đồ da", category: "Cao cấp", unit: "món", price: 240000, turnaround: "72 giờ", status: "Tạm ngừng", promotion: "Không", inventoryItems: "", note: "Cần xác nhận hóa chất" },
-];
-
-export const seedPromotions: Promotion[] = [
-  { id: "MG-301", code: "WELCOME10", name: "Khách mới", type: "Phần trăm", value: "10%", appliedService: "Tất cả dịch vụ", startDate: "2026-05-01", endDate: "2026-06-30", usage: "120", claimed: 42, status: "Đang chạy", note: "Áp dụng đơn đầu tiên" },
-  { id: "MG-302", code: "BIRTHDAY15", name: "Sinh nhật", type: "Phần trăm", value: "15%", appliedService: "Tất cả dịch vụ", startDate: "2026-01-01", endDate: "", usage: "", claimed: 18, status: "Đang chạy", note: "Tự cấp theo ngày sinh khách hàng" },
-  { id: "MG-303", code: "COMBO-GIAT-SAY", name: "Combo giặt sấy", type: "Số tiền", value: "25.000đ", appliedService: "Giặt sấy", startDate: "2026-05-15", endDate: "2026-06-15", usage: "80", claimed: 68, status: "Sắp hết hạn", note: "Áp dụng dịch vụ giặt sấy từ 5kg" },
-  { id: "MG-304", code: "VIP5", name: "Khách VIP", type: "Phần trăm", value: "5%", appliedService: "Giặt khô vest", startDate: "2026-04-01", endDate: "2026-12-31", usage: "", claimed: 96, status: "Đang chạy", note: "Chỉ áp dụng hạng Vàng trở lên" },
-  { id: "MG-305", code: "RAINY20", name: "Ngày mưa", type: "Số tiền", value: "20.000đ", appliedService: "Giặt thường", startDate: "2026-05-20", endDate: "2026-05-31", usage: "200", claimed: 137, status: "Đã kết thúc", note: "Đã kết thúc do hết thời gian" },
-];
-
 export const initialPageSize = 10;
 export const serviceCustomValueStorageKey = "home_services_custom_values_service";
 export const promotionCustomValueStorageKey = "home_services_custom_values_promotion";

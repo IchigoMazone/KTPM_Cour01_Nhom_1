@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { PageShell } from "../_components/dashboard-primitives";
 import { homeApi } from "@/src/lib/home-api";
 import { API_BASE_URL } from "@/src/lib/config";
+import { fetchCurrentUser } from "@/src/lib/auth-session";
 import { HomeTableContentSkeleton } from "@/src/components/common/auth-guard";
 
 import {
@@ -110,16 +111,9 @@ export default function StaffOperationsPage() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
-      fetch(`${API_BASE_URL}/api/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-        .then((res) => {
-          if (res.ok) return res.json();
-          throw new Error("Failed to fetch profile");
-        })
+      fetchCurrentUser(token)
         .then((data) => {
+          if (!data) return;
           if (data && data.columns_config) {
             try {
               const parsed = JSON.parse(data.columns_config);

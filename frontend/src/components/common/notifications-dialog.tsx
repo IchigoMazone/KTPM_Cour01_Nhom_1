@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
 import { getAreaToken, homeApi } from "@/src/lib/home-api";
 import { API_BASE_URL } from "@/src/lib/config";
+import { uploadSupportChatImage } from "@/src/lib/support-chat-upload";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -31,6 +32,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FormDialog, type FormField } from "@/src/app/home/_components/form-dialog";
 import SupportChatBox, { type SupportChatMessage } from "./support-chat-box";
+import AccountAvatar from "./account-avatar";
 
 type NotificationsDialogProps = {
   isUserArea: boolean;
@@ -76,6 +78,7 @@ type SupportTicket = {
     reply_to?: { id: string; sender: "customer" | "staff"; content: string };
     reaction?: string;
     revoked?: boolean;
+    deleted_for_me?: boolean;
     created_at?: string;
   }>;
 };
@@ -86,6 +89,7 @@ type NotificationItem = {
   title: string;
   description: string;
   time: string;
+  timestamp?: string;
   href: string;
   bookingId?: string;
 };
@@ -93,6 +97,7 @@ type NotificationItem = {
 type Conversation = {
   id: string;
   ticketId: string;
+  ticketIds: string[];
   name: string;
   avatarUrl?: string;
   preview: string;
@@ -176,6 +181,34 @@ function formatAppointmentTime(item: Appointment) {
   return item.appointment_time || "Vừa tạo";
 }
 
+function getAppointmentTimestamp(item: Appointment) {
+  if (item.due_at) return item.due_at;
+  if (item.wash_date) {
+    const normalizedTime = item.appointment_time && item.appointment_time !== "--:--"
+      ? item.appointment_time
+      : "00:00";
+    return `${item.wash_date}T${normalizedTime}:00`;
+  }
+  return "";
+}
+
+function buildConversationPreview(
+  message: Pick<ChatMessage, "sender" | "content" | "imageUrl" | "revoked"> | undefined,
+  currentSender: "customer" | "staff",
+  fallback: string,
+) {
+  if (!message) return fallback;
+  let preview = fallback;
+  if (message.revoked) {
+    preview = "Tin nhắn đã được thu hồi";
+  } else if (message.imageUrl) {
+    preview = "Đã gửi một ảnh";
+  } else if (message.content?.trim()) {
+    preview = message.content.trim();
+  }
+  return message.sender === currentSender ? `Bạn: ${preview}` : preview;
+}
+
 export default function NotificationsDialog({
   isUserArea,
   open,
@@ -204,8 +237,11 @@ export default function NotificationsDialog({
   const [localMessages, setLocalMessages] = useState<Record<string, ChatMessage[]>>({});
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const currentUserIdRef = useRef("");
   const supportWsRef = useRef<WebSocket | null>(null);
   const pendingSupportWsPayloadsRef = useRef<string[]>([]);
+  const typingTimeoutRef = useRef<number | null>(null);
+  const [typingTicketId, setTypingTicketId] = useState<string | null>(null);
 
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -324,6 +360,14 @@ export default function NotificationsDialog({
     });
   }, [sendSupportWsPayload]);
 
+  const sendSupportTyping = useCallback((ticketId: string, isTyping: boolean) => {
+    return sendSupportWsPayload({
+      type: "support_typing",
+      ticket_id: ticketId,
+      is_typing: isTyping,
+    });
+  }, [sendSupportWsPayload]);
+
   const appendSupportMessage = useCallback((ticketId: string, message: NonNullable<SupportTicket["messages"]>[number]) => {
     let found = false;
     setTickets((current) =>
@@ -370,6 +414,7 @@ export default function NotificationsDialog({
   }, [open, refreshData]);
 
   useEffect(() => {
+    currentUserIdRef.current = localStorage.getItem("user_id") || "";
     if (!open) return;
     const wsUrl = getSupportWsUrl();
     if (!wsUrl) return;
@@ -382,6 +427,9 @@ export default function NotificationsDialog({
           type?: string;
           ticket_id?: string;
           message?: NonNullable<SupportTicket["messages"]>[number];
+          sender_role?: "customer" | "staff";
+          is_typing?: boolean;
+          sender_id?: string;
         };
         if (payload.type === "support_message_created") {
           if (payload.ticket_id && payload.message) {
@@ -393,13 +441,19 @@ export default function NotificationsDialog({
           window.dispatchEvent(new Event("support-tickets-changed"));
         }
         if (payload.type === "support_message_updated") {
-          if (payload.ticket_id && payload.message) {
-            const updated = updateSupportMessage(payload.ticket_id, payload.message);
-            if (!updated) refreshData();
-          } else {
-            refreshData();
-          }
+          refreshData();
           window.dispatchEvent(new Event("support-tickets-changed"));
+        }
+        if (payload.type === "support_typing" && payload.ticket_id && payload.sender_role) {
+          const peerRole = isUserArea ? "staff" : "customer";
+          const isOwnEvent = payload.sender_id && payload.sender_id === currentUserIdRef.current;
+          if (payload.sender_role === peerRole && payload.is_typing && !isOwnEvent) {
+            setTypingTicketId(payload.ticket_id);
+            if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = window.setTimeout(() => setTypingTicketId(null), 1600);
+          } else if (payload.sender_role === peerRole && !payload.is_typing && typingTicketId === payload.ticket_id && !isOwnEvent) {
+            setTypingTicketId(null);
+          }
         }
         if (payload.type === "support_error") {
           toast.error(typeof payload.message === "string" ? payload.message : "Không thể gửi tin nhắn.");
@@ -416,7 +470,7 @@ export default function NotificationsDialog({
       pendingSupportWsPayloadsRef.current = [];
       socket.close();
     };
-  }, [appendSupportMessage, flushPendingSupportWsPayloads, getSupportWsUrl, open, refreshData, updateSupportMessage]);
+  }, [appendSupportMessage, flushPendingSupportWsPayloads, getSupportWsUrl, isUserArea, open, refreshData, typingTicketId, updateSupportMessage]);
 
   useEffect(() => {
     const handleChanged = () => {
@@ -468,6 +522,7 @@ export default function NotificationsDialog({
       title: `Đặt lịch - ${item.customer_name || "Khách hàng"}`,
       description: "",
       time: formatAppointmentTime(item),
+      timestamp: getAppointmentTimestamp(item),
       href: isUserArea ? "/user/bookings" : "/home/orders",
       bookingId: item.booking_id,
     }));
@@ -477,6 +532,7 @@ export default function NotificationsDialog({
       title: `Hỗ trợ - ${ticket.customer_name || "Khách hàng"}`,
       description: "",
       time: formatTicketTime(ticket.created_at),
+      timestamp: ticket.created_at,
       href: isUserArea ? "/user/support" : "/home/support",
     }));
     return mode === "messages" ? supportItems : [...supportItems, ...appointmentItems];
@@ -487,11 +543,9 @@ export default function NotificationsDialog({
       ? notifications.filter((item) => !readIds.has(item.id))
       : notifications;
     return [...list].sort((a, b) => {
-      const aUnread = !readIds.has(a.id);
-      const bUnread = !readIds.has(b.id);
-      if (aUnread && !bUnread) return -1;
-      if (!aUnread && bUnread) return 1;
-      return 0;
+      const timeA = a.timestamp ? new Date(a.timestamp).getTime() : Number.NEGATIVE_INFINITY;
+      const timeB = b.timestamp ? new Date(b.timestamp).getTime() : Number.NEGATIVE_INFINITY;
+      return timeB - timeA;
     });
   }, [notifications, readIds, showUnreadOnly]);
 
@@ -528,35 +582,42 @@ export default function NotificationsDialog({
         new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
       );
       const latestTicket = sortedTickets[0];
-      const messages = sortedTickets
+      const baseMessages = sortedTickets
         .flatMap((ticket) => (ticket.messages || []).map((message) => ({
           id: message.message_id,
           sender: message.sender_role || "customer",
-          content: message.content || "",
-          avatarUrl: message.sender_avatar,
+          content: message.revoked ? "Tin nhắn đã được thu hồi" : (message.content || ""),
+          avatarUrl: message.sender_role === "staff"
+            ? (message.sender_avatar || ticket.assigned_avatar || "")
+            : (message.sender_avatar || ticket.customer_image_url || group.avatarUrl || ""),
           imageUrl: message.image_url,
           replyTo: message.reply_to,
           reaction: message.reaction,
           revoked: message.revoked,
+          deletedForMe: message.deleted_for_me,
           timestamp: message.created_at,
           time: message.created_at
             ? new Date(message.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
             : "",
         })))
         .sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+      const conversationId = `support-customer-${groupKey}`;
+      const messages = localMessages[conversationId] || baseMessages;
       const lastMessage = messages.at(-1);
+      const currentSender: "customer" | "staff" = isUserArea ? "customer" : "staff";
       return {
-        id: `support-customer-${groupKey}`,
+        id: conversationId,
         ticketId: latestTicket.ticket_id,
+        ticketIds: sortedTickets.map((ticket) => ticket.ticket_id),
         name: group.name,
         avatarUrl: group.avatarUrl,
-        preview: lastMessage?.content || latestTicket.subject || latestTicket.type || "Cần hỗ trợ",
+        preview: buildConversationPreview(lastMessage, currentSender, latestTicket.subject || latestTicket.type || "Cần hỗ trợ"),
         time: formatTicketTime(lastMessage?.timestamp || latestTicket.created_at),
         ticketCode: sortedTickets.map((ticket) => ticket.ticket_code).join(", "),
         messages,
       };
     });
-  }, [tickets]);
+  }, [isUserArea, localMessages, tickets]);
 
   const conversations = useMemo(() => {
     const query = messageQuery.trim().toLocaleLowerCase("vi");
@@ -631,14 +692,32 @@ export default function NotificationsDialog({
     }
   };
 
-  const appendLocalImage = (imageUrl: string, replyToMessage: ChatMessage | SupportChatMessage | null = replyingTo) => {
+  const deleteSupportMessage = async (message: SupportChatMessage) => {
+    if (!sendSupportWsPayload({
+      type: "update_support_message",
+      message_id: message.id,
+      action: "delete",
+    })) {
+      try {
+        await homeApi(`/support-messages/${message.id}`, {
+          method: "PUT",
+          body: JSON.stringify({ action: "delete" }),
+        });
+        refreshData();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Không thể xóa tin nhắn.");
+      }
+    }
+  };
+
+  const sendSupportImage = async (file: File, replyToMessage: ChatMessage | SupportChatMessage | null = replyingTo) => {
     if (!selectedConversation) return;
     const now = new Date();
     const message: ChatMessage = {
       id: `local-image-${now.getTime()}`,
       sender: "staff",
       content: "",
-      imageUrl,
+      imageUrl: "",
       time: now.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
       timestamp: now.toISOString(),
       replyTo: replyToMessage
@@ -649,18 +728,41 @@ export default function NotificationsDialog({
           }
         : undefined,
     };
-    setLocalMessages((current) => ({
-      ...current,
-      [selectedConversation.id]: [...selectedConversation.messages, message],
-    }));
-    setReplyingTo(null);
+
+    try {
+      const uploadResult = await uploadSupportChatImage(file, "admin");
+      message.imageUrl = uploadResult.image_url;
+      setLocalMessages((current) => ({
+        ...current,
+        [selectedConversation.id]: [...selectedConversation.messages, message],
+      }));
+      setReplyingTo(null);
+
+      const sentByWs = sendSupportWsPayload({
+        type: "send_support_message",
+        ticket_id: selectedConversation.ticketId,
+        content: "",
+        image_url: message.imageUrl,
+        reply_to: message.replyTo,
+      });
+      if (!sentByWs) {
+        throw new Error("WebSocket chưa sẵn sàng, vui lòng mở lại hộp chat và thử lại.");
+      }
+      window.dispatchEvent(new Event("support-tickets-changed"));
+    } catch (error) {
+      setLocalMessages((current) => ({
+        ...current,
+        [selectedConversation.id]: (current[selectedConversation.id] || selectedConversation.messages).filter((item) => item.id !== message.id),
+      }));
+      toast.error(error instanceof Error ? error.message : "Không thể gửi ảnh.");
+    }
   };
 
-  const selectImageFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const selectImageFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-    appendLocalImage(URL.createObjectURL(file));
     event.target.value = "";
+    if (!file) return;
+    await sendSupportImage(file);
   };
 
   const selectEmoji = (emoji: EmojiClickData) => {
@@ -810,6 +912,7 @@ export default function NotificationsDialog({
           conversation={selectedConversation}
           currentSender="staff"
           showMeta={false}
+          typingLabel={selectedConversation.ticketIds.includes(typingTicketId || "") ? "đang soạn tin..." : null}
           onClose={() => {
             setPreviewImage(null);
             setEmojiPickerOpen(false);
@@ -818,9 +921,11 @@ export default function NotificationsDialog({
             onOpenChange(false);
           }}
           onSendMessage={(content, replyTo) => appendLocalMessage(content, replyTo)}
-          onSendImage={(file, replyTo) => appendLocalImage(URL.createObjectURL(file), replyTo)}
+          onSendImage={(file, replyTo) => sendSupportImage(file, replyTo)}
           onReactMessage={reactToSupportMessage}
           onRevokeMessage={revokeSupportMessage}
+          onDeleteMessage={deleteSupportMessage}
+          onTypingChange={(isTyping) => sendSupportTyping(selectedConversation.ticketId, isTyping)}
         />
       );
 
@@ -1268,13 +1373,6 @@ export default function NotificationsDialog({
           {conversations.length > 0 ? <div className="space-y-1.5">
             {conversations.map((item) => {
             const unread = !readIds.has(item.id);
-            const initials = item.name
-              .trim()
-              .split(/\s+/)
-              .slice(-2)
-              .map((part) => part[0])
-              .join("")
-              .toUpperCase();
             return (
               <button
                 key={item.id}
@@ -1287,11 +1385,12 @@ export default function NotificationsDialog({
                   setSelectedConversationId(item.id);
                 }}
               >
-                <span className={`grid size-10 shrink-0 place-items-center rounded-full text-xs font-semibold transition-colors ${unread ? "bg-white text-blue-600" : "bg-slate-200 text-slate-600"}`}>
-                  {item.avatarUrl ? (
-                    <img src={item.avatarUrl} alt={item.name} className="size-full rounded-full object-cover" />
-                  ) : initials || "KH"}
-                </span>
+                <AccountAvatar
+                  name={item.name}
+                  imageUrl={item.avatarUrl}
+                  size={40}
+                  className="shrink-0"
+                />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     {unread && <span className="size-1.5 shrink-0 rounded-full bg-blue-500" />}

@@ -50,16 +50,3 @@ CREATE INDEX IF NOT EXISTS idx_home_services_service_code
 
 CREATE INDEX IF NOT EXISTS idx_home_services_status
     ON home_services(status);
-
-INSERT INTO home_services (
-    service_code, name, category, description, unit, price,
-    turnaround_hours, status, promotion_enabled
-)
-VALUES
-    ('0101', 'Giặt thường', 'Giặt theo kg', 'Áo quần hằng ngày', 'kg', 15000, 12, 'active', FALSE),
-    ('0102', 'Giặt sấy', 'Giặt theo kg', 'Tách đồ trắng theo yêu cầu', 'kg', 25000, 6, 'active', TRUE),
-    ('0103', 'Giặt khô vest', 'Giặt theo món', 'Vest, áo khoác, đồ công sở', 'item', 80000, 24, 'active', TRUE),
-    ('0104', 'Chăn màn', 'Đồ cồng kềnh', 'Chăn, ga, rèm cửa', 'kg', 35000, 24, 'active', FALSE),
-    ('0105', 'Vệ sinh rèm', 'Tại nhà', 'Có lịch khảo sát trước', 'combo', 180000, 48, 'active', TRUE),
-    ('0106', 'Giặt đồ da', 'Cao cấp', 'Cần xác nhận hóa chất', 'item', 240000, 72, 'inactive', FALSE)
-ON CONFLICT (service_code) DO NOTHING;
