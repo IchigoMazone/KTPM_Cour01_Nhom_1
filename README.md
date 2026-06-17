@@ -1,129 +1,218 @@
-﻿<h1 align="center" style="font-size: 25px;">Ứng dụng quản lí giặt là</h1>
+# Ứng dụng quản lý giặt là
 
-<p><span style="font-weight: 500;">Ứng dụng giặt là giúp người dùng đặt lịch giặt, sấy và ủi đồ nhanh chóng chỉ với vài thao tác. Thời gian nhận – trả linh hoạt, phù hợp với lịch trình bận rộn của bạn. Hệ thống theo dõi đơn hàng theo thời gian thực giúp bạn yên tâm về tình trạng đồ. Dịch vụ đảm bảo chất lượng với quy trình xử lý chuyên nghiệp. Ứng dụng mang đến trải nghiệm tiện lợi, tiết kiệm thời gian và chi phí.</p>
+Ứng dụng quản lý giặt là hỗ trợ khách hàng đặt lịch giặt, sấy, ủi đồ và hỗ trợ nhân viên quản lý đơn hàng, khách hàng, dịch vụ, khuyến mãi, tài chính, kho vật tư, máy móc và hỗ trợ khách hàng. Dự án được xây dựng theo mô hình full-stack với frontend Next.js và backend FastAPI kết nối PostgreSQL.
 
-## 1 Thành viên nhóm
+## Thành viên nhóm
 
-<br>
+| STT | Mã sinh viên | Thành viên | Chức vụ | Đóng góp |
+| --- | --- | --- | --- | --- |
+| 1 | 23010600 | Trịnh Như Nhất | Nhóm trưởng | 25% |
+| 2 | 23010499 | Nguyễn Tuấn Huy | Thành viên | 25% |
+| 3 | 23010625 | Trần Văn Nhật | Thành viên | 25% |
+| 4 | 23017270 | Mầu Danh Chiến | Thành viên | 25% |
 
-<table border="1" cellspacing="0" align="center">
-<tr>
-    <th>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;STT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
-    <th>&nbsp;&nbsp;&nbsp;Mã sinh viên&nbsp;&nbsp;&nbsp;</th>
-    <th>&nbsp;&nbsp;&nbsp;Thành viên&nbsp;&nbsp;&nbsp;</th>
-    <th>&nbsp;&nbsp;&nbsp;Chức vụ&nbsp;&nbsp;&nbsp;</th>
-    <th>&nbsp;&nbsp;&nbsp;Đóng góp&nbsp;&nbsp;&nbsp;</th>
-</tr>
-<tr>
-    <td align="center">1</td>
-    <td align="center">23010600</td>
-    <td align="center">Trịnh Như Nhất</td>
-    <td align="center">Nhóm trưởng</td>
-    <td align="center">25%</td>
-</tr>
-<tr>
-    <td align="center">2</td>
-    <td align="center">23010499</td>
-    <td align="center">Nguyễn Tuấn Huy</td>
-    <td align="center">Thành viên</td>
-    <td align="center">25%</td>
-<tr>
-    <td align="center">3</td>
-    <td align="center">23010625</td>
-    <td align="center">Trần Văn Nhật</td>
-    <td align="center">Thành viên</td>
-    <td align="center">25%</td>
-</tr>
-<tr>
-    <td align="center">3</td>
-    <td align="center">23017270</td>
-    <td align="center">Mầu Danh Chiến</td>
-    <td align="center">Thành viên</td>
-    <td align="center">25%</td>
-</tr>
-</table>
+## Công nghệ sử dụng
 
-## 2 Thông tin dụng cụ
+| Thành phần | Công nghệ |
+| --- | --- |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
+| UI | shadcn/radix-ui, lucide-react, framer-motion, recharts |
+| Backend | FastAPI, Uvicorn, Pydantic |
+| Database | PostgreSQL, psycopg2 |
+| Xác thực | JWT, bcrypt, python-jose |
+| Lưu trữ ảnh | Cloudflare R2/S3 compatible storage |
 
-<br>
+## Chức năng chính
 
-<table border="1" cellspacing="0" align="center">
-<tr>
-    <th>&nbsp;&nbsp;&nbsp;Công cụ&nbsp;&nbsp;&nbsp;</th>
-    <th>&nbsp;&nbsp;&nbsp;Phiên bản&nbsp;&nbsp;&nbsp;</th>
-    <th>&nbsp;&nbsp;&nbsp;Link tải&nbsp;&nbsp;&nbsp;</th>
-    <th>&nbsp;&nbsp;&nbsp;Dùng để&nbsp;&nbsp;&nbsp;</th>
-</tr>
-<tr>
-    <td>Next.js</td>
-    <td>14.x</td>
-    <td><a href="https://nextjs.org/docs/getting-started/installation" target="_blank">Tải tại đây</a></td>
-    <td>Xây dựng giao diện frontend hiện đại.<br>Hỗ trợ SSR và tối ưu hiệu năng.</td>
-</tr>
-<tr>
-    <td>PostgreSQL</td>
-    <td>17</td>
-    <td><a href="https://www.postgresql.org/download/" target="_blank">Tải tại đây</a></td>
-    <td>Lưu trữ và quản lý dữ liệu hệ thống.<br>Đảm bảo toàn vẹn và bảo mật dữ liệu.</td>
-</tr>
-<tr>
-    <td>FastAPI</td>
-    <td>10.x</td>
-    <td><a href="https://docs.nestjs.com/" target="_blank">Tải tại đây</a></td>
-    <td>Xây dựng backend và cung cấp API.<br>Xử lý logic nghiệp vụ hệ thống.</td>
-</tr>
-<tr>
-    <td>Tailwind CSS</td>
-    <td>4.x</td>
-    <td><a href="https://tailwindcss.com/docs/installation" target="_blank">Tải tại đây</a></td>
-    <td>Thiết kế giao diện nhanh bằng utility class.<br>Hỗ trợ responsive và UI hiện đại.</td>
-</tr>
-<tr>
-    <td>TypeScript</td>
-    <td>5.x</td>
-    <td><a href="https://www.typescriptlang.org/download" target="_blank">Tải tại đây</a></td>
-    <td>Viết code có kiểu rõ ràng.<br>Giúp giảm lỗi và dễ bảo trì.</td>
-</tr>
-</table>
-</table>
+- Trang tổng quan: thống kê doanh thu, đơn hàng, đơn gần đây và tình hình vận hành.
+- Xác thực người dùng: đăng ký, đăng nhập, refresh token, quên mật khẩu, cập nhật hồ sơ và ảnh đại diện.
+- Quản lý khách hàng: thông tin liên hệ, điểm tích lũy, hạng thành viên, ghi chú đặc biệt.
+- Quản lý đơn hàng: tạo đơn, cập nhật trạng thái, lịch sử trạng thái, hóa đơn.
+- Quản lý đặt lịch: khách hàng gửi yêu cầu, nhân viên duyệt và chuyển thành đơn hàng.
+- Quản lý dịch vụ và bảng giá: tạo, sửa, xóa dịch vụ giặt là.
+- Quản lý khuyến mãi: mã ưu đãi, nhận ưu đãi, sử dụng ưu đãi.
+- Quản lý tài chính: doanh thu, công nợ, chi phí, hoàn tiền.
+- Quản lý kho và thiết bị: vật tư, máy giặt/sấy, lịch sử bảo trì.
+- Hỗ trợ khách hàng: ticket, tin nhắn hỗ trợ và websocket chat.
+- Báo cáo và thống kê: doanh thu, đơn hàng, tổng quan theo thời gian.
 
-## 3 Tổng quan, chức năng
+## Cấu trúc thư mục
 
-<h3>1. Trang chủ / Tổng quan</h3>
-<p>Hiển thị tổng đơn hàng hôm nay, doanh thu ngày/tuần/tháng, số đơn đang xử lý và cảnh báo đơn trễ hạn.</p>
+```text
+.
+├── backend/
+│   ├── app/
+│   │   ├── api/              # Router FastAPI
+│   │   ├── core/             # Bảo mật và xử lý lỗi
+│   │   ├── database/         # Kết nối DB và các file SQL
+│   │   ├── dependencies/     # Dependency injection
+│   │   ├── repositories/     # Tầng truy vấn dữ liệu
+│   │   ├── schemas/          # Pydantic schemas
+│   │   ├── services/         # Xử lý nghiệp vụ
+│   │   └── utils/            # Tiện ích phụ trợ
+│   ├── requirements.txt
+│   └── start.py
+├── frontend/
+│   ├── src/
+│   │   ├── app/              # Next.js App Router
+│   │   ├── components/       # Component dùng chung
+│   │   ├── context/          # Zustand stores
+│   │   ├── constants/        # Dữ liệu hằng số
+│   │   ├── hooks/            # Custom hooks
+│   │   ├── lib/              # API client và helper
+│   │   ├── types/            # TypeScript types
+│   │   └── utils/            # Hàm tiện ích
+│   ├── public/               # Ảnh và static assets
+│   └── package.json
+└── README.md
+```
 
-<h3>2. Quản lý khách hàng</h3>
-<p>Quản lý hồ sơ khách hàng, lịch sử đơn giặt, điểm tích lũy và các ghi chú đặc biệt như dị ứng hoặc yêu cầu riêng.</p>
+## Yêu cầu môi trường
 
-<h3>3. Quản lý đơn hàng</h3>
-<p>Tạo đơn giặt mới, theo dõi trạng thái xử lý và hỗ trợ in phiếu đơn hàng.</p>
+- Node.js 20 trở lên
+- npm
+- Python 3.12 trở lên
+- PostgreSQL 17 hoặc PostgreSQL tương thích
 
-<h3>4. Dịch vụ & Bảng giá</h3>
-<p>Quản lý các loại dịch vụ giặt và thiết lập bảng giá theo kg hoặc theo từng loại đồ.</p>
+## Cấu hình biến môi trường
 
-<h3>5. Quản lý giao nhận</h3>
-<p>Theo dõi lịch lấy/trả đồ, phân công nhân viên giao nhận và quản lý trạng thái vận chuyển.</p>
+Tạo file `backend/.env`:
 
-<h3>6. Kho & Vật tư</h3>
-<p>Quản lý vật tư như hóa chất, móc áo, túi đựng và cảnh báo khi sắp hết hàng.</p>
+```env
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/postgres
 
-<h3>7. Nhân viên</h3>
-<p>Quản lý danh sách nhân viên, ca làm việc và theo dõi hiệu suất công việc.</p>
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=postgres
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_SSLMODE=prefer
+DB_CHANNEL_BINDING=prefer
 
-<h3>8. Tài chính</h3>
-<p>Theo dõi doanh thu, chi phí, công nợ và lợi nhuận của hệ thống.</p>
+SECRET_KEY=change_me_access_token_secret
+REFRESH_TOKEN_SECRET=change_me_refresh_token_secret
+RESET_TOKEN=change_me_reset_token_secret
 
-<h3>9. Khuyến mãi & Loyalty</h3>
-<p>Quản lý mã giảm giá, chương trình tích điểm và ưu đãi khách hàng thân thiết.</p>
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_PUBLIC_URL=
+```
 
-<h3>10. Báo cáo & Thống kê</h3>
-<p>Thống kê dữ liệu đơn hàng, doanh thu và xuất báo cáo dưới dạng Excel hoặc PDF.</p>
+Tạo file `frontend/.env.local`:
 
-<h3>11. Hỗ trợ & Phản hồi</h3>
-<p>Tiếp nhận và xử lý khiếu nại, đánh giá từ khách hàng và theo dõi lịch sử hỗ trợ.</p>
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
-<h3>12. Cài đặt hệ thống</h3>
-<p>Cấu hình thông tin cửa hàng, giờ hoạt động và các thiết lập chung của hệ thống.</p>
+> Lưu ý: Không commit file `.env` chứa mật khẩu database, JWT secret hoặc khóa R2 lên Git.
 
-<br>
-<h3 align="center">Hết...</h3>
+## Cài đặt và chạy backend
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python start.py
+```
+
+Backend mặc định chạy tại:
+
+- API: `http://localhost:8000`
+- Swagger UI: `http://localhost:8000/docs`
+- OpenAPI JSON: `http://localhost:8000/openapi.json`
+
+Khi khởi động, backend sẽ tự động đọc các file SQL trong `backend/app/database` để tạo/cập nhật một số bảng nghiệp vụ như dịch vụ, đơn hàng, khuyến mãi, tài chính, hỗ trợ, memo, kho và máy móc.
+
+Nếu cần import bảng tài khoản mẫu, có thể chạy:
+
+```bash
+psql "postgresql://postgres:your_password@localhost:5432/postgres" -f app/database/accounts.sql
+```
+
+Tài khoản mẫu trong `accounts.sql`:
+
+| Username | Mật khẩu | Vai trò |
+| --- | --- | --- |
+| `admin_user1` | `Admin@123` | `admin` |
+
+## Cài đặt và chạy frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend mặc định chạy tại `http://localhost:3000`.
+
+Build production:
+
+```bash
+cd frontend
+npm run build
+npm run start
+```
+
+Kiểm tra lint:
+
+```bash
+cd frontend
+npm run lint
+```
+
+## API chính
+
+Backend gắn router với prefix `/api`.
+
+### Auth
+
+- `POST /api/auth/register`: đăng ký tài khoản
+- `POST /api/auth/login`: đăng nhập
+- `POST /api/auth/refresh`: làm mới access token
+- `GET /api/auth/me`: lấy thông tin người dùng hiện tại
+- `PUT /api/auth/me`: cập nhật hồ sơ
+- `POST /api/auth/upload-avatar`: tải ảnh đại diện lên R2
+- `POST /api/auth/forgot-password`: tạo yêu cầu quên mật khẩu
+- `POST /api/auth/reset-password`: đặt lại mật khẩu
+
+### Home
+
+- `GET /api/home/dashboard/summary`: tổng hợp dashboard
+- `GET /api/home/dashboard/revenue`: thống kê doanh thu
+- `GET /api/home/dashboard/overview`: tổng quan vận hành
+- `GET /api/home/customers`: danh sách khách hàng
+- `GET /api/home/orders`: danh sách đơn hàng
+- `GET /api/home/my-orders`: đơn hàng của người dùng hiện tại
+- `GET /api/home/services`: danh sách dịch vụ
+- `GET /api/home/promotions`: danh sách khuyến mãi
+- `GET /api/home/booking-requests`: danh sách yêu cầu đặt lịch
+- `GET /api/home/my-bookings`: lịch đặt của người dùng hiện tại
+- `GET /api/home/finance-records`: danh sách bản ghi tài chính
+- `GET /api/home/support-tickets/full`: ticket hỗ trợ kèm thông tin liên quan
+- `WS /api/home/ws/support-chat`: websocket chat hỗ trợ
+
+## Quy trình chạy local để demo
+
+1. Tạo database PostgreSQL local.
+2. Cấu hình `backend/.env`.
+3. Chạy backend bằng `python start.py`.
+4. Nếu database chưa có bảng `accounts`, import `backend/app/database/accounts.sql`.
+5. Cấu hình `frontend/.env.local` trỏ đến `http://localhost:8000`.
+6. Chạy frontend bằng `npm run dev`.
+7. Truy cập `http://localhost:3000` và đăng nhập bằng tài khoản mẫu.
+
+## Ghi chú phát triển
+
+- Frontend dùng App Router của Next.js, các trang quản trị nằm trong `frontend/src/app/home`.
+- Các trang người dùng nằm trong `frontend/src/app/user`.
+- API base URL được cấu hình tại `frontend/src/lib/config.ts`.
+- Kết nối database tập trung tại `backend/app/database/database.py`.
+- CORS hiện đang cho phép tất cả origin để tiện phát triển local.
+- File `backend/.env.example` có thể dùng làm mẫu cấu hình, nhưng nên cập nhật secret riêng khi chạy thật.
+
+## Tác giả
+
+Nhóm 1 - Học phần KTPM Cour01.
