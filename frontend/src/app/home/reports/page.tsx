@@ -69,14 +69,6 @@ const columns: DashboardTableColumn[] = [
 ];
 const statuses: Array<ReportStatus | "Tất cả"> = ["Tất cả", "Bật", "Tắt"];
 
-const seedReports: ReportRow[] = [
-  { id: "BC-101", name: "Doanh thu ngày", category: "Doanh thu", range: "Hôm nay", owner: "Quản lý", format: "Excel", schedule: "22:00 mỗi ngày", status: "Bật", note: "Gửi email quản lý" },
-  { id: "BC-102", name: "Công nợ tuần", category: "Tài chính", range: "7 ngày", owner: "Thu ngân", format: "Excel", schedule: "Thứ 2 hàng tuần", status: "Bật", note: "Lọc đơn chưa thu đủ" },
-  { id: "BC-103", name: "Tồn kho tháng", category: "Kho", range: "Tháng này", owner: "Kho", format: "PDF", schedule: "Ngày 1 mỗi tháng", status: "Bật", note: "Kèm vật tư sắp hết" },
-  { id: "BC-104", name: "Top khách hàng", category: "CRM", range: "30 ngày", owner: "Admin", format: "PDF", schedule: "Thủ công", status: "Tắt", note: "Dùng cho khuyến mãi" },
-  { id: "BC-105", name: "Hiệu suất nhân viên", category: "Vận hành", range: "Tuần này", owner: "Quản lý", format: "Excel", schedule: "Chủ nhật", status: "Bật", note: "Theo đơn hoàn thành" },
-];
-
 function mapHomeDailyReport(row: HomeDailyReportRow): ReportRow {
   const reportDate = row.report_date?.slice(0, 10) || "";
   return {

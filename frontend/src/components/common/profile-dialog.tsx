@@ -2,6 +2,7 @@
 
 import { API_BASE_URL } from "@/src/lib/config";
 import { DEFAULT_ACCOUNT_AVATAR_URL, emitAccountProfileUpdated } from "@/src/lib/account-profile";
+import { getAreaToken } from "@/src/lib/home-api";
 import AccountAvatar from "./account-avatar";
 
 import { useEffect, useMemo, useState, useRef } from "react";
@@ -161,7 +162,7 @@ export default function ProfileDialog({
     if (!files || files.length === 0) return;
 
     const file = files[0];
-    const token = localStorage.getItem("token");
+    const token = getAreaToken(isUserArea ? "user" : "admin");
     if (!token) {
       toast.error("Phiên đăng nhập đã hết hạn.");
       return;
@@ -233,7 +234,7 @@ export default function ProfileDialog({
     if (!open) return;
 
     const fetchProfile = async () => {
-      const token = localStorage.getItem("token");
+      const token = getAreaToken(isUserArea ? "user" : "admin");
       if (!token) {
         toast.error("Phiên đăng nhập đã hết hạn.");
         return;
@@ -319,7 +320,7 @@ export default function ProfileDialog({
   };
 
   const handleSave = async () => {
-    const token = localStorage.getItem("token");
+    const token = getAreaToken(isUserArea ? "user" : "admin");
     if (!token) {
       toast.error("Phiên đăng nhập đã hết hạn.");
       return;
@@ -349,6 +350,16 @@ export default function ProfileDialog({
       }
 
       setCurrentUser(data);
+      if (isUserArea) {
+        setLinkedCustomer((prev) => prev ? {
+          ...prev,
+          full_name: data.profile?.full_name || prev.full_name,
+          email: data.profile?.email || "",
+          phone: data.profile?.phone || "",
+          address: data.profile?.address || "",
+          note: data.profile?.special_notes || "",
+        } : prev);
+      }
       setForm({
         full_name: data.profile?.full_name || data.username || accountName,
         email: data.profile?.email || "",
@@ -436,9 +447,9 @@ export default function ProfileDialog({
                 <div className="relative">
                   <UserRound className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   <Input
-                    value={isUserArea ? (linkedCustomer?.full_name || form.full_name || "-") : form.full_name}
+                    value={form.full_name}
                     onChange={(e) => updateField("full_name", e.target.value)}
-                    disabled={isLoading || isUserArea}
+                    disabled={isLoading}
                     className="h-8 rounded-lg border-input bg-transparent px-2.5 py-1 pl-8 text-sm text-slate-700 shadow-none disabled:bg-slate-50 disabled:text-slate-500"
                   />
                 </div>
@@ -468,9 +479,9 @@ export default function ProfileDialog({
                   <Mail className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   <Input
                     type="email"
-                    value={displayEmail}
+                    value={form.email}
                     onChange={(e) => updateField("email", e.target.value)}
-                    disabled={isLoading || isUserArea}
+                    disabled={isLoading}
                     className="h-8 rounded-lg border-input bg-transparent px-2.5 py-1 pl-8 text-sm text-slate-700 shadow-none disabled:bg-slate-50 disabled:text-slate-500"
                   />
                 </div>
@@ -484,9 +495,9 @@ export default function ProfileDialog({
                 <div className="relative">
                   <Phone className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   <Input
-                    value={displayPhone}
+                    value={form.phone}
                     onChange={(e) => updateField("phone", e.target.value)}
-                    disabled={isLoading || isUserArea}
+                    disabled={isLoading}
                     className="h-8 rounded-lg border-input bg-transparent px-2.5 py-1 pl-8 text-sm text-slate-700 shadow-none disabled:bg-slate-50 disabled:text-slate-500"
                   />
                 </div>
@@ -546,9 +557,9 @@ export default function ProfileDialog({
                     <Building2 className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   )}
                   <Input
-                    value={displayAddress}
+                    value={form.address}
                     onChange={(e) => updateField("address", e.target.value)}
-                    disabled={isLoading || isUserArea}
+                    disabled={isLoading}
                     className="h-8 rounded-lg border-input bg-transparent px-2.5 py-1 pl-8 text-sm text-slate-700 shadow-none disabled:bg-slate-50 disabled:text-slate-500"
                   />
                 </div>
@@ -560,9 +571,9 @@ export default function ProfileDialog({
                 <Skeleton className="h-16 rounded-lg" />
               ) : (
                 <Textarea
-                  value={displayNotes}
+                  value={form.special_notes}
                   onChange={(e) => updateField("special_notes", e.target.value)}
-                  disabled={isLoading || isUserArea}
+                  disabled={isLoading}
                   placeholder="Ví dụ: dị ứng hóa chất, yêu cầu riêng..."
                   className="h-16 min-h-16 resize-none rounded-lg border-input bg-transparent px-2.5 py-2 text-sm text-slate-700 shadow-none disabled:bg-slate-50 disabled:text-slate-500"
                 />

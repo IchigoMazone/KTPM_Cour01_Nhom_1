@@ -250,6 +250,14 @@ class AccountService:
                 table_resize_mode=data.get("table_resize_mode"),
                 columns_config=data.get("columns_config"),
             )
+            repository.sync_customer_profile_by_account(
+                user_id=user_id,
+                full_name=data.get("full_name", profile.get("full_name")),
+                email=email or None,
+                phone=data.get("phone", profile.get("phone")),
+                address=data.get("address", profile.get("address")),
+                note=data.get("special_notes", profile.get("special_notes")),
+            )
             if "image_url" in data:
                 repository.sync_customer_avatar_by_account(user_id, data.get("image_url"))
             self.connect.commit()

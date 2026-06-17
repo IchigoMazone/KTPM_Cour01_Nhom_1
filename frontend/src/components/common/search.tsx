@@ -103,7 +103,7 @@ function DashboardTimeRangeControl() {
         <Button
           type="button"
           variant="ghost"
-          className="flex h-8 min-w-[194px] shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800"
+          className="flex h-8 min-w-[250px] shrink-0 gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-600 shadow-none transition-colors hover:bg-slate-50 hover:text-slate-800"
         >
           <CalendarDays className="size-4" />
           <span className="hidden whitespace-nowrap sm:inline">

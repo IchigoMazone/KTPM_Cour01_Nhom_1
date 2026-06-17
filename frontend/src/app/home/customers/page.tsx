@@ -34,6 +34,7 @@ import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeS
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
 import { homeApi, listHomeResource } from "@/src/lib/home-api";
 import { API_BASE_URL } from "@/src/lib/config";
+import { fetchCurrentUser } from "@/src/lib/auth-session";
 import { HomeTableContentSkeleton } from "@/src/components/common/auth-guard";
 
 type CustomerFields = {
@@ -282,14 +283,9 @@ export default function CustomersPage() {
       setIsLayoutLoaded(true);
       return;
     }
-    fetch(`${API_BASE_URL}/api/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((response) => {
-        if (!response.ok) throw new Error("Failed to load customers layout");
-        return response.json();
-      })
+    fetchCurrentUser(token)
       .then((data) => {
+        if (!data) return;
         if (!data?.columns_config) return;
         const parsed = JSON.parse(data.columns_config) as Record<string, unknown>;
         accountColumnsConfigRef.current = parsed;

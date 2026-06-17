@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { PageShell } from "../_components/dashboard-primitives";
 import { listHomeResource } from "@/src/lib/home-api";
 import { API_BASE_URL } from "@/src/lib/config";
+import { fetchCurrentUser } from "@/src/lib/auth-session";
 import { HomeTableContentSkeleton } from "@/src/components/common/auth-guard";
 import { type DashboardTableColumn } from "@/src/components/common/dashboard-data-table";
 
@@ -20,7 +21,6 @@ import {
 
 import {
   defaultAvatarUrl,
-  seedPromotions,
   initialPageSize,
   serviceCustomValueStorageKey,
   promotionCustomValueStorageKey,
@@ -136,15 +136,14 @@ export default function ServicesFinancePage() {
         const mappedServices = servicesRes.items.map(mapHomeService);
         setServices(mergeStoredCustomValues(mappedServices, serviceCustomValueStorageKey));
 
-        const mappedPromotions =
-          promotionsRes.items.length > 0 ? promotionsRes.items.map(mapHomePromotion) : seedPromotions;
+        const mappedPromotions = promotionsRes.items.map(mapHomePromotion);
         setPromotions(mergeStoredCustomValues(mappedPromotions, promotionCustomValueStorageKey));
         setFinanceRecords(financeRes.items.map(mapHomeFinance));
       })
       .catch(() => {
         if (alive) {
           setServices([]);
-          setPromotions(mergeStoredCustomValues(seedPromotions, promotionCustomValueStorageKey));
+          setPromotions([]);
           setFinanceRecords([]);
         }
       })
@@ -181,14 +180,9 @@ export default function ServicesFinancePage() {
       return;
     }
 
-    fetch(`${API_BASE_URL}/api/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((response) => {
-        if (!response.ok) throw new Error("Failed to fetch services layout");
-        return response.json();
-      })
+    fetchCurrentUser(token)
       .then((data) => {
+        if (!data) return;
         if (!data?.columns_config) return;
         const parsed = JSON.parse(data.columns_config) as Record<string, unknown>;
         accountColumnsConfigRef.current = parsed;

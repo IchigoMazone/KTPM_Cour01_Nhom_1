@@ -4,6 +4,12 @@ class AccountRepository:
     def __init__(self, cursor):
         self.cursor = cursor
 
+    def ensure_layout_columns(self):
+        # Account layout columns are part of the managed schema now.
+        # Avoid running DDL inside request paths because it can lock `accounts`
+        # and stall unrelated pages such as `/home` and order updates.
+        return
+
     def get_by_username(self, username):
         self.cursor.execute(
             """
@@ -135,6 +141,7 @@ class AccountRepository:
         return self.cursor.fetchone()
 
     def get_by_id(self, user_id):
+        self.ensure_layout_columns()
         self.cursor.execute(
             "SELECT user_id, username, role, is_active, page_size, table_resize_mode, columns_config FROM accounts WHERE user_id = %s",
             (user_id,)
@@ -149,6 +156,7 @@ class AccountRepository:
         )
 
     def update_profile(self, user_id, role, full_name, email, phone, address, special_notes, image_url, page_size=None, table_resize_mode=None, columns_config=None):
+        self.ensure_layout_columns()
         if role == "admin":
             special_notes = None
 
@@ -182,6 +190,24 @@ class AccountRepository:
             WHERE account_id = %s
             """,
             (image_url, user_id),
+        )
+
+    def sync_customer_profile_by_account(self, user_id, full_name, email, phone, address, note=None):
+        self.cursor.execute("SELECT to_regclass('public.home_customers')")
+        if not self.cursor.fetchone()[0]:
+            return
+        self.cursor.execute(
+            """
+            UPDATE home_customers
+            SET full_name = COALESCE(%s, full_name),
+                email = %s,
+                phone = COALESCE(%s, phone),
+                address = %s,
+                note = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE account_id = %s
+            """,
+            (full_name, email, phone, address, note, user_id),
         )
 
     def sync_account_avatar_by_customer(self, account_id, image_url):

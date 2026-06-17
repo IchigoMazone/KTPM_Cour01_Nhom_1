@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "./config";
+import { clearStoredSession, isInvalidSessionResponse, readErrorMessage, redirectToLogin } from "./auth-session";
 
 type HomeListResponse<T> = {
   items: T[];
@@ -76,13 +77,12 @@ export async function homeApi<T>(path: string, init: RequestInit = {}): Promise<
   })
     .then(async (response) => {
       if (!response.ok) {
-        const rawMessage = await response.text();
-        let message = rawMessage;
-        try {
-          const parsed = JSON.parse(rawMessage) as { detail?: string };
-          message = parsed.detail || rawMessage;
-        } catch {
-          // Keep non-JSON API errors unchanged.
+        const message = await readErrorMessage(response);
+        if (typeof window !== "undefined" && isInvalidSessionResponse(response.status, message)) {
+          clearStoredSession();
+          clearHomeApiCache();
+          redirectToLogin();
+          throw new Error(message || "Phiên đăng nhập không hợp lệ.");
         }
         throw new Error(message || `Home API failed: ${response.status}`);
       }
