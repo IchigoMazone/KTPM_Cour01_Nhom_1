@@ -78,9 +78,10 @@ export function FilterBar({
                 key={opt.id}
                 onClick={() => onValueChange(opt.id)}
               >
-                {opt.color && (
-                  <span className="mr-2 size-2 rounded-full" style={{ backgroundColor: opt.color }} />
-                )}
+                <span
+                  className="mr-2 size-2 rounded-full"
+                  style={{ backgroundColor: opt.color || "#64748b" }}
+                />
                 {opt.label}
               </DropdownMenuItem>
             );

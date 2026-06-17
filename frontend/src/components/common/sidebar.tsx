@@ -2,10 +2,10 @@
 
 import { API_BASE_URL } from "@/src/lib/config";
 
-import Image from "next/image";
 import React, { useState } from "react";
 import { Bell, LogOut, Panda, PanelLeft, Settings } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import AccountAvatar from "./account-avatar";
 import Dropdown from "../ui/dropdown";
 import LogoutDialog from "./logout-dialog";
 import NotificationsDialog from "./notifications-dialog";
@@ -15,6 +15,7 @@ import { useNavbarStore } from "@/src/context/useNavbarStore";
 import { useSettingsStore } from "@/src/context/useSettingsStore";
 import { menus } from "@/src/utils/routes";
 import { userMenus } from "@/src/utils/user-routes";
+import { ACCOUNT_PROFILE_UPDATED_EVENT, DEFAULT_ACCOUNT_AVATAR_URL } from "@/src/lib/account-profile";
 
 type SidebarItem = (typeof menus)[number] | (typeof userMenus)[number];
 
@@ -25,6 +26,13 @@ type CurrentUser = {
     full_name?: string | null;
     image_url?: string | null;
   } | null;
+};
+
+type LinkedCustomer = {
+  customer_code?: string | null;
+  full_name?: string | null;
+  image_url?: string | null;
+  rank?: string | null;
 };
 
 export default function Sidebar() {
@@ -43,7 +51,7 @@ export default function Sidebar() {
   const fallbackRoleLabel = isUserArea ? "Tài khoản khách hàng" : "Tài khoản nội bộ";
   const [accountName, setAccountName] = useState("");
   const [accountRoleLabel, setAccountRoleLabel] = useState("");
-  const [accountImageUrl, setAccountImageUrl] = useState("https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
+  const [accountImageUrl, setAccountImageUrl] = useState(DEFAULT_ACCOUNT_AVATAR_URL);
 
   React.useEffect(() => {
     let ignore = false;
@@ -65,20 +73,26 @@ export default function Sidebar() {
       customer: "Tài khoản khách hàng",
     };
 
+    const syncStoredAccount = () => {
+      if (ignore) return;
+      const nextAccountName = localStorage.getItem("accountName");
+      const nextRole = localStorage.getItem("role");
+      const nextImageUrl = localStorage.getItem("accountImageUrl");
+
+      if (nextAccountName) setAccountName(nextAccountName);
+      if (nextRole) setAccountRoleLabel(roleLabels[nextRole] || fallbackRoleLabel);
+      setAccountImageUrl(nextImageUrl || DEFAULT_ACCOUNT_AVATAR_URL);
+    };
+
     const timer = window.setTimeout(() => {
       if (ignore) return;
-      if (storedAccountName) {
-        setAccountName(storedAccountName);
-      }
-
-      if (storedRole) {
-        setAccountRoleLabel(roleLabels[storedRole] || fallbackRoleLabel);
-      }
-
-      if (storedImageUrl) {
-        setAccountImageUrl(storedImageUrl);
-      }
+      if (storedAccountName) setAccountName(storedAccountName);
+      if (storedRole) setAccountRoleLabel(roleLabels[storedRole] || fallbackRoleLabel);
+      setAccountImageUrl(storedImageUrl || DEFAULT_ACCOUNT_AVATAR_URL);
     }, 0);
+
+    window.addEventListener(ACCOUNT_PROFILE_UPDATED_EVENT, syncStoredAccount);
+    window.addEventListener("storage", syncStoredAccount);
 
     fetch(`${API_BASE_URL}/api/auth/me`, {
       headers: {
@@ -98,6 +112,37 @@ export default function Sidebar() {
         if (user.profile?.image_url) {
           setAccountImageUrl(user.profile.image_url);
           localStorage.setItem("accountImageUrl", user.profile.image_url);
+        } else {
+          setAccountImageUrl(DEFAULT_ACCOUNT_AVATAR_URL);
+          localStorage.setItem("accountImageUrl", DEFAULT_ACCOUNT_AVATAR_URL);
+        }
+
+        if (isUserArea) {
+          fetch(`${API_BASE_URL}/api/home/my-customer`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          })
+            .then(async (response) => {
+              if (!response.ok) return null;
+              return response.json() as Promise<LinkedCustomer>;
+            })
+            .then((customer) => {
+              if (ignore || !customer) return;
+              const customerName = customer.full_name?.trim() || nextAccountName;
+              const customerImage = customer.image_url || user.profile?.image_url || DEFAULT_ACCOUNT_AVATAR_URL;
+              const customerRole = customer.customer_code
+                ? `Khách hàng · ${customer.customer_code}`
+                : "Khách hàng";
+
+              setAccountName(customerName);
+              setAccountRoleLabel(customerRole);
+              setAccountImageUrl(customerImage);
+              localStorage.setItem("accountName", customerName);
+              localStorage.setItem("accountImageUrl", customerImage);
+            })
+            .catch(() => undefined);
         }
       })
       .catch(() => {
@@ -109,6 +154,8 @@ export default function Sidebar() {
     return () => {
       ignore = true;
       window.clearTimeout(timer);
+      window.removeEventListener(ACCOUNT_PROFILE_UPDATED_EVENT, syncStoredAccount);
+      window.removeEventListener("storage", syncStoredAccount);
     };
   }, [fallbackRoleLabel, isUserArea]);
 
@@ -229,12 +276,11 @@ export default function Sidebar() {
               trigger={
                 <button className="flex h-10 min-w-0 cursor-pointer items-center rounded-lg text-slate-600">
                   <div className="flex h-10 w-10 items-center justify-center">
-                    <Image
-                      src={accountImageUrl}
-                      alt="avatar"
-                      width={24}
-                      height={24}
-                      className="h-6 w-6 rounded-full object-cover transition-all hover:scale-105"
+                    <AccountAvatar
+                      name={displayAccountName}
+                      imageUrl={accountImageUrl}
+                      size={24}
+                      className="shrink-0 transition-transform hover:scale-105 after:border-slate-200"
                     />
                   </div>
                   <span className={isExpanded ? "flex min-w-0 items-center truncate pl-1 font-normal" : "hidden"}>
@@ -248,13 +294,7 @@ export default function Sidebar() {
               {({ close }) => (
                 <>
                   <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-2.5">
-                    <Image
-                      src={accountImageUrl}
-                      alt="avatar"
-                      width={28}
-                      height={28}
-                      className="h-7 w-7 rounded-full object-cover"
-                    />
+                    <AccountAvatar name={displayAccountName} imageUrl={accountImageUrl} size={28} className="shrink-0 after:border-slate-200" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium leading-5">
                         {displayAccountName}
@@ -274,13 +314,7 @@ export default function Sidebar() {
                       setProfileOpen(true);
                     }}
                   >
-                    <Image
-                      src={accountImageUrl}
-                      alt="default-avatar"
-                      width={14}
-                      height={14}
-                      className="h-[14px] w-[14px] rounded-full object-cover"
-                    />
+                    <AccountAvatar name={displayAccountName} imageUrl={accountImageUrl} size={14} className="shrink-0 after:border-slate-200" />
                     <span>Hồ sơ</span>
                   </button>
                   <button

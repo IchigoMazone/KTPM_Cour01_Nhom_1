@@ -55,10 +55,44 @@ class AccountRepository:
         )
         return self.cursor.fetchone()[0]
 
+    def link_customer_profile(self, user_id, email=None, phone=None):
+        self.cursor.execute("SELECT to_regclass('public.home_customers')")
+        if not self.cursor.fetchone()[0]:
+            return
+        self.cursor.execute(
+            """
+            UPDATE home_customers
+            SET account_id = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE account_id IS NULL
+              AND (
+                (%s IS NOT NULL AND %s <> '' AND LOWER(COALESCE(email, '')) = LOWER(%s))
+                OR (%s IS NOT NULL AND %s <> '' AND COALESCE(phone, '') = %s)
+              )
+              AND customer_id = (
+                SELECT customer_id
+                FROM home_customers
+                WHERE account_id IS NULL
+                  AND (
+                    (%s IS NOT NULL AND %s <> '' AND LOWER(COALESCE(email, '')) = LOWER(%s))
+                    OR (%s IS NOT NULL AND %s <> '' AND COALESCE(phone, '') = %s)
+                  )
+                ORDER BY created_at
+                LIMIT 1
+              )
+            """,
+            (
+                user_id,
+                email, email, email,
+                phone, phone, phone,
+                email, email, email,
+                phone, phone, phone,
+            ),
+        )
+
     def ensure_profile(self, user_id, username, role="user"):
         default_email = f"{username}@example.com"
         default_address = "Chưa cập nhật"
-        default_image_url = "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
+        default_image_url = None
         self.cursor.execute(
             """
             UPDATE accounts
@@ -102,7 +136,7 @@ class AccountRepository:
 
     def get_by_id(self, user_id):
         self.cursor.execute(
-            "SELECT user_id, username, role, is_active FROM accounts WHERE user_id = %s",
+            "SELECT user_id, username, role, is_active, page_size, table_resize_mode, columns_config FROM accounts WHERE user_id = %s",
             (user_id,)
         )
         return self.cursor.fetchone()
@@ -114,7 +148,7 @@ class AccountRepository:
             (password_hash, user_id)
         )
 
-    def update_profile(self, user_id, role, full_name, email, phone, address, special_notes, image_url):
+    def update_profile(self, user_id, role, full_name, email, phone, address, special_notes, image_url, page_size=None, table_resize_mode=None, columns_config=None):
         if role == "admin":
             special_notes = None
 
@@ -127,8 +161,38 @@ class AccountRepository:
                 address = %s,
                 special_notes = %s,
                 image_url = %s,
+                page_size = COALESCE(%s, page_size),
+                table_resize_mode = COALESCE(%s, table_resize_mode),
+                columns_config = COALESCE(%s, columns_config),
                 updated_at = CURRENT_TIMESTAMP
             WHERE user_id = %s
             """,
-            (full_name, email, phone, address, special_notes, image_url, user_id)
+            (full_name, email, phone, address, special_notes, image_url, page_size, table_resize_mode, columns_config, user_id)
+        )
+
+    def sync_customer_avatar_by_account(self, user_id, image_url):
+        self.cursor.execute("SELECT to_regclass('public.home_customers')")
+        if not self.cursor.fetchone()[0]:
+            return
+        self.cursor.execute(
+            """
+            UPDATE home_customers
+            SET image_url = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE account_id = %s
+            """,
+            (image_url, user_id),
+        )
+
+    def sync_account_avatar_by_customer(self, account_id, image_url):
+        if not account_id:
+            return
+        self.cursor.execute(
+            """
+            UPDATE accounts
+            SET image_url = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = %s
+            """,
+            (image_url, account_id),
         )

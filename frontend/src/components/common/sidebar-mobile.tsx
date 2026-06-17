@@ -31,7 +31,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { API_BASE_URL } from "@/src/lib/config";
+import AccountAvatar from "./account-avatar";
 import { GradientText } from "../ui/gradient-text";
+import { ACCOUNT_PROFILE_UPDATED_EVENT, DEFAULT_ACCOUNT_AVATAR_URL } from "@/src/lib/account-profile";
 
 type NavItem = {
   label: string;
@@ -43,6 +46,12 @@ type NavGroup = {
   label: string;
   icon: LucideIcon;
   items: NavItem[];
+};
+
+type LinkedCustomer = {
+  customer_code?: string | null;
+  full_name?: string | null;
+  image_url?: string | null;
 };
 
 const navGroups: NavGroup[] = [
@@ -115,7 +124,7 @@ export default function SidebarMobile({ onClick }: { onClick: () => void }) {
   const [isSessionReady, setIsSessionReady] = useState(false);
   const [accountName, setAccountName] = useState("");
   const [accountRole, setAccountRole] = useState("");
-  const [accountImageUrl, setAccountImageUrl] = useState("https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
+  const [accountImageUrl, setAccountImageUrl] = useState(DEFAULT_ACCOUNT_AVATAR_URL);
 
   const isLoggedIn = Boolean(accountRole);
   const startPath = accountRole === "admin" ? "/home" : "/user";
@@ -124,22 +133,58 @@ export default function SidebarMobile({ onClick }: { onClick: () => void }) {
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    const timer = window.setTimeout(() => {
+    const syncStoredAccount = () => {
       const token = localStorage.getItem("token");
       const role = localStorage.getItem("role");
-
       if (token && role) {
         setAccountName(localStorage.getItem("accountName") || localStorage.getItem("username") || "Tài khoản");
         setAccountRole(role);
-        setAccountImageUrl(localStorage.getItem("accountImageUrl") || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
+        setAccountImageUrl(localStorage.getItem("accountImageUrl") || DEFAULT_ACCOUNT_AVATAR_URL);
+      } else {
+        setAccountName("");
+        setAccountRole("");
+        setAccountImageUrl(DEFAULT_ACCOUNT_AVATAR_URL);
       }
-
       setIsSessionReady(true);
+    };
+
+    const timer = window.setTimeout(() => {
+      syncStoredAccount();
     }, 0);
+
+    window.addEventListener(ACCOUNT_PROFILE_UPDATED_EVENT, syncStoredAccount);
+    window.addEventListener("storage", syncStoredAccount);
+
+    const token = localStorage.getItem("token");
+    const role = localStorage.getItem("role");
+    if (token && role === "customer") {
+      fetch(`${API_BASE_URL}/api/home/my-customer`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store",
+      })
+        .then(async (response) => {
+          if (!response.ok) return null;
+          return response.json() as Promise<LinkedCustomer>;
+        })
+        .then((customer) => {
+          if (!customer) return;
+          const customerName = customer.full_name?.trim() || localStorage.getItem("accountName") || "Khách hàng";
+          const customerImage = customer.image_url || localStorage.getItem("accountImageUrl") || DEFAULT_ACCOUNT_AVATAR_URL;
+          setAccountName(customerName);
+          setAccountImageUrl(customerImage);
+          localStorage.setItem("accountName", customerName);
+          localStorage.setItem("accountImageUrl", customerImage);
+        })
+        .catch(() => undefined);
+    }
 
     return () => {
       document.body.style.overflow = originalOverflow;
       window.clearTimeout(timer);
+      window.removeEventListener(ACCOUNT_PROFILE_UPDATED_EVENT, syncStoredAccount);
+      window.removeEventListener("storage", syncStoredAccount);
     };
   }, []);
 
@@ -249,11 +294,7 @@ export default function SidebarMobile({ onClick }: { onClick: () => void }) {
                 onClick={onClick}
                 className="flex min-w-0 items-center gap-2 rounded-lg px-1.5 py-1 text-sm font-medium text-slate-800 no-underline hover:text-blue-700"
               >
-                <img
-                  src={accountImageUrl}
-                  alt=""
-                  className="size-8 shrink-0 rounded-full object-cover"
-                />
+                <AccountAvatar name={accountName || "Tài khoản"} imageUrl={accountImageUrl} size={32} className="shrink-0 after:border-slate-200" />
                 <span className="truncate">{accountName}</span>
               </Link>
               {accountRole === "admin" && (

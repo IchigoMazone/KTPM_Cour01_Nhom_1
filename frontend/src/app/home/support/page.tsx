@@ -1,19 +1,40 @@
 "use client";
 
-import { useMemo, useState, type DragEvent } from "react";
-import Image from "next/image";
+import { useMemo, useState, useEffect, useRef, type DragEvent } from "react";
 import {
   ImagePlus,
   MessageCircle,
   Send,
   ChevronLeft,
   CheckCheck,
-  MoreVertical,
   Paperclip,
+  ChevronDown,
+  ChevronUp,
+  Smile,
+  Link,
+  Bold,
+  Sparkles,
+  Search,
+  PanelRight,
+  CalendarDays,
+  Mail,
+  MapPin,
+  Phone,
+  ShieldCheck,
+  UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -32,40 +53,31 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { type DashboardTableColumn } from "@/src/components/common/dashboard-data-table";
 import { useDashboardTimeRangeStore } from "@/src/context/useDashboardTimeRangeStore";
 import { formatRange, normalizeRange } from "@/src/utils/dashboard-time";
+import { homeApi, listHomeResource } from "@/src/lib/home-api";
+import { HomeTableContentSkeleton } from "@/src/components/common/auth-guard";
+import { toast } from "sonner";
+import { API_BASE_URL } from "@/src/lib/config";
 
-type TicketStatus = "Chưa xử lý" | "Đang xử lý" | "Đã giải quyết";
-type Priority = "Cao" | "Trung bình" | "Thấp";
-
-type Ticket = {
-  id: string;
-  type: string;
-  customer: string;
-  phone: string;
-  orderId: string;
-  priority: Priority;
-  owner: string;
-  ownerAvatar?: string;
-  status: TicketStatus;
-  washDate: string;
-  createdAt: string;
-  note: string;
-};
-
-type SupportMessage = {
-  id: string;
-  ticketId: string;
-  sender: "customer" | "staff";
-  senderName: string;
-  avatar?: string;
-  content: string;
-  imageUrl?: string;
-  createdAt: string;
-};
+import {
+  TicketStatus,
+  Priority,
+  Ticket,
+  SupportMessage,
+  HomeSupportTicketRow,
+  mapHomeTicket,
+  mapHomeMessages,
+  statusColor,
+  priorityColor,
+  formatReadableDate,
+  formatMessageTime,
+  quickReplies,
+} from "./support-shared";
 
 const initialPageSize = 10;
 const defaultColumns: DashboardTableColumn[] = [
   { id: "id", label: "Mã", width: 104, visible: true },
   { id: "type", label: "Loại", width: 112, visible: true },
+  { id: "customerCode", label: "Mã KH", width: 112, visible: true },
   { id: "customer", label: "Khách hàng", width: 150, visible: true },
   { id: "phone", label: "SĐT", width: 116, visible: true },
   { id: "orderId", label: "Đơn", width: 96, visible: true },
@@ -74,13 +86,16 @@ const defaultColumns: DashboardTableColumn[] = [
   { id: "status", label: "Trạng thái", width: 116, visible: true },
   { id: "washDate", label: "Ngày giặt", width: 112, visible: true },
   { id: "createdAt", label: "Ngày tạo", width: 104, visible: true },
-  { id: "note", label: "Nội dung", width: 240, visible: true },
+  { id: "note", label: "Ghi chú", width: 240, visible: true },
   { id: "actions", label: "Thao tác", width: 152, visible: true },
 ];
 const statuses: Array<TicketStatus | "Tất cả"> = ["Tất cả", "Chưa xử lý", "Đang xử lý", "Đã giải quyết"];
 
 function mergeDefaultColumns(source: DashboardTableColumn[]) {
-  const next = [...source];
+  const next = source.map((column) => {
+    const defaultColumn = defaultColumns.find((item) => item.id === column.id);
+    return defaultColumn ? { ...column, label: defaultColumn.label } : column;
+  });
   defaultColumns.forEach((column) => {
     if (next.some((item) => item.id === column.id)) return;
     const actionIndex = next.findIndex((item) => item.id === "actions");
@@ -89,15 +104,9 @@ function mergeDefaultColumns(source: DashboardTableColumn[]) {
   return next;
 }
 
-const seedTickets: Ticket[] = [
-  { id: "HT-501", type: "Mất đồ", customer: "Nguyễn Văn A", phone: "0903123456", orderId: "DH-1022", priority: "Cao", owner: "Quản lý", ownerAvatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", status: "Đang xử lý", washDate: "2026-05-29", createdAt: "2026-05-29", note: "Thiếu 1 tất đen" },
-  { id: "HT-502", type: "Giao trễ", customer: "Trần Thị B", phone: "0912456789", orderId: "DH-1031", priority: "Trung bình", owner: "Tài xế C", ownerAvatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", status: "Chưa xử lý", washDate: "2026-05-29", createdAt: "2026-05-29", note: "Trễ 45 phút so với lịch hẹn" },
-  { id: "HT-503", type: "Hỏng đồ", customer: "Phạm Lan", phone: "0938123456", orderId: "DH-1036", priority: "Cao", owner: "Admin", ownerAvatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", status: "Đã giải quyết", washDate: "2026-05-28", createdAt: "2026-05-28", note: "Đền bù theo chính sách" },
-  { id: "HT-504", type: "Thanh toán", customer: "Shop Linen", phone: "0283999888", orderId: "DH-1061", priority: "Thấp", owner: "Thu ngân", ownerAvatar: "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif", status: "Đang xử lý", washDate: "2026-05-27", createdAt: "2026-05-27", note: "Đối soát chuyển khoản" },
-];
-
 const emptyForm = {
   type: "",
+  customerCode: "",
   customer: "",
   phone: "",
   orderId: "",
@@ -107,18 +116,6 @@ const emptyForm = {
   washDate: "",
   createdAt: "",
   note: "",
-};
-
-const statusColor: Record<TicketStatus, { text: string; bg: string }> = {
-  "Chưa xử lý": { text: "#2563eb", bg: "rgba(37,99,235,0.09)" },
-  "Đang xử lý": { text: "#d97706", bg: "rgba(217,119,6,0.09)" },
-  "Đã giải quyết": { text: "#059669", bg: "rgba(5,150,105,0.09)" },
-};
-
-const priorityColor: Record<Priority, { text: string; bg: string }> = {
-  "Cao": { text: "#dc2626", bg: "rgba(220,38,38,0.09)" },
-  "Trung bình": { text: "#d97706", bg: "rgba(217,119,6,0.09)" },
-  "Thấp": { text: "#2563eb", bg: "rgba(37,99,235,0.09)" },
 };
 
 const statusDotColors = Object.fromEntries(
@@ -148,14 +145,6 @@ function StatusPill({ label }: { label: TicketStatus }) {
   );
 }
 
-function formatReadableDate(dateStr?: string) {
-  if (!dateStr) return "-";
-  if (dateStr.includes("/")) return dateStr;
-  const [y, m, d] = dateStr.split("-");
-  if (!y || !m || !d) return dateStr;
-  return `${d}/${m}/${y}`;
-}
-
 function MetricCard({ title, value, hint, color }: { title: string; value: string; hint: string; color: string }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3">
@@ -171,8 +160,74 @@ function MetricCard({ title, value, hint, color }: { title: string; value: strin
   );
 }
 
+function getInitials(name: string) {
+  if (!name) return "KH";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function getInitialsBg(name: string) {
+  if (!name) return "bg-purple-100 text-purple-700 border-purple-200";
+  const sum = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const colors = [
+    "bg-indigo-100 text-indigo-700 border-indigo-200",
+    "bg-purple-100 text-purple-700 border-purple-200",
+    "bg-pink-100 text-pink-700 border-pink-200",
+    "bg-blue-100 text-blue-700 border-blue-200",
+    "bg-cyan-100 text-cyan-700 border-cyan-200",
+    "bg-teal-100 text-teal-700 border-teal-200",
+    "bg-emerald-100 text-emerald-700 border-emerald-200",
+    "bg-amber-100 text-amber-700 border-amber-200",
+    "bg-orange-100 text-orange-700 border-orange-200",
+  ];
+  return colors[sum % colors.length];
+}
+
+type SupportCustomer = {
+  customer_id: string;
+  customer_code: string;
+  full_name: string;
+  phone?: string;
+  address?: string;
+  email?: string;
+  birthday?: string;
+  image_url?: string;
+  rank?: string;
+  loyalty_points?: number;
+  total_orders?: number;
+  total_spent?: number;
+  note?: string;
+  account_id?: string;
+  account_username?: string;
+};
+
+const customerAvatarColors = ["#0f766e", "#2563eb", "#7c3aed", "#be123c", "#c2410c", "#047857"];
+
+function getCustomerAvatarColor(name: string) {
+  const hash = Array.from(name).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return customerAvatarColors[hash % customerAvatarColors.length];
+}
+
+function SupportCustomerAvatar({ customer, name, size = 28 }: { customer?: SupportCustomer; name: string; size?: number }) {
+  return (
+    <Avatar className="shrink-0 after:border-slate-200" style={{ width: size, height: size }}>
+      {customer?.image_url ? <AvatarImage src={customer.image_url} alt={name} /> : null}
+      <AvatarFallback
+        className="font-semibold leading-none text-white"
+        style={{ backgroundColor: getCustomerAvatarColor(name), fontSize: Math.max(10, size * 0.34) }}
+      >
+        <span className="block translate-y-px leading-none">{getInitials(name)}</span>
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+
 export default function SupportPage() {
-  const [tickets, setTickets] = useState(seedTickets);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [isLayoutLoaded, setIsLayoutLoaded] = useState(false);
+  const accountColumnsConfigRef = useRef<Record<string, unknown>>({});
   const [currentUser] = useState(() => {
     if (typeof window !== "undefined") {
       const username = localStorage.getItem("username");
@@ -186,9 +241,17 @@ export default function SupportPage() {
       const storedAvatar = localStorage.getItem("accountImageUrl");
       if (storedAvatar) return storedAvatar;
     }
-    return "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif";
+    return "";
   });
-  const [columns, setColumns] = useState<DashboardTableColumn[]>(defaultColumns);
+  const [columns, setColumns] = useState<DashboardTableColumn[]>(() => {
+    if (typeof window === "undefined") return defaultColumns;
+    try {
+      const saved = JSON.parse(localStorage.getItem("home_support_columns") || "");
+      return mergeDefaultColumns(saved || defaultColumns);
+    } catch {
+      return defaultColumns;
+    }
+  });
   const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -209,43 +272,124 @@ export default function SupportPage() {
   const [openAddColumn, setOpenAddColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState("");
   const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
-  const [activeChatTicketId, setActiveChatTicketId] = useState<string | null>(null);
-  const [chatDraft, setChatDraft] = useState("");
-  const [chatImagePreview, setChatImagePreview] = useState<string | null>(null);
-  const [ticketMessages, setTicketMessages] = useState<Record<string, SupportMessage[]>>(() =>
-    Object.fromEntries(
-      seedTickets.map((ticket) => [
-        ticket.id,
-        [
-          {
-            id: `${ticket.id}-seed`,
-            ticketId: ticket.id,
-            sender: "customer" as const,
-            senderName: ticket.customer,
-            content: ticket.note,
-            createdAt: ticket.createdAt,
-          },
-        ],
-      ]),
-    ),
-  );
+  const [expandOngoing, setExpandOngoing] = useState(true);
+  const [expandClosed, setExpandClosed] = useState(true);
+  const [ticketMessages, setTicketMessages] = useState<Record<string, SupportMessage[]>>({});
+  const [customers, setCustomers] = useState<SupportCustomer[]>([]);
+  const [profileCustomer, setProfileCustomer] = useState<SupportCustomer | null>(null);
+  const [supportOrders, setSupportOrders] = useState<Array<{
+    order_code: string;
+    customer_code: string;
+  }>>([]);
+
+  useEffect(() => {
+    let alive = true;
+    homeApi<HomeSupportTicketRow[]>("/support-tickets/full")
+      .then((rows) => {
+        if (!alive) return;
+        setTickets(rows.map(mapHomeTicket));
+        setTicketMessages(Object.fromEntries(rows.map((row) => [row.ticket_code, mapHomeMessages(row)])));
+      })
+      .catch((error) => {
+        if (!alive) return;
+        setTickets([]);
+        setTicketMessages({});
+        toast.error(error instanceof Error ? error.message : "Không thể tải danh sách ticket.");
+      })
+      .finally(() => {
+        if (alive) setIsDataLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    Promise.all([
+      listHomeResource<SupportCustomer>("customers", { limit: 500 }),
+      homeApi<Array<{ order_code: string; customer_code: string }>>("/support-tickets/orders"),
+    ])
+      .then(([customerRows, orderRows]) => {
+        setCustomers(customerRows.items);
+        setSupportOrders(orderRows);
+      })
+      .catch(() => {
+        setCustomers([]);
+        setSupportOrders([]);
+      });
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setIsLayoutLoaded(true);
+      return;
+    }
+    fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((response) => {
+        if (!response.ok) return null;
+        return response.json();
+      })
+      .then((data) => {
+        if (!data?.columns_config) return;
+        const parsed = JSON.parse(data.columns_config) as Record<string, unknown>;
+        accountColumnsConfigRef.current = parsed;
+        const layout = (parsed.supportLayout || {}) as {
+          columns?: DashboardTableColumn[];
+          tableResizeMode?: "fit" | "custom";
+          pageSize?: number;
+        };
+        if (layout.columns) setColumns(mergeDefaultColumns(layout.columns));
+        if (layout.tableResizeMode) setTableResizeMode(layout.tableResizeMode);
+        if (layout.pageSize) setPageSize(layout.pageSize);
+      })
+      .catch(() => undefined)
+      .finally(() => setIsLayoutLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("home_support_columns", JSON.stringify(columns));
+    if (!isLayoutLoaded) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const timeoutId = window.setTimeout(() => {
+      const nextConfig = {
+        ...accountColumnsConfigRef.current,
+        supportLayout: { columns, tableResizeMode, pageSize },
+      };
+      accountColumnsConfigRef.current = nextConfig;
+      fetch(`${API_BASE_URL}/api/auth/me`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ columns_config: JSON.stringify(nextConfig) }),
+      }).catch(() => undefined);
+    }, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [columns, isLayoutLoaded, pageSize, tableResizeMode]);
+
   const activeColumns = useMemo(() => mergeDefaultColumns(columns), [columns]);
   const ticketFormFields = useMemo<FormField[]>(() => {
     const fieldByColumnId: Record<string, FormField> = {
-      type: { id: "type", label: "Loại hỗ trợ", type: "select", options: ["Mất đồ", "Giao trễ", "Hỏng đồ", "Thanh toán", "Khác"] },
-      customer: { id: "customer", label: "Tên khách", type: "text", placeholder: "Tên khách" },
-      phone: { id: "phone", label: "Số điện thoại", type: "text", placeholder: "090..." },
-      orderId: { id: "orderId", label: "Mã đơn", type: "text", placeholder: "DH-1022" },
+      type: { id: "type", label: "Loại hỗ trợ", type: "select", options: ["Mất đồ", "Giao trễ", "Hỏng đồ", "Thanh toán", "Khác"], required: true },
+      customerCode: { id: "customerCode", label: "Mã khách hàng", type: "text", placeholder: "KH-0001", required: true },
+      customer: { id: "customer", label: "Tên khách", type: "text", readOnly: true },
+      phone: { id: "phone", label: "Số điện thoại", type: "text", readOnly: true },
+      orderId: { id: "orderId", label: "Mã đơn", type: "text", placeholder: "DH-0001", required: true },
       priority: { id: "priority", label: "Độ ưu tiên", type: "select", options: ["Cao", "Trung bình", "Thấp"], optionDotColors: priorityDotColors },
       owner: { id: "owner", label: "Người phụ trách", type: "custom_staff" },
       status: { id: "status", label: "Trạng thái", type: "custom_status" },
       washDate: { id: "washDate", label: "Ngày giặt", type: "date" },
       createdAt: { id: "createdAt", label: "Ngày tạo", type: "date" },
-      note: { id: "note", label: "Nội dung xử lý", type: "textarea", placeholder: "Mô tả vấn đề, phương án xử lý, bồi thường..." },
+      note: { id: "note", label: "Ghi chú", type: "textarea", placeholder: "Mô tả yêu cầu hỗ trợ..." },
     };
 
-    return activeColumns
-      .filter((column) => column.visible !== false && column.id !== "id" && column.id !== "actions")
+    const orderedFields = activeColumns
+      .filter((column) => column.id !== "id" && column.id !== "actions")
       .map((column) => {
         return fieldByColumnId[column.id] || {
           id: column.id,
@@ -254,6 +398,11 @@ export default function SupportPage() {
           placeholder: `Nhập ${column.label.toLowerCase()}`,
         } satisfies FormField;
       });
+
+    return [
+      ...orderedFields.filter((field) => field.id !== "note"),
+      fieldByColumnId.note,
+    ];
   }, [activeColumns]);
   const updateColumns = (value: DashboardTableColumn[] | ((prev: DashboardTableColumn[]) => DashboardTableColumn[])) => {
     setColumns((prev) => {
@@ -275,7 +424,7 @@ export default function SupportPage() {
     });
   }, [query, selectedStatus, tickets]);
 
-  const pageCount = Math.ceil(filteredTickets.length / pageSize);
+  const pageCount = Math.max(1, Math.ceil(filteredTickets.length / pageSize));
   const paginatedTickets = filteredTickets.slice((page - 1) * pageSize, page * pageSize);
   const totalVisibleWidth = activeColumns.filter((column) => column.visible !== false).reduce((sum, column) => sum + (column.width || 150), 0);
   const visibleTicketIds = useMemo(
@@ -284,8 +433,6 @@ export default function SupportPage() {
   );
   const allVisibleTicketsSelected = visibleTicketIds.length > 0 && visibleTicketIds.every((id) => selectedTicketIds.has(id));
   const selectedVisibleTicketCount = visibleTicketIds.filter((id) => selectedTicketIds.has(id)).length;
-  const activeChatTicket = activeChatTicketId ? tickets.find((ticket) => ticket.id === activeChatTicketId) ?? null : null;
-  const activeChatMessages = activeChatTicketId ? ticketMessages[activeChatTicketId] ?? [] : [];
   const customColumns = useMemo(
     () => activeColumns.filter((column) => !defaultColumns.some((defaultColumn) => defaultColumn.id === column.id)),
     [activeColumns]
@@ -460,8 +607,15 @@ export default function SupportPage() {
     setDeleteConfirmOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deletingTicketId) {
+      const ticket = tickets.find((item) => item.id === deletingTicketId);
+      try {
+        await homeApi(`/support-tickets/${ticket?.dbId || deletingTicketId}`, { method: "DELETE" });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Không thể xóa ticket.");
+        return;
+      }
       setTickets((prev) => prev.filter((item) => item.id !== deletingTicketId));
       setSelectedTicketIds((prev) => {
         const next = new Set(prev);
@@ -469,6 +623,7 @@ export default function SupportPage() {
         return next;
       });
       setDeletingTicketId(null);
+      toast.success("Đã xóa ticket hỗ trợ.");
     }
     setDeleteConfirmOpen(false);
   };
@@ -488,6 +643,7 @@ export default function SupportPage() {
     setEditingTicketId(ticket.id);
     setForm({
       type: ticket.type,
+      customerCode: ticket.customerCode,
       customer: ticket.customer,
       phone: ticket.phone,
       orderId: ticket.orderId,
@@ -502,103 +658,94 @@ export default function SupportPage() {
     setOpenForm(true);
   };
 
-  const openReplyPage = (ticket: Ticket) => {
-    setActiveChatTicketId(ticket.id);
-    setChatDraft("");
-    setChatImagePreview(null);
-    setTickets((prev) =>
-      prev.map((item) =>
-        item.id === ticket.id
-          ? {
-            ...item,
-            owner: currentUser,
-            ownerAvatar: currentUserAvatar,
-            status: item.status === "Chưa xử lý" ? "Đang xử lý" : item.status,
-          }
-          : item,
-      ),
-    );
+  const handleTicketFormChange = (nextForm: Record<string, string>) => {
+    const rawCustomerCode = (nextForm.customerCode || "").trim().toUpperCase();
+    const customerCode = rawCustomerCode && !rawCustomerCode.startsWith("KH-")
+      ? `KH-${rawCustomerCode.replace(/\D/g, "").slice(0, 4)}`
+      : rawCustomerCode;
+    const customer = customers.find((item) => item.customer_code.toUpperCase() === customerCode);
+    const orderCode = (nextForm.orderId || "").trim().toUpperCase();
+    setForm({
+      ...nextForm,
+      customerCode,
+      customer: customer?.full_name || "",
+      phone: customer?.phone || "",
+      orderId: orderCode,
+    });
   };
 
-  const sendMessage = () => {
-    if (!activeChatTicketId || (!chatDraft.trim() && !chatImagePreview)) return;
-    const now = new Date();
-    const message: SupportMessage = {
-      id: `${activeChatTicketId}-${now.getTime()}`,
-      ticketId: activeChatTicketId,
-      sender: "staff",
-      senderName: currentUser,
-      avatar: currentUserAvatar,
-      content: chatDraft.trim(),
-      imageUrl: chatImagePreview || undefined,
-      createdAt: now.toLocaleString("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    };
-    setTicketMessages((prev) => ({
-      ...prev,
-      [activeChatTicketId]: [...(prev[activeChatTicketId] ?? []), message],
-    }));
-    setTickets((prev) =>
-      prev.map((ticket) =>
-        ticket.id === activeChatTicketId
-          ? {
-            ...ticket,
-            owner: currentUser,
-            ownerAvatar: currentUserAvatar,
-            status: ticket.status === "Chưa xử lý" ? "Đang xử lý" : ticket.status,
-          }
-          : ticket,
-      ),
-    );
-    setChatDraft("");
-    setChatImagePreview(null);
-  };
-
-  const saveTicket = () => {
-    if (!form.type?.trim() || !form.customer?.trim()) return;
-
-    if (editingTicketId) {
-      const originalTicket = tickets.find((t) => t.id === editingTicketId);
-      const payload: Omit<Ticket, "id"> = {
-        type: form.type,
-        customer: form.customer,
-        phone: form.phone || "",
-        orderId: form.orderId || "-",
-        priority: (form.priority as Priority) || "Trung bình",
-        owner: currentUser,
-        ownerAvatar: currentUserAvatar || originalTicket?.ownerAvatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif",
-        status: (form.status as TicketStatus) || "Chưa xử lý",
-        washDate: form.washDate || form.createdAt || new Date().toISOString().slice(0, 10),
-        createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
-        note: form.note || "",
-        ...getCustomFields(form),
-      };
-      setTickets((prev) => prev.map((ticket) => ticket.id === editingTicketId ? { ...ticket, ...payload } : ticket));
-    } else {
-      const payload: Omit<Ticket, "id"> = {
-        type: form.type,
-        customer: form.customer,
-        phone: form.phone || "",
-        orderId: form.orderId || "-",
-        priority: (form.priority as Priority) || "Trung bình",
-        owner: currentUser,
-        ownerAvatar: currentUserAvatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif",
-        status: (form.status as TicketStatus) || "Chưa xử lý",
-        washDate: form.washDate || form.createdAt || new Date().toISOString().slice(0, 10),
-        createdAt: form.createdAt || new Date().toISOString().slice(0, 10),
-        note: form.note || "",
-        ...getCustomFields(form),
-      };
-      setTickets((prev) => [{ id: `HT-${Date.now().toString().slice(-3)}`, ...payload }, ...prev]);
+  const updateTicketStatus = async (ticket: Ticket, nextStatus: TicketStatus) => {
+    if (ticket.status === nextStatus) return;
+    try {
+      const saved = await homeApi<HomeSupportTicketRow>(`/support-tickets/${ticket.dbId || ticket.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      setTickets((prev) => prev.map((item) =>
+        item.id === ticket.id ? { ...item, status: saved.status } : item
+      ));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể cập nhật trạng thái.");
     }
+  };
 
-    setPage(1);
-    setOpenForm(false);
+  const saveTicket = async () => {
+    if (!form.type?.trim() || !form.customerCode?.trim() || !form.orderId?.trim()) {
+      toast.error("Vui lòng nhập đầy đủ các trường bắt buộc.");
+      return;
+    }
+    const customer = customers.find((item) => item.customer_code === form.customerCode);
+    if (!customer) {
+      toast.error(`Không tồn tại khách hàng ${form.customerCode}.`);
+      return;
+    }
+    if (!supportOrders.some((order) =>
+      order.order_code === form.orderId && order.customer_code === form.customerCode
+    )) {
+      toast.error(`Đơn hàng ${form.orderId} không thuộc khách hàng ${form.customerCode}.`);
+      return;
+    }
+    const originalTicket = tickets.find((ticket) => ticket.id === editingTicketId);
+    const payload = {
+      type: form.type,
+      subject: form.note?.trim().slice(0, 200) || `${form.type} · ${form.orderId}`,
+      customer_code: form.customerCode,
+      order_code: form.orderId,
+      priority: (form.priority as Priority) || "Trung bình",
+      assigned_name: currentUser,
+      assigned_avatar: currentUserAvatar,
+      status: (form.status as TicketStatus) || "Chưa xử lý",
+      wash_date: form.washDate || null,
+      note: form.note?.trim() || "",
+    };
+    try {
+      const saved = editingTicketId
+        ? await homeApi<HomeSupportTicketRow>(`/support-tickets/${originalTicket?.dbId || editingTicketId}`, {
+            method: "PUT",
+            body: JSON.stringify(payload),
+          })
+        : await homeApi<HomeSupportTicketRow>("/support-tickets", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+      const nextTicket = mapHomeTicket({
+        ...saved,
+        customer_code: saved.customer_code || payload.customer_code,
+        customer_name: saved.customer_name || customer.full_name,
+        customer_phone: saved.customer_phone || customer.phone,
+        order_code: saved.order_code || payload.order_code || undefined,
+        assigned_name: saved.assigned_name || currentUser,
+        assigned_avatar: saved.assigned_avatar || currentUserAvatar,
+      });
+      setTickets((prev) => editingTicketId
+        ? prev.map((ticket) => ticket.id === editingTicketId ? nextTicket : ticket)
+        : [nextTicket, ...prev]);
+      setPage(1);
+      setOpenForm(false);
+      toast.success(editingTicketId ? "Đã cập nhật ticket." : `Đã tạo ${nextTicket.id}.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể lưu ticket.");
+    }
   };
 
   const renderTicketCell = (ticket: Ticket, column: DashboardTableColumn) => {
@@ -611,19 +758,20 @@ export default function SupportPage() {
       </TableCell>
     );
     if (column.id === "type") return <TableCell key={column.id}>{ticket.type}</TableCell>;
+    if (column.id === "customerCode") return <TableCell key={column.id} className="font-medium text-slate-700">{ticket.customerCode || "-"}</TableCell>;
     if (column.id === "customer") {
-      const avatarUrl = "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif";
+      const customer = customers.find((item) => item.customer_code === ticket.customerCode);
       return (
-        <TableCell key={column.id} className="font-medium text-slate-900">
+        <TableCell key={column.id}>
           <div className="flex items-center gap-2.5">
-            <Image
-              src={avatarUrl}
-              alt={ticket.customer}
-              width={28}
-              height={28}
-              className="size-6 shrink-0 rounded-full object-cover"
-            />
-            <span className="truncate">{ticket.customer}</span>
+            <SupportCustomerAvatar customer={customer} name={ticket.customer} size={24} />
+            <button
+              type="button"
+              className="truncate text-left text-slate-900 hover:text-slate-600"
+              onClick={() => customer && setProfileCustomer(customer)}
+            >
+              {ticket.customer}
+            </button>
           </div>
         </TableCell>
       );
@@ -631,23 +779,7 @@ export default function SupportPage() {
     if (column.id === "phone") return <TableCell key={column.id}><a href={`tel:${ticket.phone}`} className="text-slate-500 hover:text-slate-800">{ticket.phone}</a></TableCell>;
     if (column.id === "orderId") return <TableCell key={column.id}>{ticket.orderId}</TableCell>;
     if (column.id === "priority") return <TableCell key={column.id}><PriorityPill label={ticket.priority} /></TableCell>;
-    if (column.id === "owner") {
-      const avatarUrl = ticket.ownerAvatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif";
-      return (
-        <TableCell key={column.id} className="font-medium text-slate-900">
-          <div className="flex items-center gap-2.5">
-            <Image
-              src={avatarUrl}
-              alt={ticket.owner}
-              width={24}
-              height={24}
-              className="size-6 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
-            />
-            <span className="truncate">{ticket.owner}</span>
-          </div>
-        </TableCell>
-      );
-    }
+    if (column.id === "owner") return <TableCell key={column.id} className="font-normal text-slate-700">{ticket.owner || "-"}</TableCell>;
     if (column.id === "status") return <TableCell key={column.id}><StatusPill label={ticket.status} /></TableCell>;
     if (column.id === "washDate") return <TableCell key={column.id} className="text-slate-500">{formatReadableDate(ticket.washDate)}</TableCell>;
     if (column.id === "createdAt") return <TableCell key={column.id} className="text-slate-500">{formatReadableDate(ticket.createdAt)}</TableCell>;
@@ -661,13 +793,6 @@ export default function SupportPage() {
             onClick={() => openEditForm(ticket)}
           >
             Sửa
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition-colors hover:bg-slate-50"
-            onClick={() => openReplyPage(ticket)}
-          >
-            Phản hồi
           </button>
           <button
             type="button"
@@ -707,15 +832,22 @@ export default function SupportPage() {
             onChange={() => toggleTicket(ticket.id)}
             className={`shrink-0 ${checkboxClass}`}
           />
-          <Image
-            src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
-            alt={ticket.customer}
-            width={32}
-            height={32}
-            className="size-8 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
+          <SupportCustomerAvatar
+            customer={customers.find((item) => item.customer_code === ticket.customerCode)}
+            name={ticket.customer}
+            size={32}
           />
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-slate-700">{ticket.customer}</p>
+            <button
+              type="button"
+              className="block max-w-full truncate text-left text-sm font-medium text-slate-700 hover:text-slate-950"
+              onClick={() => {
+                const customer = customers.find((item) => item.customer_code === ticket.customerCode);
+                if (customer) setProfileCustomer(customer);
+              }}
+            >
+              {ticket.customer}
+            </button>
             <p className="truncate text-[11px] text-slate-400">{ticket.id} · {ticket.type}</p>
           </div>
         </div>
@@ -723,22 +855,10 @@ export default function SupportPage() {
       </div>
       <p className="mt-2 line-clamp-2 text-xs text-slate-500">{ticket.note}</p>
       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <Image
-            src={ticket.ownerAvatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"}
-            alt={ticket.owner}
-            width={16}
-            height={16}
-            className="size-4 shrink-0 rounded-full object-cover ring-1 ring-slate-100 shadow-sm"
-          />
-          <span className="truncate text-[11px] text-slate-400">{ticket.owner} · Giặt {formatReadableDate(ticket.washDate)}</span>
-        </div>
+        <span className="min-w-0 truncate text-[11px] font-normal text-slate-400">{ticket.owner || "-"} · Giặt {formatReadableDate(ticket.washDate)}</span>
         <div className="flex gap-1.5">
           <button type="button" className="inline-flex h-6 items-center rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200" onClick={() => openEditForm(ticket)}>
             Chi tiết
-          </button>
-          <button type="button" className="inline-flex h-6 items-center rounded-md bg-slate-100 px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200" onClick={() => openReplyPage(ticket)}>
-            Phản hồi
           </button>
           <button type="button" className="inline-flex h-6 items-center rounded-md bg-red-50 px-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100/70" onClick={(e) => startDeleteTicket(ticket.id, e)}>
             Xóa
@@ -761,14 +881,21 @@ export default function SupportPage() {
           />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <Image
-                src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"
-                alt={ticket.customer}
-                width={24}
-                height={24}
-                className="size-6 rounded-full object-cover ring-1 ring-slate-100 shadow-sm"
+              <SupportCustomerAvatar
+                customer={customers.find((item) => item.customer_code === ticket.customerCode)}
+                name={ticket.customer}
+                size={24}
               />
-              <p className="font-semibold text-slate-950">{ticket.customer}</p>
+              <button
+                type="button"
+                className="font-semibold text-slate-950 hover:text-slate-600"
+                onClick={() => {
+                  const customer = customers.find((item) => item.customer_code === ticket.customerCode);
+                  if (customer) setProfileCustomer(customer);
+                }}
+              >
+                {ticket.customer}
+              </button>
               <span className="text-xs font-medium text-slate-400">{ticket.id}</span>
               <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{ticket.type}</span>
               <StatusPill label={ticket.status} />
@@ -777,17 +904,7 @@ export default function SupportPage() {
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
               <span>Số điện thoại: {ticket.phone}</span>
               <span>Mã đơn: {ticket.orderId}</span>
-              <span className="inline-flex items-center gap-1.5">
-                Phụ trách:
-                <Image
-                  src={ticket.ownerAvatar || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif"}
-                  alt={ticket.owner}
-                  width={16}
-                  height={16}
-                  className="size-4 shrink-0 rounded-full object-cover ring-1 ring-slate-100 shadow-sm"
-                />
-                <span>{ticket.owner}</span>
-              </span>
+              <span>Phụ trách: {ticket.owner || "-"}</span>
               <span>Ngày tạo: {formatReadableDate(ticket.createdAt)}</span>
               <span>Ngày giặt: {formatReadableDate(ticket.washDate)}</span>
             </div>
@@ -804,13 +921,6 @@ export default function SupportPage() {
           </button>
           <button
             type="button"
-            className="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-slate-50"
-            onClick={() => openReplyPage(ticket)}
-          >
-            Phản hồi
-          </button>
-          <button
-            type="button"
             className="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600 hover:border-red-100"
             onClick={(e) => startDeleteTicket(ticket.id, e)}
           >
@@ -821,216 +931,8 @@ export default function SupportPage() {
     </div>
   );
 
-  if (activeChatTicket) {
-    return (
-      <PageShell fullHeight>
-        <div className="min-h-0 flex-1 overflow-hidden bg-white flex flex-col">
-
-          {/* Left Column: Chat Conversation */}
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
-
-            {/* Chat Header */}
-            <div className="border-b border-slate-100 bg-white px-4 py-3 shrink-0 flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <button
-                  onClick={() => setActiveChatTicketId(null)}
-                  className="mr-1 rounded-full p-1 text-slate-400 hover:bg-slate-100 lg:hidden"
-                  title="Quay lại"
-                >
-                  <ChevronLeft className="size-5" />
-                </button>
-                <Avatar className="size-9 border border-slate-100 shadow-sm shrink-0">
-                  <AvatarImage src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={activeChatTicket.customer} />
-                  <AvatarFallback>{activeChatTicket.customer.slice(0, 1)}</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 text-left">
-                  <p className="truncate text-sm font-semibold text-slate-900 leading-tight">{activeChatTicket.customer}</p>
-                  <p className="text-[11px] font-medium text-slate-400 mt-0.5">
-                    {activeChatTicket.id} · {activeChatTicket.type}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-2">
-                <button
-                  onClick={() => {
-                    setTickets(prev => prev.map(t => t.id === activeChatTicket.id ? { ...t, status: "Đã giải quyết" } : t));
-                    setActiveChatTicketId(null);
-                  }}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                >
-                  Đóng Ticket
-                </button>
-                <button className="flex size-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700">
-                  <MoreVertical className="size-4.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Conversation Messages */}
-            <div className="min-h-0 flex-1 bg-white overflow-hidden">
-              <ScrollArea className="h-full">
-                <div className="space-y-6 px-5 py-6">
-                  {activeChatMessages.map((message) => {
-                    const isStaff = message.sender === "staff";
-                    return (
-                      <div key={message.id} className={`flex items-start gap-3 ${isStaff ? "justify-end" : "justify-start"}`}>
-                        {!isStaff && (
-                          <Avatar className="size-8 mt-1 border border-slate-100 shadow-sm shrink-0">
-                            <AvatarImage src="https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif" alt={message.senderName} />
-                            <AvatarFallback>{message.senderName.slice(0, 1)}</AvatarFallback>
-                          </Avatar>
-                        )}
-                        <div className={`flex max-w-[70%] flex-col gap-1 ${isStaff ? "items-end" : "items-start"}`}>
-                          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold mb-0.5">
-                            <span>{message.senderName}</span>
-                            <span>·</span>
-                            <span>{formatReadableDate(message.createdAt)}</span>
-                            {isStaff && <span className="font-bold text-[#0ebd85]">You</span>}
-                          </div>
-                          <div className={`rounded-xl px-4 py-3 text-sm leading-5 shadow-2xs ${isStaff
-                            ? "bg-[#edfbf4] text-slate-800 rounded-tr-none border border-emerald-50/50"
-                            : "bg-[#f1f3f4] text-slate-800 rounded-tl-none"
-                            }`}>
-                            {message.imageUrl && (
-                              <div className="mb-2 overflow-hidden rounded-lg">
-                                <Image
-                                  src={message.imageUrl}
-                                  alt="Ảnh đính kèm"
-                                  width={360}
-                                  height={240}
-                                  unoptimized
-                                  className="max-h-64 w-full object-cover"
-                                />
-                              </div>
-                            )}
-                            {message.content && <p className="whitespace-pre-wrap">{message.content}</p>}
-                          </div>
-
-                          {/* Time and checkmarks under message */}
-                          <div className="flex items-center gap-1 px-1 mt-0.5">
-                            <span className="text-[10px] text-slate-400">10:30 am</span>
-                            <CheckCheck className="size-3 text-slate-400" />
-                          </div>
-                        </div>
-                        {isStaff && (
-                          <Avatar className="size-8 mt-1 border border-slate-100 shadow-sm shrink-0">
-                            <AvatarImage src={message.avatar || currentUserAvatar} alt={message.senderName} />
-                            <AvatarFallback>{message.senderName.slice(0, 1)}</AvatarFallback>
-                          </Avatar>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            </div>
-
-
-
-
-            {/* Chat Input Footer */}
-            <div className="border-t border-slate-105 bg-white p-4 shrink-0">
-              {chatImagePreview && (
-                <div className="mb-3 flex w-fit items-start gap-2 rounded-lg border bg-background p-2">
-                  <Image
-                    src={chatImagePreview}
-                    alt="Ảnh chuẩn bị gửi"
-                    width={96}
-                    height={72}
-                    unoptimized
-                    className="h-16 w-24 rounded-md object-cover"
-                  />
-                  <Button variant="ghost" size="sm" onClick={() => setChatImagePreview(null)}>
-                    Xóa
-                  </Button>
-                </div>
-              )}
-
-              <div className="flex flex-col gap-3">
-                <textarea
-                  value={chatDraft}
-                  onChange={(event) => setChatDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      sendMessage();
-                    }
-                  }}
-                  placeholder="Write a message..."
-                  className="w-full resize-none bg-transparent text-sm text-slate-750 placeholder-slate-400 focus:outline-none min-h-[50px] max-h-24 py-1"
-                />
-
-                <div className="flex items-center justify-between border-t border-slate-50 pt-2.5">
-                  <div className="flex items-center gap-1.5 text-slate-400">
-
-                    {/* File Attachment */}
-                    <label className="flex items-center gap-1 shrink-0 cursor-pointer rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-500 transition-colors hover:bg-slate-100">
-                      <Paperclip className="size-3.5" />
-                      <span>File</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          if (!file) return;
-                          setChatImagePreview(URL.createObjectURL(file));
-                          event.target.value = "";
-                        }}
-                      />
-                    </label>
-
-                    {/* Image Shortcut */}
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <label className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg hover:bg-slate-50 hover:text-slate-600 transition-colors">
-                            <ImagePlus className="size-4" />
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                if (!file) return;
-                                setChatImagePreview(URL.createObjectURL(file));
-                                event.target.value = "";
-                              }}
-                            />
-                          </label>
-                        </TooltipTrigger>
-                        <TooltipContent>Gửi ảnh</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    <button type="button" className="flex size-7 items-center justify-center rounded-lg hover:bg-slate-50 hover:text-slate-600 transition-colors" title="AI Assist">
-                      <span className="text-xs">✨</span>
-                    </button>
-                    <button type="button" className="flex size-7 items-center justify-center rounded-lg hover:bg-slate-50 hover:text-slate-600 transition-colors" title="Emojis">
-                      <span className="text-xs">😊</span>
-                    </button>
-                  </div>
-
-                  {/* Send Button Green */}
-                  <button
-                    type="button"
-                    onClick={sendMessage}
-                    disabled={!chatDraft.trim() && !chatImagePreview}
-                    className="flex items-center gap-1.5 rounded-lg bg-[#0ebd85] px-4 py-2 text-xs font-bold text-white transition-all hover:bg-[#0ca977] hover:scale-[1.02] active:scale-[0.98] disabled:bg-slate-100 disabled:text-slate-400 disabled:scale-100 shadow-2xs"
-                  >
-                    <span>Send</span>
-                    <Send className="size-3" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-
-        </div>
-      </PageShell>
-    );
+  if (isDataLoading) {
+    return <HomeTableContentSkeleton />;
   }
 
   return (
@@ -1085,7 +987,11 @@ export default function SupportPage() {
           onToggleAll={toggleVisibleTickets}
         />
 
-        {viewMode === "Bảng" ? (
+        {filteredTickets.length === 0 ? (
+          <div className="flex min-h-0 flex-1 items-center justify-center p-8 text-center">
+            <p className="text-sm text-slate-400">Không tìm thấy ticket phù hợp.</p>
+          </div>
+        ) : viewMode === "Bảng" ? (
           <TableView
             columns={activeColumns}
             onColumnsChange={updateColumns}
@@ -1125,7 +1031,8 @@ export default function SupportPage() {
             dragOverColumnId={dragOverStatus}
             onDragOverColumnIdChange={setDragOverStatus}
             onDropItem={(id, status) => {
-              setTickets((prev) => prev.map((ticket) => ticket.id === id ? { ...ticket, status: status as TicketStatus } : ticket));
+              const ticket = tickets.find((item) => item.id === id);
+              if (ticket) void updateTicketStatus(ticket, status as TicketStatus);
             }}
             renderCard={renderTicketKanbanCard}
             tableResizeMode={tableResizeMode}
@@ -1153,7 +1060,7 @@ export default function SupportPage() {
         title={editingTicketId ? `Chỉnh sửa ${editingTicketId}` : "Thêm ticket hỗ trợ"}
         fields={ticketFormFields}
         form={form}
-        onFormChange={setForm}
+        onFormChange={handleTicketFormChange}
         onSave={saveTicket}
         currentStaffName={currentUser}
         currentStaffAvatar={currentUserAvatar}
@@ -1162,6 +1069,107 @@ export default function SupportPage() {
         showCloseButton={false}
         showCloseButtonAtBottom={true}
       />
+
+      <Dialog open={Boolean(profileCustomer)} onOpenChange={(open) => {
+        if (!open) setProfileCustomer(null);
+      }}>
+        <DialogContent
+          showCloseButton={false}
+          className="flex h-[min(86vh,680px)] w-[min(86vw,680px)] max-w-[min(86vw,680px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[680px]"
+        >
+          {profileCustomer && (
+            <>
+              <DialogHeader className="border-b border-slate-200 px-6 py-3">
+                <div className="flex items-center gap-3">
+                  <SupportCustomerAvatar customer={profileCustomer} name={profileCustomer.full_name} size={40} />
+                  <div className="min-w-0">
+                    <DialogTitle className="truncate text-base font-semibold leading-6 text-slate-950">
+                      {profileCustomer.full_name}
+                    </DialogTitle>
+                    <p className="text-sm text-slate-500">Khách hàng · {profileCustomer.customer_code}</p>
+                    <p className="mt-1 text-xs text-slate-400">{profileCustomer.rank || "Thường"}</p>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="min-h-0 flex-1 p-5">
+                <div className="grid gap-3 md:grid-cols-2">
+                  {[
+                    [UserRound, "Họ tên", profileCustomer.full_name],
+                    [ShieldCheck, "Tên đăng nhập", profileCustomer.account_username || "Chưa liên kết"],
+                    [Mail, "Email", profileCustomer.email || "-"],
+                    [Phone, "Số điện thoại", profileCustomer.phone || "-"],
+                    [CalendarDays, "Ngày sinh", formatReadableDate(profileCustomer.birthday?.slice(0, 10))],
+                    [Sparkles, "Điểm / hạng", `${Number(profileCustomer.loyalty_points || 0).toLocaleString("vi-VN")} điểm · ${profileCustomer.rank || "Thường"}`],
+                  ].map(([Icon, label, value]) => {
+                    const FieldIcon = Icon as typeof UserRound;
+                    return (
+                      <div key={String(label)} className="space-y-2">
+                        <Label>{String(label)}</Label>
+                        <div className="relative">
+                          <FieldIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                          <Input
+                            value={String(value)}
+                            disabled
+                            className="h-8 rounded-lg border-input bg-slate-50 px-2.5 py-1 pl-8 text-sm text-slate-500 shadow-none"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Địa chỉ mặc định</Label>
+                    <div className="relative">
+                      <MapPin className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        value={profileCustomer.address || "-"}
+                        disabled
+                        className="h-8 rounded-lg border-input bg-slate-50 px-2.5 py-1 pl-8 text-sm text-slate-500 shadow-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Ghi chú</Label>
+                    <Textarea
+                      value={profileCustomer.note || "-"}
+                      disabled
+                      className="h-16 min-h-16 resize-none rounded-lg border-input bg-slate-50 px-2.5 py-2 text-sm text-slate-500 shadow-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+                  <p className="text-sm font-medium text-slate-950">Trạng thái tài khoản</p>
+                  <div className="mt-3 grid gap-2 md:grid-cols-3">
+                    {[
+                      profileCustomer.account_id ? "Đã liên kết" : "Chưa liên kết",
+                      `${Number(profileCustomer.total_orders || 0).toLocaleString("vi-VN")} đơn hàng`,
+                      `${Number(profileCustomer.total_spent || 0).toLocaleString("vi-VN")}đ chi tiêu`,
+                    ].map((item) => (
+                      <div
+                        key={item}
+                        className="flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700"
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="m-0 flex-row justify-end gap-2 border-t border-slate-200 bg-white px-6 py-3">
+                <button
+                  type="button"
+                  className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-none hover:bg-slate-50 cursor-pointer"
+                  onClick={() => setProfileCustomer(null)}
+                >
+                  Đóng
+                </button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <DialogContent showCloseButton={false} className="sm:max-w-[400px] bg-white rounded-xl border border-slate-200 shadow-xl p-6">

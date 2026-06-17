@@ -8,10 +8,16 @@ export type OrderStatus =
 
 export type Order = {
   id: string;
+  customerCode?: string;
+  customerDbId?: string;
+  serviceCode?: string;
+  serviceDbId?: string;
   customer: string;
   phone: string;
   address: string;
   service: string;
+  serviceUnit?: string;
+  unitPrice?: number;
   quantity: string;
   amount: number;
   status: OrderStatus;
@@ -23,6 +29,7 @@ export type Order = {
   staff: string;
   createdAt: string;
   note: string;
+  dbId?: string;
   [key: string]: string | number | undefined;
 };
 

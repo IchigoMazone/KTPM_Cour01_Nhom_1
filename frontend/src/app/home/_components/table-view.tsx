@@ -23,6 +23,15 @@ interface TableViewProps<T> {
     onDragEnd: () => void;
   };
   onColumnsChange?: any;
+  selectAll?: {
+    ref?: any;
+    checked: boolean;
+    disabled?: boolean;
+    onChange: () => void;
+    className: string;
+    label: string;
+    columnId?: string;
+  };
   page: number;
   pageCount: number;
   totalRows: number;
@@ -46,6 +55,7 @@ export function TableView<T>({
   renderCell,
   columnDrag,
   onColumnsChange,
+  selectAll,
   page,
   pageCount,
   totalRows,
@@ -70,6 +80,7 @@ export function TableView<T>({
         renderCell={renderCell}
         columnDrag={columnDrag}
         onColumnsChange={onColumnsChange}
+        selectAll={selectAll}
       />
       <DashboardTableFooter
         page={page}

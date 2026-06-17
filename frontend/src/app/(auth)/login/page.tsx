@@ -8,6 +8,7 @@ import { SpokeSpinner } from "@/src/components/ui/spoke-spinner";
 import { GradientText } from "@/src/components/ui/gradient-text";
 import { validateUsername, validatePassword } from "@/src/lib/validators/auth";
 import { API_BASE_URL } from "@/src/lib/config";
+import { DEFAULT_ACCOUNT_AVATAR_URL } from "@/src/lib/account-profile";
 import { toast } from "sonner";
 
 const images = ["/summer (1).jfif", "/summer (2).jfif", "/summer (3).jfif"];
@@ -74,14 +75,21 @@ export default function Page() {
 
       const role = data.role === "admin" ? "admin" : "customer";
       localStorage.setItem("token", data.access_token);
+      localStorage.setItem(role === "admin" ? "adminToken" : "userToken", data.access_token);
       localStorage.setItem("refreshToken", data.refresh_token);
+      localStorage.setItem(role === "admin" ? "adminRefreshToken" : "userRefreshToken", data.refresh_token);
       localStorage.setItem("role", role);
       localStorage.setItem("username", data.username);
       localStorage.setItem("user_id", data.user_id);
       localStorage.setItem("accountName", data.profile?.full_name || data.username);
       localStorage.setItem("accountEmail", data.profile?.email || "");
       localStorage.setItem("accountAddress", data.profile?.address || "");
-      localStorage.setItem("accountImageUrl", data.profile?.image_url || "https://pub-40f0fd53a3c74462bfbb6e9fbe66aece.r2.dev/default_avatar.jfif");
+      localStorage.setItem("accountImageUrl", data.profile?.image_url || DEFAULT_ACCOUNT_AVATAR_URL);
+      sessionStorage.setItem("token", data.access_token);
+      sessionStorage.setItem(role === "admin" ? "adminToken" : "userToken", data.access_token);
+      sessionStorage.setItem("refreshToken", data.refresh_token);
+      sessionStorage.setItem(role === "admin" ? "adminRefreshToken" : "userRefreshToken", data.refresh_token);
+      sessionStorage.setItem("role", role);
       toast.success(data.message || "Đăng nhập thành công!");
 
       router.push(role === "admin" ? "/home" : "/user");
