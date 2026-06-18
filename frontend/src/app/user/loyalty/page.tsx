@@ -1,5 +1,4 @@
 "use client";
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Gift, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -26,6 +25,7 @@ import {
   mapHomePromotion,
 } from "@/src/utils/services";
 
+
 type PromotionClaim = {
   claim_id: string;
   promotion_id: string;
@@ -36,6 +36,7 @@ type PromotionClaim = {
   booking_id?: string;
   order_id?: string;
 };
+
 
 const defaultColumns: DashboardTableColumn[] = [
   { id: "id", label: "Mã ID", width: 112, visible: true },
@@ -50,15 +51,16 @@ const defaultColumns: DashboardTableColumn[] = [
   { id: "value", label: "Giá trị", width: 112, visible: true },
   { id: "actions", label: "Thao tác", width: 140, visible: true },
 ];
-
 const statusOptions: FilterOption[] = [
   { id: "Tất cả", label: "Tất cả", color: "#64748b", bgColor: "rgba(100,116,139,0.09)" },
   { id: "Chưa sử dụng", label: "Chưa sử dụng", color: "#059669", bgColor: "rgba(5,150,105,0.09)" },
   { id: "Đã sử dụng", label: "Đã sử dụng", color: "#64748b", bgColor: "rgba(100,116,139,0.10)" },
 ];
 
+
 const checkboxClass =
   "relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all checked:border-emerald-300 checked:bg-emerald-300 after:absolute after:left-1/2 after:top-1/2 after:hidden after:h-[9px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-[58%] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block";
+
 
 const statusStyle: Record<string, { color: string; bg: string }> = {
   "Chưa sử dụng": { color: "#059669", bg: "rgba(5,150,105,0.09)" },
@@ -69,9 +71,11 @@ function normalizeCode(value?: string) {
   return String(value || "").trim().toUpperCase();
 }
 
+
 function getClaimUsageStatus(claim?: PromotionClaim | null) {
   return claim?.claim_status === "Đã sử dụng" ? "Đã sử dụng" : "Chưa sử dụng";
 }
+
 
 export default function UserLoyaltyPage() {
   const range = useDashboardTimeRangeStore((state) => state.range);
@@ -98,10 +102,12 @@ export default function UserLoyaltyPage() {
     setPromotions(assignFriendlyPromotionIds(response.items.map(mapHomePromotion)));
   }, []);
 
+
   const loadClaims = useCallback(async () => {
     const rows = await homeApi<PromotionClaim[]>("/my-promotion-claims", { cache: "no-store" });
     setClaims(rows);
   }, []);
+
 
   useEffect(() => {
     let alive = true;
@@ -123,7 +129,6 @@ export default function UserLoyaltyPage() {
       setIsConfigLoaded(true);
       return;
     }
-
     fetch(`${API_BASE_URL}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -148,6 +153,8 @@ export default function UserLoyaltyPage() {
       .finally(() => setIsConfigLoaded(true));
   }, []);
 
+
+
   useEffect(() => {
     if (!isConfigLoaded) return;
     const token = localStorage.getItem("token");
@@ -170,15 +177,18 @@ export default function UserLoyaltyPage() {
     return () => window.clearTimeout(timeoutId);
   }, [columns, isConfigLoaded, pageSize, tableResizeMode]);
 
+
   const claimMap = useMemo(
     () => new Map(claims.map((claim) => [normalizeCode(claim.code), claim])),
     [claims],
   );
 
+
   const claimedPromotions = useMemo(
     () => promotions.filter((promotion) => claimMap.has(normalizeCode(promotion.code))),
     [claimMap, promotions],
   );
+
 
   const filteredPromotions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -203,7 +213,6 @@ export default function UserLoyaltyPage() {
       return matchesStatus && matchesQuery;
     });
   }, [claimMap, claimedPromotions, query, selectedStatus]);
-
   const pageCount = Math.max(1, Math.ceil(filteredPromotions.length / pageSize));
   const safePage = Math.min(page, pageCount);
   const paginatedPromotions = filteredPromotions.slice((safePage - 1) * pageSize, safePage * pageSize);
@@ -211,7 +220,6 @@ export default function UserLoyaltyPage() {
   const selectedVisibleCount = visibleIds.filter((code) => selectedIds.has(code)).length;
   const allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
   const totalVisibleWidth = columns.filter((column) => column.visible !== false).reduce((sum, column) => sum + (column.width || 150), 0);
-
   const claimedCount = claims.filter((claim) => claim.claim_status === "Đã nhận").length;
   const usedCount = claims.filter((claim) => claim.claim_status === "Đã sử dụng").length;
 
