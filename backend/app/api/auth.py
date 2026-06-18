@@ -10,14 +10,17 @@ from app.utils.r2 import upload_file_to_r2
 router_auth = APIRouter()
 
 
+
 @router_auth.post("/login")
 def login(body: LoginRequest, service: AccountService = Depends(get_account_service)):
     return service.login(body.dict())
 
 
+
 @router_auth.post("/register")
 def register(body: RegisterRequest, service: AccountService = Depends(get_account_service)):
     return service.register(body.dict())
+
 
 
 @router_auth.post("/refresh")
@@ -54,6 +57,7 @@ def update_me(
             detail=result.get("message", "Không thể cập nhật hồ sơ.")
         )
     return result
+
 
 
 @router_auth.post("/upload-avatar")
