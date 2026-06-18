@@ -95,7 +95,6 @@ type UserOrder = {
   orderCode?: string;
   [key: string]: string | number | undefined;
 };
-
 type CustomerProfile = {
   customer_id: string;
   customer_code: string;
@@ -112,7 +111,6 @@ type CustomerProfile = {
   note?: string;
   account_username?: string;
 };
-
 const checkboxClass =
   "relative size-4 appearance-none rounded-[5px] border border-slate-300 bg-white transition-all checked:border-emerald-300 checked:bg-emerald-300 after:absolute after:left-1/2 after:top-1/2 after:hidden after:h-[9px] after:w-[5px] after:-translate-x-1/2 after:-translate-y-[58%] after:rotate-45 after:border-b-2 after:border-r-2 after:border-white after:content-[''] checked:after:block";
 
@@ -126,6 +124,7 @@ const BOOKING_BLOCKED_COLUMN_IDS = new Set([
   "payment",
   "unitPrice",
 ]);
+
 
 const orderColumns: DashboardTableColumn[] = [
   { id: "id", label: "Mã đơn", width: 130, visible: true },
@@ -145,6 +144,7 @@ const orderColumns: DashboardTableColumn[] = [
   { id: "actions", label: "Thao tác", width: 140, visible: true },
 ];
 
+
 function normalizeOrderColumns(columns: DashboardTableColumn[]) {
   const sanitizedColumns = columns.filter((column) => column?.id && !BOOKING_BLOCKED_COLUMN_IDS.has(column.id));
   let customCols: DashboardTableColumn[] = [];
@@ -157,13 +157,13 @@ function normalizeOrderColumns(columns: DashboardTableColumn[]) {
       }
     } catch {}
   }
-
   const existingIds = new Set(sanitizedColumns.map((column) => column.id));
   const defaultColumnById = new Map(orderColumns.map((column) => [column.id, column]));
   const next = sanitizedColumns.map((column) => ({
     ...column,
     label: defaultColumnById.get(column.id)?.label || column.label,
   }));
+
 
   customCols.forEach((column) => {
     if (existingIds.has(column.id)) return;
@@ -174,6 +174,7 @@ function normalizeOrderColumns(columns: DashboardTableColumn[]) {
     existingIds.add(column.id);
   });
 
+
   orderColumns.forEach((column) => {
     if (existingIds.has(column.id)) return;
     const noteIndex = next.findIndex((item) => item.id === "note");
@@ -183,7 +184,6 @@ function normalizeOrderColumns(columns: DashboardTableColumn[]) {
       : noteIndex !== -1 ? noteIndex : actionIndex !== -1 ? actionIndex : next.length;
     next.splice(insertIndex === -1 ? next.length : insertIndex, 0, column);
   });
-
   const unitPriceIndex = next.findIndex((column) => column.id === "unitPrice");
   const quantityIndex = next.findIndex((column) => column.id === "quantity");
   if (unitPriceIndex !== -1 && quantityIndex !== -1 && unitPriceIndex !== quantityIndex + 1) {
@@ -194,6 +194,7 @@ function normalizeOrderColumns(columns: DashboardTableColumn[]) {
   return next;
 }
 
+
 const statusDotColor: Record<UserOrderStatus, string> = {
   "Chờ xử lý": "#f59e0b",
   "Đã được duyệt": "#10b981",
@@ -201,12 +202,14 @@ const statusDotColor: Record<UserOrderStatus, string> = {
   "Quá hạn": "#64748b",
 };
 
+
 const statusBgColor: Record<UserOrderStatus, string> = {
   "Chờ xử lý": "rgba(245,158,11,0.08)",
   "Đã được duyệt": "rgba(16,185,129,0.08)",
   "Không được duyệt": "rgba(239,68,68,0.08)",
   "Quá hạn": "rgba(100,116,139,0.09)",
 };
+
 
 const statusOptions: FilterOption[] = [
   { id: "Tất cả", label: "Tất cả", color: "#64748b", bgColor: "rgba(100,116,139,0.09)" },
@@ -218,12 +221,15 @@ const statusOptions: FilterOption[] = [
   })),
 ];
 
+
+
 const historyStatuses: UserOrderStatus[] = [
   "Chờ xử lý",
   "Đã được duyệt",
   "Không được duyệt",
   "Quá hạn",
 ];
+
 
 function normalizeStatus(status?: string, deliveryDate?: string): UserOrderStatus {
   const rawStatus = String(status || "").trim();
@@ -236,7 +242,6 @@ function normalizeStatus(status?: string, deliveryDate?: string): UserOrderStatu
   if (date.getTime() > 0 && date < today) return "Quá hạn";
   return "Chờ xử lý";
 }
-
 function formatDate(dateStr?: string) {
   if (!dateStr) return "-";
   const date = new Date(dateStr);
